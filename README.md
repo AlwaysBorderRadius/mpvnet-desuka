@@ -1,3 +1,5 @@
+[🇪🇸 Español](#mpvnet-desuka) | [🇬🇧 English](#mpvnet-desuka-en)
+
 # MPVNET DESUKA
 
 **mpvnet desuka** es una versión personalizada de mpvnet diseñada con el objetivo de reproducir anime en la mejor calidad posible, mejorando la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas. 
@@ -7,7 +9,7 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
 
 ## 🧰 Instalación
 
-> 🪟 **Solo Windows (Portable)**  
+> 🪟 **Solo Windows**  
 > 💻 *Puede funcionar en Linux mediante WINE, pero no está garantizado.*
 
 1. **Extrae** la carpeta `mpvnet desuka` donde quieras.  
@@ -21,7 +23,7 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
    - Ve a `mpvnet desuka > ctrl+E > Global Settings`
    - Y cambia `Upscaling Backend` de `TensorRT` a `DirectML`
 
-4. La primera vez que cargues cada modelo de **AnimeJaNai**, se abrira una terminal. No te asustes, eso es el engine creando un perfil (.engine) para tu PC.  
+4. La primera vez que cargues cada modelo de **AnimeJaNai**, se abrira una terminal. No te asustes, eso es el engine creando un perfil `.engine` para tu PC.  
 Ten en cuenta que AnimeJaNai es un shader pesado y cada vez que lo actives tardara unos segundos en verse el cambio en el video. Si has de activarlo, desactivarlo o cambiar de modelo, pausa antes el video.
 
 6. Ahora te toca aprender las **Keybinds** para saber como usarlo del todo :)  
@@ -200,3 +202,178 @@ Nuevas keybinds importantes:
 - Autoload:
   - Nueva versión de Autoload.
 </details>
+
+---
+
+# MPVNET DESUKA (EN)
+
+**mpvnet desuka** is a custom build of mpvnet made to play anime at the highest possible quality, enhancing the original image in real time through shaders without losing background or texture details.  
+It also includes a modern interface and extra features, making it a complete and easy-to-use player.
+
+<img width="2538" height="1350" alt="imagen" src="https://github.com/user-attachments/assets/8dbd4a62-3fd3-464a-86f6-e49ac8b4eed8" />
+
+## 🧰 Installation
+
+> 🪟 **Windows only**  
+> 💻 *Might work on Linux with WINE, but not guaranteed.*
+
+1. **Extract** the `mpvnet desuka` folder wherever you want.  
+   - Recommended: `C:\Program Files\mpvnet desuka` or `C:\APPs\mpvnet desuka` if you’re special like me.
+
+2. If you saved it in a different path:
+   - Go to `portable_config/script-opts/discord.conf`
+   - Edit the line: `binary_path=C:\Program Files\mpvnet desuka\mpv-discord.exe`
+
+3. For **AMD GPUs**:
+   - Go to `mpvnet desuka > ctrl+E > Global Settings`
+   - Change `Upscaling Backend` from `TensorRT` to `DirectML`
+
+4. The first time you load any **AnimeJaNai** model, a terminal window will pop up. Don’t panic, the engine is creating a `.engine` profile for your PC.  
+Keep in mind AnimeJaNai is heavy: every time you enable it, it’ll take a few seconds to apply. If you need to enable/disable or switch models, pause the video first.
+
+6. Now it’s time to learn the **keybinds** so you can actually fully use it :)  
+Also check the **changelog** (important to see what’s new or changed) and the **documentation**. Don’t be lazy.
+
+### 🔄 Updating
+
+- **Option 1:** Replace only the updated files.  
+- **Option 2:** Delete the previous folder and extract the new version.  
+  *(If you use AnimeJaNai, you’ll need to regenerate the `.engine` files.)*
+
+### 🧯 Troubleshooting
+
+- If AnimeJaNai doesn’t work (no load or no visible effect):  
+  ➝ Delete all `.engine` files in `mpvnet desuka/animejanai/onnx`.
+
+- If mpvnet or the interface freezes:  
+  ➝ Open Task Manager and kill the process.  
+  *(The AnimeJaNai build of mpvnet is very sensitive, if it’s doing something like loading a model or fading the interface, wait until it finishes before doing something else.)*
+
+- If “thumbfast ERROR” appears and thumbnails don’t load:  
+  ➝ Close and reopen the video, and wait a few seconds before hovering over the progress bar so frames can preload.
+
+- If “thumbfast ERROR” appears but thumbnails do load:  
+  ➝ Ignore it 👍🏻
+
+## 📖 Documentation
+
+### Recommended Requirements
+- **AnimeJaNai**:
+  - 4K ➝ Mode 1 ➝ RTX 4090
+  - 4K ➝ Mode 2 ➝ RTX 3080
+  - 4K ➝ Mode 3 ➝ RTX 3060
+  - 1080p ➝ Any Mode ➝ Mid-range PC
+- **Anime4K** *(lighter)*:
+  - 4K ➝ Mid-high to high-end PC
+  - 1080p ➝ Low to mid-range PC
+
+### 🧩 Included Shaders
+
+| Shader            | Description                                                                                     |
+|--------------------|--------------------------------------------------------------------------------------------------|
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | ONNX shader. V2 remasters 4K video while preserving all details and removing artifacts, though it can look odd in scenes with blur or chromatic aberration. V3 produces a nearly identical result to the original — not recommended. |
+| [**Anime4K**](https://github.com/h5mcbox/anime4k)        | GLSL shader. Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
+
+### 🧩 Included Scripts
+
+| Script            | Description                                                                                     |
+|--------------------|--------------------------------------------------------------------------------------------------|
+| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua)   | Automatically loads all video files in the folder into the playlist. *(I use an old version on purpose.)* |
+| [**modernX**](https://github.com/zydezu/ModernX)        | Modern mpvnet interface with custom modifications. *(Using the most maintained branch.)* |
+| [**thumbfast**](https://github.com/po5/thumbfast)      | Displays thumbnails on the progress bar, just like YouTube. |
+| [**DiscordRPC**](https://github.com/tnychn/mpv-discord)     | Discord Rich Presence integration. |
+| **Custom Config**  | Custom `mpv.conf`, `mpvnet.conf`, `input.conf`, and `script-opts`. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
+| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai)  | AnimeJaNai-modified version of mpvnet. |
+
+### ⌨️ Keybinds
+
+- `Ctrl + Right Click` ➝ Opens contextual menu with all settings.  
+- `Ctrl + E` ➝ Opens AnimeJaNai menu.  
+- `C` ➝ Opens mpvnet menu *(please don’t touch random stuff or you might break the config 😭🙏🏻 and it’ll be your fault, not mine)*.  
+- `Ctrl + 1 / 2 / 3` ➝ Enable AnimeJaNai V2 (4090 / 3080 / 3060).  
+- `Shift + 1 / 2 / 3` ➝ Enable AnimeJaNai V3 (4090 / 3080 / 3060).  
+- `Ctrl + 0` ➝ Disable AnimeJaNai.  
+- `1–6` ➝ Enable Anime4K presets.  
+- `0` ➝ Disable Anime4K.  
+- `D` ➝ Toggle Discord Rich Presence.
+
+> 📝 *You technically can use AnimeJaNai and Anime4K together, but that’s ilegal. Don’t.*
+
+## 🆕 Changelog
+
+<details>
+  <summary><strong>MPVNET DESUKA V1.2 - 4/10/2025</strong></summary>
+
+- Added a missing keybind from my previous mpv setup.
+</details>
+
+<details>
+  <summary><strong>MPVNET DESUKA V1.1 - 15/09/2025</strong></summary>
+
+- Added compatibility with Windows 11 rounded corners.  
+- Tweaked thumbnail design.
+</details>
+
+<details>
+  <summary><strong>🆕 MPVNET DESUKA V1 (RELEASE) - 25/08/2025</strong></summary>
+
+- MPVNET AnimeJaNai v3.2.0 (MPVNET v7.1.1.3-beta + AnimeJaNai V3 + VapourSynth R70 + etc)  
+- ModernX 0.4.3 (updated)  
+- Thumbfast Feb 4, 2025 (updated)  
+- Added AnimeJaNai V2 shader (the good one).  
+- Migrated from mpv average to mpvnet.  
+- Migrated all previous modifications.
+- ModernX:
+	- Added screenshot button.  
+	- Added pin window button.  
+	- New icons, font, and hover effects.  
+	- Redesigned thumbnails.  
+	- Added chapter name display.  
+	- Improved UI scale, text, and messages.  
+	- Fixed overlap between title and description.  
+	- Accidentally fixed AnimeJaNai stability issues when switching fullscreen.  
+	- Accidentally improved seek smoothness with AnimeJaNai enabled.  
+	- Translated mpvnet UI into Spanish.
+ - mpv.conf:
+	- Merged my changes with AnimeJaNai.  
+	- More efficient GPU API and rendering process.  
+	- “Watch later” feature exists but is disabled by default.
+ - mpvnet.conf:
+	- Doesn’t save previous session volume.
+ - New keybinds:
+	- `Ctrl + Right Click` ➝ Context menu  
+	- `Ctrl + E` ➝ AnimeJaNai menu  
+	- `Ctrl + J` ➝ AnimeJaNai status  
+	- `C` ➝ mpvnet menu (don’t break things 😭)  
+	- `S` ➝ Screenshot  
+	- `M` ➝ Mute  
+	- `Ctrl + 1,2,3` ➝ AnimeJaNai V2  
+	- `Shift + 1,2,3` ➝ AnimeJaNai V3  
+	- `Ctrl + 0` ➝ Disable AnimeJaNai  
+	- `1–6` ➝ Anime4K  
+	- `0` ➝ Disable Anime4K
+ - DiscordRPC:
+	- Toggled with `D`.
+</details>
+
+<details>
+  <summary><strong>MPV v5.1</strong></summary>
+
+- Various keybind fixes.  
+- Reverted to old Autoload version (the new one is not configurable and loads everything).
+</details>
+
+<details>
+  <summary><strong>MPV v5</strong></summary>
+
+- MPV 64-bit V3 (2024-08) — better shader performance in theory.  
+- Safer, cleaner `input.conf` with better keybinds.  
+- Improved subtitle/audio language preference and UI behavior.  
+- Updated ModernX branch with hover effects, rounded icons, gradient, and more.  
+- Added Thumbfast for YouTube-like thumbnails.  
+- Other tweaks and cleanup.
+</details>
+
+---
+
+### 🇪🇸 MADE IN (S)PAIN 🇪🇸
