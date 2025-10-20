@@ -1,6 +1,6 @@
 [🇪🇸 Español](#mpvnet-desuka) | [🇬🇧 English](#mpvnet-desuka-en)
 
-# MPVNET DESUKA
+# ✨MPVNET DESUKA✨
 
 **mpvnet desuka** es una versión personalizada de mpvnet diseñada con el objetivo de reproducir anime en la mejor calidad posible, mejorando la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas. 
 Además, incluye una interfaz moderna y funciones añadidas que lo convierten en un reproductor completo y fácil de usar.
@@ -52,7 +52,7 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 
 ## 📖 Documentación
 
-### Requisitos recomendados
+### 🔧Requisitos recomendados
 - **AnimeJaNai**:
   - 4K ➝ Modo 1 ➝ RTX 4090
   - 4K ➝ Modo 2 ➝ RTX 3080
@@ -205,7 +205,7 @@ Nuevas keybinds importantes:
 
 ---
 
-# MPVNET DESUKA (EN)
+# ✨MPVNET DESUKA (EN)✨
 
 **mpvnet desuka** is a custom build of mpvnet made to play anime at the highest possible quality, enhancing the original image in real time through shaders without losing background or texture details.  
 It also includes a modern interface and extra features, making it a complete and easy-to-use player.
@@ -257,7 +257,7 @@ Also check the **changelog** (important to see what’s new or changed) and the 
 
 ## 📖 Documentation
 
-### Recommended Requirements
+### 🔧Recommended Requirements
 - **AnimeJaNai**:
   - 4K ➝ Mode 1 ➝ RTX 4090
   - 4K ➝ Mode 2 ➝ RTX 3080
