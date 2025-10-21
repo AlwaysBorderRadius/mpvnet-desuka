@@ -20,8 +20,8 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
 
 ## 🧰 Instalación
 
-> 🪟 **Solo Windows**  
-> 💻 *Puede funcionar en Linux mediante WINE, pero no está garantizado.*
+> 🪟 **Windows Only**  
+> 💻 *Puede que funcione en Linux mediante WINE, pero no te lo aseguro.*
 
 1. **Extrae** la carpeta `mpvnet desuka` donde quieras.  
    - Recomendado: `C:\Program Files\mpvnet desuka` o `C:\APPs\mpvnet desuka` si eres especial como yo.
@@ -273,7 +273,7 @@ It also includes a modern interface and extra features, making it a complete and
 ## 🧰 Installation
 
 > 🪟 **Windows only**  
-> 💻 *Might work on Linux with WINE, but not guaranteed.*
+> 💻 *Might work on Linux with WINE, but idk.*
 
 1. **Extract** the `mpvnet desuka` folder wherever you want.  
    - Recommended: `C:\Program Files\mpvnet desuka` or `C:\APPs\mpvnet desuka` if you’re special like me.
