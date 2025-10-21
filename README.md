@@ -38,7 +38,7 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
 Ten en cuenta que AnimeJaNai es un shader pesado y cada vez que lo actives tardara unos segundos en verse el cambio en el video. Si has de activarlo, desactivarlo o cambiar de modelo, pausa antes el video.
 
 6. Ahora te toca aprender las **Keybinds** para saber como usarlo del todo :)  
-Leete tambien el **changelog** (importante, para saber que cambios se han hecho y funciones extra que podrian ser de tu interes) + la documentacion, no seas vago.
+Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vago.
 
 ### 🔄 Actualización
 
@@ -82,21 +82,21 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 
 ### 🧩 Shaders incluidos
 
-| Shader            | Descripción                                                                                     |
-|--------------------|--------------------------------------------------------------------------------------------------|
+| Shader | Descripción |
+|-|-|
 | [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX. V2: remasteriza la imagen 4K manteniendo todos los detalles, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: resultado practicamente identico al original, no recomiendo usarlo. |
-| [**Anime4K**](https://github.com/h5mcbox/anime4k)        | Shader GLSL. Mejora nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas a la imagen.                             |
+| [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL. Mejora nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas al dibujado. |
 
 ### 🧩 Scripts incluidos
 
-| Script            | Descripción                                                                                     |
-|--------------------|--------------------------------------------------------------------------------------------------|
-| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua)   | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. *(Uso una versión antigua a propósito)* |
-| [**modernX**](https://github.com/zydezu/ModernX)        | Interfaz moderna para mpv, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)*                            |
-| [**thumbfast**](https://github.com/po5/thumbfast)      | Muestra miniaturas en la barra de progreso, como en YouTube.                                    |
-| [**DiscordRPC**](https://github.com/tnychn/mpv-discord)     | Integración con Discord Rich Presence.                                                           |
-| **Custom Config**  | mpv.conf, mpvnet.conf input.conf y script-opts personalizados. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings)                                |
-| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai)  | Version modificada por AnimeJaNai                                |
+| Script | Descripción |
+|-|-|
+| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. *(Uso una versión antigua a propósito)* |
+| [**modernX**](https://github.com/zydezu/ModernX) | Interfaz moderna para mpv, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)* |
+| [**thumbfast**](https://github.com/po5/thumbfast) | Muestra miniaturas en la barra de progreso, como en YouTube. |
+| [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Integración con Discord Rich Presence. |
+| **Custom Config** | mpv.conf, mpvnet.conf input.conf y script-opts personalizados. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
+| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Version modificada por AnimeJaNai |
 
 ### ⌨️ Keybinds importantes
 
@@ -125,7 +125,7 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 
 > 📝 *AnimeJaNai y anime4k se pueden usar en conjunto, pero es muy criminal, mejor no lo hagas.*
 
-### ⚙️ Detalles importantes
+### ⚙️ Algunos detalles importantes
 
 - El guardado del **nivel de volumen** entre sesiones está desactivado por defecto.  
   → Si quieres activarlo, abre `mpvnet.conf` y cambia `remember-volume=no` a `yes`.
@@ -136,6 +136,10 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 - Algunos botones de la interfaz tienen **dos funciones**:  
   → **Click derecho** = función principal  
   → **Click izquierdo** = función alternativa
+
+- Las pistas de Audio y Subtitulos se cargaran automatiamente en este orden, independientemente de su posición:  
+  → **Audio:** `Japones`, `Ingles`, `Español`, etc.  
+  → **Subtitulos:** `Español`, `Latino`, `Ingles`, etc.
 
 ## 🆕 Changelog
 
@@ -286,7 +290,7 @@ It also includes a modern interface and extra features, making it a complete and
 Keep in mind AnimeJaNai is heavy: every time you enable it, it’ll take a few seconds to apply. If you need to enable/disable or switch models, pause the video first.
 
 6. Now it’s time to learn the **keybinds** so you can actually fully use it :)  
-Also check the **changelog** (important to see what’s new or changed) and the **documentation**. Don’t be lazy.
+Also check the **changelog** (very interesting!) and the **documentation**. Don’t be lazy.
 
 ### 🔄 Updating
 
@@ -331,21 +335,21 @@ Also check the **changelog** (important to see what’s new or changed) and the 
 
 ### 🧩 Included Shaders
 
-| Shader            | Description                                                                                     |
-|--------------------|--------------------------------------------------------------------------------------------------|
+| Shader | Description |
+|-|-|
 | [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | ONNX shader. V2 remasters 4K video while preserving all details and removing artifacts, though in some cases it can look odd in scenes with blur or chromatic aberration. V3 produces a nearly identical result to the original — not recommended. |
-| [**Anime4K**](https://github.com/h5mcbox/anime4k)        | GLSL shader. Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
+| [**Anime4K**](https://github.com/h5mcbox/anime4k) | GLSL shader. Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
 
 ### 🧩 Included Scripts
 
-| Script            | Description                                                                                     |
-|--------------------|--------------------------------------------------------------------------------------------------|
-| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua)   | Automatically loads all video files in the folder into the playlist. *(I use an old version on purpose.)* |
-| [**modernX**](https://github.com/zydezu/ModernX)        | Modern mpvnet interface with custom modifications. *(Using the most maintained branch.)* |
-| [**thumbfast**](https://github.com/po5/thumbfast)      | Displays thumbnails on the progress bar, just like YouTube. |
-| [**DiscordRPC**](https://github.com/tnychn/mpv-discord)     | Discord Rich Presence integration. |
-| **Custom Config**  | Custom `mpv.conf`, `mpvnet.conf`, `input.conf`, and `script-opts`. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
-| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai)  | AnimeJaNai-modified version of mpvnet. |
+| Script | Description |
+|-|-|
+| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Automatically loads all video files in the folder into the playlist. *(I use an old version on purpose.)* |
+| [**modernX**](https://github.com/zydezu/ModernX) | Modern mpvnet interface with custom modifications. *(Using the most maintained branch.)* |
+| [**thumbfast**](https://github.com/po5/thumbfast) | Displays thumbnails on the progress bar, just like YouTube. |
+| [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Discord Rich Presence integration. |
+| **Custom Config** | Custom `mpv.conf`, `mpvnet.conf`, `input.conf`, and `script-opts`. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
+| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | AnimeJaNai-modified version of mpvnet. |
 
 ### ⌨️ Keybinds
 
@@ -386,6 +390,9 @@ Also check the **changelog** (important to see what’s new or changed) and the 
   → **Right Click** = primary action  
   → **Left Click** = alternate action
 
+- Audio and subtitle tracks will load automatically in this order, regardless of their position:  
+  → **Audio:** `Japanese`, `English`, `Spanish`, etc.  
+  → **Subtitles:** `Spanish`, `Latin`, `English`, etc.
 
 ## 🆕 Changelog
 
@@ -465,5 +472,3 @@ Also check the **changelog** (important to see what’s new or changed) and the 
 ---
 
 ### 🇪🇸 MADE IN (S)PAIN 🇪🇸
-
-
