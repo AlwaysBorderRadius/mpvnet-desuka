@@ -7,6 +7,17 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
 
 <img width="2538" height="1350" alt="imagen" src="https://github.com/user-attachments/assets/8dbd4a62-3fd3-464a-86f6-e49ac8b4eed8" />
 
+### 🎞️ Comparaciones
+
+| Escenarios | Mejor Encode* vs AnimeJaNai V2** vs Anime4k*** |
+|-|-|
+| Primeros Planos | [Link](https://slow.pics/c/Cb703Qla) |
+| Fondos, Texturas y Letras | [Link](https://slow.pics/c/AR9TAsPZ) |
+
+****Mejor Encode** Blu-Ray segun Sneedex y SeaDex.*  
+*****AnimeJaNai V2** con el modelo Ultra Compact. En mi opinion, el modelo (superior) Compact es un poco demasiado y requiere mucha mas potencia por poca mejora extra.*  
+******Anime4k** con el modo A. En mi opinion, el mejor modo relacion nitidez/difuminado.*
+
 ## 🧰 Instalación
 
 > 🪟 **Solo Windows**  
@@ -41,7 +52,7 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 ➝ Borra todos los `.engine` en `mpvnet desuka/animejanai/onnx`.
 
 - Si mpvnet o la interfaz se congela:  
-➝ Abre el Administrador de tareas y mata el proceso. 
+➝ Abre el Administrador de tareas y mata el proceso de mpvnet y mpv-discord.exe. 
 *(El mpvnet de AnimeJaNai es muy sensible, asi que tratalo con delicadeza. Si esta haciendo una cosa (cargando un modelo, desvaneciendo la interfaz...), espera a que termine antes de hacer la siguiente (maximizar la pantalla, cambiar la pista de subs...).)*
 
 - Si aparece "thumbfast ERROR" y no aparecen los thumbnails:
@@ -52,21 +63,28 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 
 ## 📖 Documentación
 
-### 🔧Requisitos recomendados
+### 🔧 Requisitos recomendados
 - **AnimeJaNai**:
-  - 4K ➝ Modo 1 ➝ RTX 4090
-  - 4K ➝ Modo 2 ➝ RTX 3080
-  - 4K ➝ Modo 3 ➝ RTX 3060
-  - 1080p ➝ Cualquier Modo ➝ PC de gama media
+
+| Resolucion de tu pantalla | Perfil | GPU |
+|-|-|-|
+| 4K | Modo 1 Compact | RTX 4090 |
+| 4K | Modo 2 Ultra Compact | RTX 3080 |
+| 4K | Modo 3 Super Ulta Compact | RTX 3060 |
+| 1080p | Cualquier Modo | GPU de gama media |
+
 - **Anime4K** *(mas ligero)*:
-  - 4K ➝ PC de gama media-alta y alta
-  - 1080p ➝ PC de gama media-baja y media
+
+| Resolucion de tu pantalla | Perfil | GPU |
+|-|-|-|
+| 4K | Cualquier Modo | GPU de gama media-alta y alta |
+| 1080p | Cualquier Modo | GPU de gama media-baja y media |
 
 ### 🧩 Shaders incluidos
 
 | Shader            | Descripción                                                                                     |
 |--------------------|--------------------------------------------------------------------------------------------------|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX. V2: remasteriza la imagen 4K manteniendo todos los detalles, a la vez que elimina artefactos, pero puede verse raro en escenas con blur o aberracion cromatica. V3: resultado practicamente identico al original, no recomiendo usarlo. |
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX. V2: remasteriza la imagen 4K manteniendo todos los detalles, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: resultado practicamente identico al original, no recomiendo usarlo. |
 | [**Anime4K**](https://github.com/h5mcbox/anime4k)        | Shader GLSL. Mejora nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas a la imagen.                             |
 
 ### 🧩 Scripts incluidos
@@ -74,7 +92,7 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 | Script            | Descripción                                                                                     |
 |--------------------|--------------------------------------------------------------------------------------------------|
 | [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua)   | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. *(Uso una versión antigua a propósito)* |
-| [**modernX**](https://github.com/zydezu/ModernX)        | Interfaz moderna para mpvnet, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)*                            |
+| [**modernX**](https://github.com/zydezu/ModernX)        | Interfaz moderna para mpv, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)*                            |
 | [**thumbfast**](https://github.com/po5/thumbfast)      | Muestra miniaturas en la barra de progreso, como en YouTube.                                    |
 | [**DiscordRPC**](https://github.com/tnychn/mpv-discord)     | Integración con Discord Rich Presence.                                                           |
 | **Custom Config**  | mpv.conf, mpvnet.conf input.conf y script-opts personalizados. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings)                                |
@@ -82,17 +100,42 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
 
 ### ⌨️ Keybinds importantes
 
-- `Ctrl + Click derecho` ➝ Menú contextual con todos los ajustes.  
-- `Ctrl + E` ➝ Menú de AnimeJaNai.  
-- `C` ➝ Menú de mpvnet *(porfa no toques nada o puede q rompas el archivo de config 😭🙏🏻 y sera culpa tuya, no mia)*.  
-- `Ctrl + 1 / 2 / 3` ➝ Activa AnimeJaNai V2 (4090 / 3080 / 3060).  
-- `Shift + 1 / 2 / 3` ➝ Activa AnimeJaNai V3 (4090 / 3080 / 3060).  
-- `Ctrl + 0` ➝ Desactiva AnimeJaNai.  
-- `1–6` ➝ Activa los diferentes modos de Anime4K.  
-- `0` ➝ Desactiva Anime4K.  
-- `D` ➝ Activa/Desactiva Discord Rich Presence.
+- `Click derecho`, `Espacio` ➝ Pausa  
+- `Ctrl + Click derecho` ➝ Abre el menú contextual con todos los ajustes  
+- `Ctrl + E` ➝ Abre el menú de AnimeJaNai  
+- `Ctrl + J` ➝ Muestra qué modelo de AnimeJaNai está activo  
+- `C` ➝ Abre el menú de mpvnet *(porfa no toques nada o puedes romper la config 😭🙏🏻 y será culpa tuya, no mía)*  
+- `Ctrl + 1 / 2 / 3` ➝ Activa AnimeJaNai V2 (4090 / 3080 / 3060)  
+- `Shift + 1 / 2 / 3` ➝ Activa AnimeJaNai V3 (4090 / 3080 / 3060)  
+- `Ctrl + 0` ➝ Desactiva AnimeJaNai  
+- `1–6` ➝ Activa los diferentes modos de Anime4K  
+- `0` ➝ Desactiva Anime4K  
+- `D` ➝ Activa o desactiva Discord Rich Presence  
+- `S` ➝ Toma capturas de pantalla desde el reproductor  
+- `↑` ➝ Subir volumen (+2)  
+- `↓` ➝ Bajar volumen (−2)  
+- `Shift + ↑` ➝ Subir volumen (+50)  
+- `Shift + ↓` ➝ Bajar volumen (−50)  
+- `→` ➝ Avanzar 5 segundos  
+- `←` ➝ Retroceder 5 segundos  
+- `Ctrl + →` ➝ Avanzar 85 segundos  
+- `Ctrl + ←` ➝ Retroceder 85 segundos
+- `Shift + →` ➝ Avanzar un fotograma  
+- `Shift + ←` ➝ Retroceder un fotograma  
 
 > 📝 *AnimeJaNai y anime4k se pueden usar en conjunto, pero es muy criminal, mejor no lo hagas.*
+
+### ⚙️ Detalles importantes
+
+- El guardado del **nivel de volumen** entre sesiones está desactivado por defecto.  
+  → Si quieres activarlo, abre `mpvnet.conf` y cambia `remember-volume=no` a `yes`.
+
+- La función **“watch later”** también está desactivada por defecto.  
+  → Para activarla, abre `mpv.conf` y descomenta `watch-later-options=start`.
+
+- Algunos botones de la interfaz tienen **dos funciones**:  
+  → **Click derecho** = función principal  
+  → **Click izquierdo** = función alternativa
 
 ## 🆕 Changelog
 
@@ -129,8 +172,8 @@ Leete tambien el **changelog** (importante, para saber que cambios se han hecho 
   - Se ha añadido el nombre del chapter.
   - Se ha mejorado el tamaño de la interfaz, textos y mensajes.
   - Se ha arreglado el overlap ente Titulo y Descripcion.
-  - Se ha arreglado sin querer la estabilidad del mpvnet con animejanai funcionando al pasar de ventana a fullscreen y al reves. Ahora ya no crashea.
-  - Se ha arreglado sin querer la fluidez al avanzar/retroceder en el video cuando se usa el shader de animejanai.
+  - Se ha arreglado sin querer (un poco) la estabilidad del mpvnet con animejanai funcionando al pasar de ventana a fullscreen y al reves. Ahora ya no crashea.
+  - Se ha arreglado sin querer (un poco) la fluidez al avanzar/retroceder en el video cuando se usa el shader de animejanai.
   - Se ha traducido la interfaz de mpvnet al español.
 - mpv.conf:
   - Se han fusionado mis cambios con los de AnimeJaNai.
@@ -212,6 +255,17 @@ It also includes a modern interface and extra features, making it a complete and
 
 <img width="2538" height="1350" alt="imagen" src="https://github.com/user-attachments/assets/8dbd4a62-3fd3-464a-86f6-e49ac8b4eed8" />
 
+### 🎞️ Comparisons
+
+| Scenarios | Best Encode* vs AnimeJaNai V2** vs Anime4K*** |
+|-|-|
+| Close-ups | [Link](https://slow.pics/c/Cb703Qla) |
+| Backgrounds, Textures & Text | [Link](https://slow.pics/c/AR9TAsPZ) |
+
+***Best Blu-Ray Encode** according to Sneedex and SeaDex.  
+****AnimeJaNai V2** using the Ultra Compact model. In my opinion, the superior Compact model is a bit too much — it requires far more GPU power for very little visual improvement.  
+*****Anime4K** in Mode A — in my opinion, the best balance between sharpness and softness.
+
 ## 🧰 Installation
 
 > 🪟 **Windows only**  
@@ -246,7 +300,7 @@ Also check the **changelog** (important to see what’s new or changed) and the 
   ➝ Delete all `.engine` files in `mpvnet desuka/animejanai/onnx`.
 
 - If mpvnet or the interface freezes:  
-  ➝ Open Task Manager and kill the process.  
+  ➝ Open Task Manager and kill the mpvnet and mpv-discord.exe processes.  
   *(The AnimeJaNai build of mpvnet is very sensitive, if it’s doing something like loading a model or fading the interface, wait until it finishes before doing something else.)*
 
 - If “thumbfast ERROR” appears and thumbnails don’t load:  
@@ -257,21 +311,29 @@ Also check the **changelog** (important to see what’s new or changed) and the 
 
 ## 📖 Documentation
 
-### 🔧Recommended Requirements
-- **AnimeJaNai**:
-  - 4K ➝ Mode 1 ➝ RTX 4090
-  - 4K ➝ Mode 2 ➝ RTX 3080
-  - 4K ➝ Mode 3 ➝ RTX 3060
-  - 1080p ➝ Any Mode ➝ Mid-range PC
+### 🔧 Recommended Requirements
+
+- **AnimeJaNai:**
+
+| Your Screen Resolution | Profile | GPU |
+|-|-|-|
+| 4K | Mode 1 Compact | RTX 4090 |
+| 4K | Mode 2 Ultra Compact | RTX 3080 |
+| 4K | Mode 3 Super Ultra Compact | RTX 3060 |
+| 1080p | Any Mode | Mid-range GPU |
+
 - **Anime4K** *(lighter)*:
-  - 4K ➝ Mid-high to high-end PC
-  - 1080p ➝ Low to mid-range PC
+
+| Your Screen Resolution | Profile | GPU |
+|-|-|-|
+| 4K | Any Mode | Mid-high to high-end GPU |
+| 1080p | Any Mode | Mid-low to mid-range GPU |
 
 ### 🧩 Included Shaders
 
 | Shader            | Description                                                                                     |
 |--------------------|--------------------------------------------------------------------------------------------------|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | ONNX shader. V2 remasters 4K video while preserving all details and removing artifacts, though it can look odd in scenes with blur or chromatic aberration. V3 produces a nearly identical result to the original — not recommended. |
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | ONNX shader. V2 remasters 4K video while preserving all details and removing artifacts, though in some cases it can look odd in scenes with blur or chromatic aberration. V3 produces a nearly identical result to the original — not recommended. |
 | [**Anime4K**](https://github.com/h5mcbox/anime4k)        | GLSL shader. Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
 
 ### 🧩 Included Scripts
@@ -287,17 +349,43 @@ Also check the **changelog** (important to see what’s new or changed) and the 
 
 ### ⌨️ Keybinds
 
-- `Ctrl + Right Click` ➝ Opens contextual menu with all settings.  
-- `Ctrl + E` ➝ Opens AnimeJaNai menu.  
-- `C` ➝ Opens mpvnet menu *(please don’t touch random stuff or you might break the config 😭🙏🏻 and it’ll be your fault, not mine)*.  
-- `Ctrl + 1 / 2 / 3` ➝ Enable AnimeJaNai V2 (4090 / 3080 / 3060).  
-- `Shift + 1 / 2 / 3` ➝ Enable AnimeJaNai V3 (4090 / 3080 / 3060).  
-- `Ctrl + 0` ➝ Disable AnimeJaNai.  
-- `1–6` ➝ Enable Anime4K presets.  
-- `0` ➝ Disable Anime4K.  
-- `D` ➝ Toggle Discord Rich Presence.
+- `Right Click`, `Space` ➝ Pause  
+- `Ctrl + Right Click` ➝ Opens contextual menu with all settings  
+- `Ctrl + E` ➝ Opens AnimeJaNai menu  
+- `Ctrl + J` ➝ Shows which AnimeJaNai model is active  
+- `C` ➝ Opens mpvnet menu *(please don’t mess around or you might break the config 😭🙏🏻 and it’ll be your fault, not mine)*  
+- `Ctrl + 1 / 2 / 3` ➝ Enable AnimeJaNai V2 (4090 / 3080 / 3060)  
+- `Shift + 1 / 2 / 3` ➝ Enable AnimeJaNai V3 (4090 / 3080 / 3060)  
+- `Ctrl + 0` ➝ Disable AnimeJaNai  
+- `1–6` ➝ Enable different Anime4K modes  
+- `0` ➝ Disable Anime4K  
+- `D` ➝ Toggle Discord Rich Presence  
+- `S` ➝ Take screenshots from the player  
+- `Up` ➝ Volume +2  
+- `Down` ➝ Volume −2  
+- `Shift + Up` ➝ Volume +50  
+- `Shift + Down` ➝ Volume −50  
+- `Right` ➝ Jump +5 seconds  
+- `Left` ➝ Jump −5 seconds  
+- `Ctrl + Right` ➝ Jump +85 seconds  
+- `Ctrl + Left` ➝ Jump −85 seconds
+- `Shift + Right` ➝ Frame-step forward  
+- `Shift + Left` ➝ Frame-step backward  
 
 > 📝 *You technically can use AnimeJaNai and Anime4K together, but that’s ilegal. Don’t.*
+
+### ⚙️ Additional Notes
+
+- Saving the current **volume level** for the next session is disabled by default.  
+  → To enable it, open `mpvnet.conf` and change `remember-volume=no` to `yes`.  
+
+- The **“watch later”** feature is disabled by default.  
+  → To enable it, open `mpv.conf` and uncomment `watch-later-options=start`.
+
+- Some buttons in the interface have **dual functions**:  
+  → **Right Click** = primary action  
+  → **Left Click** = alternate action
+
 
 ## 🆕 Changelog
 
@@ -331,8 +419,8 @@ Also check the **changelog** (important to see what’s new or changed) and the 
 	- Added chapter name display.  
 	- Improved UI scale, text, and messages.  
 	- Fixed overlap between title and description.  
-	- Accidentally fixed AnimeJaNai stability issues when switching fullscreen.  
-	- Accidentally improved seek smoothness with AnimeJaNai enabled.  
+	- Accidentally fixed (a little bit) AnimeJaNai stability issues when switching fullscreen.  
+	- Accidentally improved (a little bit) seek smoothness with AnimeJaNai enabled.  
 	- Translated mpvnet UI into Spanish.
  - mpv.conf:
 	- Merged my changes with AnimeJaNai.  
@@ -377,3 +465,5 @@ Also check the **changelog** (important to see what’s new or changed) and the 
 ---
 
 ### 🇪🇸 MADE IN (S)PAIN 🇪🇸
+
+
