@@ -34,17 +34,14 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
    - Ve a `mpvnet desuka > ctrl+E > Global Settings`
    - Y cambia `Upscaling Backend` de `TensorRT` a `DirectML`
 
-4. La primera vez que cargues cada modelo de **AnimeJaNai**, se abrira una terminal. No te asustes, eso es el engine creando un perfil `.engine` para tu PC.  
-Ten en cuenta que AnimeJaNai es un shader pesado y cada vez que lo actives tardara unos segundos en verse el cambio en el video. Si has de activarlo, desactivarlo o cambiar de modelo, pausa antes el video.
+4. En **GPUs NVIDIA**:
+   - La primera vez que cargues cada modelo de **AnimeJaNai**, se abrira una terminal. No te asustes, eso es el engine creando un perfil `.engine` para tu PC.  
 
-6. Ahora te toca aprender las **Keybinds** para saber como usarlo del todo :)  
+> Ten en cuenta que AnimeJaNai es un shader pesado y cada vez que lo actives tardara unos segundos en verse el cambio en el video. Pausa el video antes de activarlo, desactivarlo o cambiar de modelo y no maximices ni entres en pantalla completa mientras carga.  
+> *El mpvnet de AnimeJaNai es muy sensible, asi que tratalo con delicadeza. Si esta haciendo una cosa (cargando un modelo, desvaneciendo la interfaz...), espera a que termine antes de hacer la siguiente (cambiar la pista de subs, avanzar/retroceder...).*
+
+5. Ahora te toca aprender las **Keybinds** para saber como usarlo del todo :)  
 Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vago.
-
-### 🔄 Actualización
-
-- **Opción 1:** Sustituye solo los archivos actualizados.  
-- **Opción 2:** Elimina la carpeta anterior y extrae la nueva versión.  
-*(Si usas AnimeJaNai, tendrás que regenerar los archivos `.engine`.)*
 
 ### 🧯 Troubleshooting
 
@@ -53,7 +50,6 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 
 - Si mpvnet o la interfaz se congela:  
 ➝ Abre el Administrador de tareas y mata el proceso de mpvnet y mpv-discord.exe. 
-*(El mpvnet de AnimeJaNai es muy sensible, asi que tratalo con delicadeza. Si esta haciendo una cosa (cargando un modelo, desvaneciendo la interfaz...), espera a que termine antes de hacer la siguiente (maximizar la pantalla, cambiar la pista de subs...).)*
 
 - Si aparece "thumbfast ERROR" y no aparecen los thumbnails:
 ➝ Cierra y vuelve a abrir el video, pero espera unos segundos antes de pasar el raton por encima de la barra, para que le de tiempo de cargar los frames.
@@ -70,7 +66,7 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 |-|-|-|
 | 4K | Modo 1 Compact | RTX 4090 |
 | 4K | Modo 2 Ultra Compact | RTX 3080 |
-| 4K | Modo 3 Super Ulta Compact | RTX 3060 |
+| 4K | Modo 3 Super Ultra Compact | RTX 3060 |
 | 1080p | Cualquier Modo | GPU de gama media |
 
 - **Anime4K** *(mas ligero)*:
@@ -266,9 +262,9 @@ It also includes a modern interface and extra features, making it a complete and
 | Close-ups | [Link](https://slow.pics/c/Cb703Qla) |
 | Backgrounds, Textures & Text | [Link](https://slow.pics/c/AR9TAsPZ) |
 
-***Best Blu-Ray Encode** according to Sneedex and SeaDex.  
-****AnimeJaNai V2** using the Ultra Compact model. In my opinion, the superior Compact model is a bit too much — it requires far more GPU power for very little visual improvement.  
-*****Anime4K** in Mode A — in my opinion, the best balance between sharpness and softness.
+****Best Blu-Ray Encode** according to Sneedex and SeaDex.*  
+*****AnimeJaNai V2** using the Ultra Compact model. In my opinion, the superior Compact model is a bit too much and it requires far more GPU power for very little visual improvement.*  
+******Anime4K** in Mode A, in my opinion, the best balance between sharpness and softness.*
 
 ## 🧰 Installation
 
@@ -286,17 +282,14 @@ It also includes a modern interface and extra features, making it a complete and
    - Go to `mpvnet desuka > ctrl+E > Global Settings`
    - Change `Upscaling Backend` from `TensorRT` to `DirectML`
 
-4. The first time you load any **AnimeJaNai** model, a terminal window will pop up. Don’t panic, the engine is creating a `.engine` profile for your PC.  
-Keep in mind AnimeJaNai is heavy: every time you enable it, it’ll take a few seconds to apply. If you need to enable/disable or switch models, pause the video first.
+4. In **NVIDIA GPUs**:
+   - The first time you load any **AnimeJaNai** model, a terminal window will pop up. Don’t panic, the engine is creating a `.engine` profile for your PC.
+   
+> Keep in mind AnimeJaNai is heavy: every time you enable it, it’ll take a few seconds to apply. Pause the video before switching models, and do not maximize nor enter full screen while the shader is still loading.  
+> *The AnimeJaNai build of mpvnet is very "sensitive", if it’s doing something like loading a model or fading the interface, wait until it finishes before doing something else like seeking backward/forward.*
 
-6. Now it’s time to learn the **keybinds** so you can actually fully use it :)  
+5. Now it’s time to learn the **keybinds** so you can actually fully use it :)  
 Also check the **changelog** (very interesting!) and the **documentation**. Don’t be lazy.
-
-### 🔄 Updating
-
-- **Option 1:** Replace only the updated files.  
-- **Option 2:** Delete the previous folder and extract the new version.  
-  *(If you use AnimeJaNai, you’ll need to regenerate the `.engine` files.)*
 
 ### 🧯 Troubleshooting
 
@@ -305,7 +298,6 @@ Also check the **changelog** (very interesting!) and the **documentation**. Don�
 
 - If mpvnet or the interface freezes:  
   ➝ Open Task Manager and kill the mpvnet and mpv-discord.exe processes.  
-  *(The AnimeJaNai build of mpvnet is very sensitive, if it’s doing something like loading a model or fading the interface, wait until it finishes before doing something else.)*
 
 - If “thumbfast ERROR” appears and thumbnails don’t load:  
   ➝ Close and reopen the video, and wait a few seconds before hovering over the progress bar so frames can preload.
