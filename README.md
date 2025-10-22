@@ -2,7 +2,7 @@
 
 # ✨MPVNET DESUKA✨
 
-**mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de reproducir anime en la mejor calidad posible, mejorando nitidez de la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas. 
+**mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de reproducir anime en la mejor calidad posible, mejorando la nitidez de la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas. 
 Además, incluye una interfaz moderna y funciones añadidas que lo convierten en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base.
 
 <img width="2538" height="1350" alt="imagen" src="https://github.com/user-attachments/assets/8dbd4a62-3fd3-464a-86f6-e49ac8b4eed8" />
