@@ -5,7 +5,7 @@
 **mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de reproducir anime en la mejor calidad posible, mejorando la nitidez de la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas. 
 Además, incluye una interfaz moderna y funciones añadidas que lo convierten en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base.
 
-<img width="2538" height="1350" alt="imagen" src="https://github.com/user-attachments/assets/8dbd4a62-3fd3-464a-86f6-e49ac8b4eed8" />
+<img width="2674" height="1383" alt="Captura de pantalla (427)" src="https://github.com/user-attachments/assets/195fad87-b80a-42a7-88ba-d2e7e4601df4" />
 
 ### 🎞️ Comparaciones
 
@@ -253,7 +253,7 @@ Nuevas keybinds importantes:
 **mpvnet desuka** is a custom build of mpvnet made to play anime at the highest possible quality, sharpening the original image in real time through shaders, without losing background or texture details.  
 It also includes a modern interface and extra features, making it a complete and easy-to-use player, unlike the base mpv/mpvnet.
 
-<img width="2538" height="1350" alt="imagen" src="https://github.com/user-attachments/assets/8dbd4a62-3fd3-464a-86f6-e49ac8b4eed8" />
+<img width="2674" height="1383" alt="Captura de pantalla (427)" src="https://github.com/user-attachments/assets/195fad87-b80a-42a7-88ba-d2e7e4601df4" />
 
 ### 🎞️ Comparisons
 
