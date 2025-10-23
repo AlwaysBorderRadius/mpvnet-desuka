@@ -52,10 +52,10 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 ➝ Abre el Administrador de tareas y mata el proceso de mpvnet y mpv-discord.exe. 
 
 - Si aparece "thumbfast ERROR" y no aparecen los thumbnails:
-➝ Cierra y vuelve a abrir el video, pero espera unos segundos antes de pasar el raton por encima de la barra, para que le de tiempo de cargar los frames.
+  ➝ Cierra y vuelve a abrir el video, pero espera unos segundos antes de pasar el raton por encima de la barra, para que le de tiempo de cargar los frames.
 
 - Si aparece "thumbfast ERROR", pero si aparecen los thumbnails:
-➝ No hagas caso 👍🏻
+  ➝ No hagas caso 👍🏻
 
 ## 📖 Documentación
 
