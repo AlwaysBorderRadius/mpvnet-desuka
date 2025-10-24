@@ -131,7 +131,22 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
   → **Audio:** `Japones`, `Ingles`, `Español`, etc.  
   → **Subtitulos:** `Español`, `Latino`, `Ingles`, etc.
 
-## 🆕 Changelog
+# ✨MPV DESUKA (LITTLE)✨
+
+Mi antigua version, actualizada con los cambios de la nueva.
+
+## ¿Qué cambia?
+
+- Usa **mpv** en lugar de **mpvnet** como base  
+- Incluye solo **Anime4K** (sin AnimeJaNai)  
+- Pesa **~120 MB** en lugar de más de **6 GB**  
+- Es **100 % estable**, sin *crashes*  
+- También funciona en **Linux con Wine**
+- Para instalar, tan solo sigue los pasos 1 y 2
+
+> 📝 *Las Keybinds de teclas y la configuración son las mismas.*
+
+## 🆕 Changelog (Pre-GitHub)
 
 <details>
   <summary><strong>MPVNET DESUKA V1.2 - 4/10/2025</strong></summary>
@@ -373,7 +388,22 @@ Also check the **changelog** (very interesting!) and the **documentation**. Don�
   → **Audio:** `Japanese`, `English`, `Spanish`, etc.  
   → **Subtitles:** `Spanish`, `Latin`, `English`, etc.
 
-## 🆕 Changelog
+# ✨MPV DESUKA (LITTLE)✨
+
+My older build, updated with the latest changes.
+
+## What’s different?
+
+- Uses **mpv** instead of **mpvnet** as the base  
+- Includes only **Anime4K** (no AnimeJaNai)  
+- Size reduced to **~120 MB** instead of **6 GB+**  
+- **100 % stable**, no crashes  
+- Also works on **Linux with Wine**
+- To install it, just follow steps 1 and 2
+
+> 📝 *Keybinds and configuration are the same.*
+
+## 🆕 Changelog (Pre-GitHub)
 
 <details>
   <summary><strong>MPVNET DESUKA V1.2 - 4/10/2025</strong></summary>
