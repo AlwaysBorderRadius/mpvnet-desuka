@@ -51,45 +51,39 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 - Si mpvnet o la interfaz se congela:  
 ➝ Abre el Administrador de tareas y mata el proceso de mpvnet y mpv-discord.exe. 
 
-- Si aparece "thumbfast ERROR" y no aparecen los thumbnails:  
-➝ Cierra y vuelve a abrir el video, pero espera unos segundos antes de pasar el raton por encima de la barra, para que le de tiempo de cargar los frames.
-
-- Si aparece "thumbfast ERROR", pero si aparecen los thumbnails:  
-➝ No hagas caso 👍🏻
-
 ## 📖 Documentación
 
 ### 🔧 Requisitos recomendados
+
 - **AnimeJaNai**:
 
-| Resolucion de tu pantalla | Perfil | GPU |
+| Perfil | Modelo | GPU |
 |-|-|-|
-| 4K | Modo 1 Compact | RTX 4090 |
-| 4K | Modo 2 Ultra Compact | RTX 3080 |
-| 4K | Modo 3 Super Ultra Compact | RTX 3060 |
-| 1080p | Cualquier Modo | GPU de gama media |
+| 1 | Compact | RTX 4090 |
+| 2 | Ultra Compact | RTX 3080 |
+| 3 | Super Ultra Compact | RTX 3060 |
 
 - **Anime4K** *(mas ligero)*:
 
 | Resolucion de tu pantalla | Perfil | GPU |
 |-|-|-|
-| 4K | Cualquier Modo | GPU de gama media-alta y alta |
-| 1080p | Cualquier Modo | GPU de gama media-baja y media |
+| 4K | Cualquier Perfil | GPU de gama media-alta y alta |
+| 1080p | Cualquier Perfil | GPU de gama media-baja y media |
 
 ### 🧩 Shaders incluidos
 
 | Shader | Descripción |
 |-|-|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX. V2: remasteriza la imagen 4K manteniendo todos los detalles, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: resultado practicamente identico al original, no recomiendo usarlo. |
-| [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL. Mejora nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas al dibujado. |
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX. V2: Remasteriza la imagen a 4K aumentando drasticamente el nivel de detalle y nitidez, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: Remasteriza la imagen a 4K manteniendo todos los detalles, arreglando el line art, eliminando bordes de sierra y otros artefactos que puedan haber, mientras preserva los efectos originales de blur, difuminados, aberracion cromatica... Aunque cuesta mucho apreciar la diferencia. |
+| [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL. Mejora la nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas al dibujado. |
 
 ### 🧩 Scripts incluidos
 
 | Script | Descripción |
 |-|-|
-| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. *(Uso una versión antigua a propósito)* |
+| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. |
 | [**modernX**](https://github.com/zydezu/ModernX) | Interfaz moderna para mpv, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)* |
-| [**thumbfast**](https://github.com/po5/thumbfast) | Muestra miniaturas en la barra de progreso, como en YouTube. |
+| [**thumbfast**](https://github.com/po5/thumbfast) | Muestra miniaturas en la barra de progreso, como en YouTube. *(Uso una version antigua a proposito)* |
 | [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Integración con Discord Rich Presence. |
 | **Custom Config** | mpv.conf, mpvnet.conf input.conf y script-opts personalizados. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
 | [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Version modificada por AnimeJaNai |
@@ -127,13 +121,13 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
   → Si quieres activarlo, abre `mpvnet.conf` y cambia `remember-volume=no` a `yes`.
 
 - La función **“watch later”** también está desactivada por defecto.  
-  → Para activarla, abre `mpv.conf` y descomenta `watch-later-options=start`.
+  → Para activarla, abre `mpv.conf`, cambia `resume-playback=no` a `yes` y descomenta `watch-later-options=start`.
 
 - Algunos botones de la interfaz tienen **dos funciones**:  
   → **Click derecho** = función principal  
   → **Click izquierdo** = función alternativa
 
-- Las pistas de Audio y Subtitulos se cargaran automatiamente en este orden, independientemente de su posición:  
+- Las pistas de Audio y Subtitulos se cargaran automatiamente en este orden, independientemente de su posición (puedes cambiarlo en `mpv.conf`):  
   → **Audio:** `Japones`, `Ingles`, `Español`, etc.  
   → **Subtitulos:** `Español`, `Latino`, `Ingles`, etc.
 
@@ -299,46 +293,39 @@ Also check the **changelog** (very interesting!) and the **documentation**. Don�
 - If mpvnet or the interface freezes:  
   ➝ Open Task Manager and kill the mpvnet and mpv-discord.exe processes.  
 
-- If “thumbfast ERROR” appears and thumbnails don’t load:  
-  ➝ Close and reopen the video, and wait a few seconds before hovering over the progress bar so frames can preload.
-
-- If “thumbfast ERROR” appears but thumbnails do load:  
-  ➝ Ignore it 👍🏻
-
 ## 📖 Documentation
 
 ### 🔧 Recommended Requirements
 
 - **AnimeJaNai:**
 
-| Your Screen Resolution | Profile | GPU |
+| Profile | Model | GPU |
 |-|-|-|
-| 4K | Mode 1 Compact | RTX 4090 |
-| 4K | Mode 2 Ultra Compact | RTX 3080 |
-| 4K | Mode 3 Super Ultra Compact | RTX 3060 |
-| 1080p | Any Mode | Mid-range GPU |
+| 1 | Compact | RTX 4090 |
+| 2 | Ultra Compact | RTX 3080 |
+| 3 | Super Ultra Compact | RTX 3060 |
 
 - **Anime4K** *(lighter)*:
 
 | Your Screen Resolution | Profile | GPU |
 |-|-|-|
-| 4K | Any Mode | Mid-high to high-end GPU |
-| 1080p | Any Mode | Mid-low to mid-range GPU |
+| 4K | Any Profile | Mid-high to high-end GPU |
+| 1080p | Any Profile | Mid-low to mid-range GPU |
 
 ### 🧩 Included Shaders
 
 | Shader | Description |
 |-|-|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | ONNX shader. V2 remasters 4K video while preserving all details and removing artifacts, though in some cases it can look odd in scenes with blur or chromatic aberration. V3 produces a nearly identical result to the original — not recommended. |
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | ONNX Shader V2: Remasters the image to 4K, drastically increasing the level of detail and sharpness while removing artifacts, but in some cases it may look strange in scenes with blur or chromatic aberration. V3: Remasters the image to 4K, maintaining all the details, fixing the line art, removing jagged edges and other artifacts that may be present, while preserving the original effects of blur, dithering, chromatic aberration... Although it is difficult to notice the difference. |
 | [**Anime4K**](https://github.com/h5mcbox/anime4k) | GLSL shader. Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
 
 ### 🧩 Included Scripts
 
 | Script | Description |
 |-|-|
-| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Automatically loads all video files in the folder into the playlist. *(I use an old version on purpose.)* |
+| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Automatically loads all video files in the folder into the playlist. |
 | [**modernX**](https://github.com/zydezu/ModernX) | Modern mpvnet interface with custom modifications. *(Using the most maintained branch.)* |
-| [**thumbfast**](https://github.com/po5/thumbfast) | Displays thumbnails on the progress bar, just like YouTube. |
+| [**thumbfast**](https://github.com/po5/thumbfast) | Displays thumbnails on the progress bar, just like YouTube. *(I use an old version on purpose.)* |
 | [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Discord Rich Presence integration. |
 | **Custom Config** | Custom `mpv.conf`, `mpvnet.conf`, `input.conf`, and `script-opts`. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
 | [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | AnimeJaNai-modified version of mpvnet. |
@@ -376,13 +363,13 @@ Also check the **changelog** (very interesting!) and the **documentation**. Don�
   → To enable it, open `mpvnet.conf` and change `remember-volume=no` to `yes`.  
 
 - The **“watch later”** feature is disabled by default.  
-  → To enable it, open `mpv.conf` and uncomment `watch-later-options=start`.
+  → To enable it, open `mpv.conf`, change `resume-playback=no` to `yes` and uncomment `watch-later-options=start`.
 
 - Some buttons in the interface have **dual functions**:  
   → **Right Click** = primary action  
   → **Left Click** = alternate action
 
-- Audio and subtitle tracks will load automatically in this order, regardless of their position:  
+- Audio and subtitle tracks will load automatically in this order, regardless of their position (you can change it in `mpv.conf`):  
   → **Audio:** `Japanese`, `English`, `Spanish`, etc.  
   → **Subtitles:** `Spanish`, `Latin`, `English`, etc.
 
