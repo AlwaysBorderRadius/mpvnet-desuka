@@ -18,6 +18,12 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
 *****AnimeJaNai V2** con el modelo Ultra Compact. En mi opinion, el modelo (superior) Compact es un poco demasiado y requiere mucha mas potencia por poca mejora extra.*  
 ******Anime4k** con el modo A. En mi opinion, el mejor modo relacion nitidez/difuminado.*
 
+| Escenarios | Mejor Encode vs AnimeJaNai V3* vs AnimeJaNai V2 vs Anime4k |
+|-|-|
+| Un poco de todo | [Link](https://slow.pics/c/XJtobDb0) |
+
+****AnimeJaNai V3** con el modelo Compact. El que requiere más potencia.*
+
 ## 🧰 Instalación
 
 > 🪟 **Windows Only**  
@@ -70,23 +76,18 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 | 4K | Cualquier Perfil | GPU de gama media-alta y alta |
 | 1080p | Cualquier Perfil | GPU de gama media-baja y media |
 
-### 🧩 Shaders incluidos
+### 🧩 ¿Qué incluye?
 
-| Shader | Descripción |
-|-|-|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX. V2: Remasteriza la imagen a 4K aumentando drasticamente el nivel de detalle y nitidez, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: Remasteriza la imagen a 4K manteniendo todos los detalles, arreglando el line art, eliminando bordes de sierra y otros artefactos que puedan haber, mientras preserva los efectos originales de blur, difuminados, aberracion cromatica... Aunque cuesta mucho apreciar la diferencia. |
-| [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL. Mejora la nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas al dibujado. |
-
-### 🧩 Scripts incluidos
-
-| Script | Descripción |
-|-|-|
-| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. |
-| [**modernX**](https://github.com/zydezu/ModernX) | Interfaz moderna para mpv, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)* |
-| [**thumbfast**](https://github.com/po5/thumbfast) | Muestra miniaturas en la barra de progreso, como en YouTube. *(Uso una version antigua a proposito)* |
-| [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Integración con Discord Rich Presence. |
-| **Custom Config** | mpv.conf, mpvnet.conf input.conf y script-opts personalizados. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
-| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Version modificada por AnimeJaNai |
+| | Tipo | Descripción |
+|-|-|-|
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX | V2: Remasteriza la imagen a 4K aumentando drasticamente el nivel de detalle y nitidez, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: Recomendado para puristas. Remasteriza la imagen a 4K manteniendo todos los detalles, arreglando el line art, eliminando bordes de sierra y otros artefactos que puedan haber, mientras preserva los efectos originales de blur, difuminados, aberracion cromatica... Aunque cuesta mucho apreciar la diferencia. |
+| [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL | Mejora la nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas al dibujado. |
+| [**autoload**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Script | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. |
+| [**modernX**](https://github.com/zydezu/ModernX) | Script | Interfaz moderna para mpv, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)* |
+| [**thumbfast**](https://github.com/po5/thumbfast) | Script | Muestra miniaturas en la barra de progreso, como en YouTube. *(Uso una version antigua a proposito)* |
+| [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Script | Integración con Discord Rich Presence. |
+| **Custom Config** | Configuración | mpv.conf, mpvnet.conf input.conf y script-opts personalizados. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
+| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Reproductor Base | Version modificada por AnimeJaNai. |
 
 ### ⌨️ Keybinds importantes
 
@@ -275,6 +276,12 @@ It also includes a modern interface and extra features, making it a complete and
 *****AnimeJaNai V2** using the Ultra Compact model. In my opinion, the superior Compact model is a bit too much and it requires far more GPU power for very little visual improvement.*  
 ******Anime4K** in Mode A, in my opinion, the best balance between sharpness and softness.*
 
+| Scenarios | Best Encode vs AnimeJaNai V3* vs AnimeJaNai V2 vs Anime4k |
+|-|-|
+| A little bit of everything | [Link](https://slow.pics/c/XJtobDb0) |
+
+****AnimeJaNai V3** using the Compact model. The one that requires more power.*
+
 ## 🧰 Installation
 
 > 🪟 **Windows only**  
@@ -327,23 +334,18 @@ Also check the **changelog** (very interesting!) and the **documentation**. Don�
 | 4K | Any Profile | Mid-high to high-end GPU |
 | 1080p | Any Profile | Mid-low to mid-range GPU |
 
-### 🧩 Included Shaders
+### 🧩 What's included?
 
-| Shader | Description |
-|-|-|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | ONNX Shader V2: Remasters the image to 4K, drastically increasing the level of detail and sharpness while removing artifacts, but in some cases it may look strange in scenes with blur or chromatic aberration. V3: Remasters the image to 4K, maintaining all the details, fixing the line art, removing jagged edges and other artifacts that may be present, while preserving the original effects of blur, dithering, chromatic aberration... Although it is difficult to notice the difference. |
-| [**Anime4K**](https://github.com/h5mcbox/anime4k) | GLSL shader. Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
-
-### 🧩 Included Scripts
-
-| Script | Description |
-|-|-|
-| [**autoload.lua**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Automatically loads all video files in the folder into the playlist. |
-| [**modernX**](https://github.com/zydezu/ModernX) | Modern mpvnet interface with custom modifications. *(Using the most maintained branch.)* |
-| [**thumbfast**](https://github.com/po5/thumbfast) | Displays thumbnails on the progress bar, just like YouTube. *(I use an old version on purpose.)* |
-| [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Discord Rich Presence integration. |
-| **Custom Config** | Custom `mpv.conf`, `mpvnet.conf`, `input.conf`, and `script-opts`. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
-| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | AnimeJaNai-modified version of mpvnet. |
+| | Tipo | Descripción |
+|-|-|-|
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX | Remasters the image to 4K, drastically increasing the level of detail and sharpness while removing artifacts, but in some cases it may look strange in scenes with blur or chromatic aberration. V3: Recommended for purists. Remasters the image to 4K, maintaining all the details, fixing the line art, removing jagged edges and other artifacts that may be present, while preserving the original effects of blur, dithering, chromatic aberration... Although it is difficult to notice the difference. |
+| [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL | Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
+| [**autoload**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Script | Automatically loads all video files in the folder into the playlist. |
+| [**modernX**](https://github.com/zydezu/ModernX) | Script | Modern mpvnet interface with custom modifications. *(Using the most maintained branch.)* |
+| [**thumbfast**](https://github.com/po5/thumbfast) | Script | Displays thumbnails on the progress bar, just like YouTube. *(I use an old version on purpose.)* |
+| [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Script |  Discord Rich Presence integration. |
+| **Custom Config** | Configuración | Custom `mpv.conf`, `mpvnet.conf`, `input.conf`, and `script-opts`. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
+| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Base player | AnimeJaNai-modified version of mpvnet. |
 
 ### ⌨️ Keybinds
 
