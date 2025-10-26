@@ -2,27 +2,38 @@
 
 # ✨MPVNET DESUKA✨
 
-**mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de reproducir anime en la mejor calidad posible, mejorando la nitidez de la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas. 
-Además, incluye una interfaz moderna y funciones añadidas que lo convierten en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base.
+**mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de ver anime en la mejor calidad y comodidad posible.  
+Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas, a la vez que se eliminan los artefactos que puedan haber. Incluye tambien, una interfaz moderna y funciones extra, convirtiendolo asi en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base. 
+
+> 📝 *Tambien apto para pelis y series.*
 
 <img width="2674" height="1383" alt="Captura de pantalla (427)" src="https://github.com/user-attachments/assets/195fad87-b80a-42a7-88ba-d2e7e4601df4" />
 
 ### 🎞️ Comparaciones
 
-| Escenarios | Mejor Encode* vs AnimeJaNai V2** vs Anime4k*** |
+| Escenarios | Mejor Encode* vs AnimeJaNai V2 UC vs Anime4k Mode A (los mas nitidos) |
 |-|-|
 | Primeros Planos | [Link](https://slow.pics/c/Cb703Qla) |
-| Fondos, Texturas y Letras | [Link](https://slow.pics/c/AR9TAsPZ) |
+| Fondos y Texturas | [Link](https://slow.pics/c/AR9TAsPZ) |
 
-****Mejor Encode** Blu-Ray segun Sneedex y SeaDex.*  
-*****AnimeJaNai V2** con el modelo Ultra Compact. En mi opinion, el modelo (superior) Compact es un poco demasiado y requiere mucha mas potencia por poca mejora extra.*  
-******Anime4k** con el modo A. En mi opinion, el mejor modo relacion nitidez/difuminado.*
+> 📝 ***Mejor Encode:** El mejor encode que existe, segun Sneedex y SeaDex.*  
 
-| Escenarios | Mejor Encode vs AnimeJaNai V3* vs AnimeJaNai V2 vs Anime4k |
+| Shaders | Comparaciones Extra |
 |-|-|
-| Un poco de todo | [Link](https://slow.pics/c/XJtobDb0) |
+| Mejor Encode vs AnimeJaNai V3 C vs AnimeJaNai V2 UC vs Anime4k Mode A | [Link](https://slow.pics/c/XJtobDb0) |
+| Mejor Encode vs AnimeJaNai V3 C vs AnimeJaNai V3 Sharp SUC / UC / C vs AnimeJaNai V2 UC | [Link](https://slow.pics/c/3Cz5SCTY) |
+| Mejor Encode vs Anime4k Mode A vs AnimeJaNai V2 SUC vs AnimeJaNai V2 UC | [Link](https://slow.pics/c/QgO4Wf5i) |
 
-****AnimeJaNai V3** con el modelo Compact. El que requiere más potencia.*
+> 📝 *Si te cuesta ver las diferencias entre, por ejemplo: la 2a captura y la 4a o 5a, usa la opción de Slider.*  
+
+### Mi recomendacion:  
+
+| Opción Recomendada | Shader y Modelo | Situaciones de uso |
+|-|-|-|
+| Opcion 1 | AnimeJaNai V2 UC | El más nitido, sin pasarse (en mi opinion, AnimeJaNai V2 C es demasiado). |
+| Opcion 2 | AnimeJaNai V3 Sharp C > UC > SUC | Recomendado si eres mas puritano y quieres un buen balance entre nitidez/fidelidad. |
+| Opcion 3 | AnimeJaNai V2 SUC > Anime4k | Recomendado si quieres mas nitidez, pero te limita la GPU. (Ambas opciones difuminan un poco los fondos, sobretodo Anime4k). |
+| Opcion 4 | AnimeJaNai V3 C > UC > SUC | Recomendado si eres muy puritano, y solo quieres pulir la imagen y eliminar todos los artefactos que pueda tener el encode. |
 
 ## 🧰 Instalación
 
@@ -43,11 +54,14 @@ Además, incluye una interfaz moderna y funciones añadidas que lo convierten en
 4. En **GPUs NVIDIA**:
    - La primera vez que cargues cada modelo de **AnimeJaNai**, se abrira una terminal. No te asustes, eso es el engine creando un perfil `.engine` para tu PC.  
 
-> Ten en cuenta que AnimeJaNai es un shader pesado y cada vez que lo actives tardara unos segundos en verse el cambio en el video. Pausa el video antes de activarlo, desactivarlo o cambiar de modelo y no maximices ni entres en pantalla completa mientras carga.  
-> *El mpvnet de AnimeJaNai es muy sensible, asi que tratalo con delicadeza. Si esta haciendo una cosa (cargando un modelo, desvaneciendo la interfaz...), espera a que termine antes de hacer la siguiente (cambiar la pista de subs, avanzar/retroceder...).*
+- Ten en cuenta que AnimeJaNai es un shader pesado y cada vez que lo actives tardara unos segundos en verse el cambio en el video.  
+  Pausa el video antes de activarlo, desactivarlo o cambiar de modelo y no maximices ni entres en pantalla completa mientras carga.
+
+- El mpvnet de AnimeJaNai es muy sensible, asi que tratalo con delicadeza.  
+  Si esta haciendo una cosa (cargando un modelo, desvaneciendo la interfaz...), espera a que termine antes de hacer la siguiente (cambiar la pista de subs, avanzar/retroceder...).
 
 5. Ahora te toca aprender las **Keybinds** para saber como usarlo del todo :)  
-Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vago.
+Leete tambien el **changelog** (¡muy interesante!) y la **documentacion** + la documentacion de lo que esta incluido si quieres saber mas.
 
 ### 🧯 Troubleshooting
 
@@ -55,7 +69,7 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 ➝ Borra todos los `.engine` en `mpvnet desuka/animejanai/onnx`.
 
 - Si mpvnet o la interfaz se congela:  
-➝ Abre el Administrador de tareas y mata el proceso de mpvnet y mpv-discord.exe. 
+➝ Abre el Administrador de tareas y mata el proceso de `mpvnet` y `mpv-discord.exe`. 
 
 ## 📖 Documentación
 
@@ -63,30 +77,30 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 
 - **AnimeJaNai**:
 
-| Perfil | Modelo | GPU |
-|-|-|-|
-| 1 | Compact | RTX 4090 |
-| 2 | Ultra Compact | RTX 3080 |
-| 3 | Super Ultra Compact | RTX 3060 |
+| Modelo | GPU |
+|-|-|
+| Compact (C) | RTX 4090 |
+| Ultra Compact (UC) | RTX 3080 |
+| Super Ultra Compact (SUC) | RTX 3060 |
 
 - **Anime4K** *(mas ligero)*:
 
-| Resolucion de tu pantalla | Perfil | GPU |
+| Resolucion de tu pantalla | Modo | GPU |
 |-|-|-|
-| 4K | Cualquier Perfil | GPU de gama media-alta y alta |
-| 1080p | Cualquier Perfil | GPU de gama media-baja y media |
+| 4K | Cualquier Modo | GPU de gama media-alta y alta |
+| 1080p | Cualquier Modo | GPU de gama media-baja y media |
 
 ### 🧩 ¿Qué incluye?
 
 | | Tipo | Descripción |
 |-|-|-|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX | V2: Remasteriza la imagen a 4K aumentando drasticamente el nivel de detalle y nitidez, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: Recomendado para puristas. Remasteriza la imagen a 4K manteniendo todos los detalles, arreglando el line art, eliminando bordes de sierra y otros artefactos que puedan haber, mientras preserva los efectos originales de blur, difuminados, aberracion cromatica... Aunque cuesta mucho apreciar la diferencia. |
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX | V2: Remasteriza la imagen a 4K aumentando drasticamente el nivel de detalle y nitidez, a la vez que elimina artefactos, pero en algunos casos puede verse raro en escenas con blur o aberracion cromatica. V3: Recomendado para puristas. Remasteriza la imagen a 4K manteniendo todos los detalles, arreglando el line art, eliminando bordes de sierra y otros artefactos que puedan haber, mientras preserva los efectos originales de blur, difuminados, aberracion cromatica... Aunque cuesta apreciar la diferencia. En cambio la version Sharp, ofrece lo mismo, pero con un poco mas de nitidez.  |
 | [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL | Mejora la nitidez y elimina artefactos, pero suaviza mucho la imagen, perdiendo asi detalles del fondo de la escena y texturas aplicadas al dibujado. |
 | [**autoload**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Script | Carga automáticamente todos los archivos de vídeo en la carpeta a la lista de reproducción. |
 | [**modernX**](https://github.com/zydezu/ModernX) | Script | Interfaz moderna para mpv, con modificaciones propias. *(Uso la rama mas mantenida a dia de hoy)* |
 | [**thumbfast**](https://github.com/po5/thumbfast) | Script | Muestra miniaturas en la barra de progreso, como en YouTube. *(Uso una version antigua a proposito)* |
 | [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Script | Integración con Discord Rich Presence. |
-| **Custom Config** | Configuración | mpv.conf, mpvnet.conf input.conf y script-opts personalizados. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
+| **Custom Config** | Configuración | Comportamiento del reproductor personalizado, a travs de modificaciones a: mpv.conf, mpvnet.conf input.conf, animejanai.conf y script-opts. Fuentes: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
 | [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Reproductor Base | Version modificada por AnimeJaNai. |
 
 ### ⌨️ Keybinds importantes
@@ -96,8 +110,11 @@ Leete tambien el **changelog** (muy interesante) + la documentacion, no seas vag
 - `Ctrl + E` ➝ Abre el menú de AnimeJaNai  
 - `Ctrl + J` ➝ Muestra qué modelo de AnimeJaNai está activo  
 - `C` ➝ Abre el menú de mpvnet *(porfa no toques nada o puedes romper la config 😭🙏🏻 y será culpa tuya, no mía)*  
-- `Ctrl + 1 / 2 / 3` ➝ Activa AnimeJaNai V2 (4090 / 3080 / 3060)  
-- `Shift + 1 / 2 / 3` ➝ Activa AnimeJaNai V3 (4090 / 3080 / 3060)  
+- `Ctrl + 1 / 2 / 3` ➝ Activa AnimeJaNai V2 ( C / UC / SUC )
+- `Ctrl + 4 / 5 / 6` ➝ Activa AnimeJaNai V3 Sharp ( C / UC / SUC )
+- `Ctrl + 7 / 8` ➝ Perfiles de AnimeJaNai vacios, por si quieres encadenar varios modelos en un perfil nuevo, desde el menu de AnimeJaNai. 
+- `Ctrl + 7` ➝ Activa AnimeJaNai V1 SD Beta  
+- `Shift + 1 / 2 / 3` ➝ Activa AnimeJaNai V3 ( C / UC / SUC )  
 - `Ctrl + 0` ➝ Desactiva AnimeJaNai  
 - `1–6` ➝ Activa los diferentes modos de Anime4K  
 - `0` ➝ Desactiva Anime4K  
@@ -141,7 +158,7 @@ Mi antigua version, actualizada con los cambios de la nueva.
 - Usa **mpv** en lugar de **mpvnet** como base  
 - Incluye solo **Anime4K** (sin AnimeJaNai)  
 - Pesa **~120 MB** en lugar de más de **6 GB**  
-- Es **100 % estable**, sin *crashes*  
+- Es **100 % estable**, sin *crasheos*  
 - También funciona en **Linux con Wine**
 - Para instalar, tan solo sigue los pasos 1 y 2
 
@@ -260,27 +277,38 @@ Nuevas keybinds importantes:
 
 # ✨MPVNET DESUKA (EN)✨
 
-**mpvnet desuka** is a custom build of mpvnet made to play anime at the highest possible quality, sharpening the original image in real time through shaders, without losing background or texture details.  
-It also includes a modern interface and extra features, making it a complete and easy-to-use player, unlike the base mpv/mpvnet.
+**mpvnet desuka** is a custom build of mpvnet made to watch anime in the best possible quality and comfort.  
+It upscales to 4k the original image using real-time shaders, without losing any details in the background or textures, while eliminating any artifacts that may be present. It also includes a modern interface and extra features, making it a complete and easy-to-use player, unlike the base mpv/mpvnet. 
+
+> 📝 *Also suitable for movies and series.*
 
 <img width="2674" height="1383" alt="Captura de pantalla (427)" src="https://github.com/user-attachments/assets/195fad87-b80a-42a7-88ba-d2e7e4601df4" />
 
 ### 🎞️ Comparisons
 
-| Scenarios | Best Encode* vs AnimeJaNai V2** vs Anime4K*** |
+| Scenarios | Best Encode* vs AnimeJaNai V2 UC vs Anime4k Mode A (the sharpest ones) |
 |-|-|
 | Close-ups | [Link](https://slow.pics/c/Cb703Qla) |
-| Backgrounds, Textures & Text | [Link](https://slow.pics/c/AR9TAsPZ) |
+| Backgrounds and Textures | [Link](https://slow.pics/c/AR9TAsPZ) |
 
-****Best Blu-Ray Encode** according to Sneedex and SeaDex.*  
-*****AnimeJaNai V2** using the Ultra Compact model. In my opinion, the superior Compact model is a bit too much and it requires far more GPU power for very little visual improvement.*  
-******Anime4K** in Mode A, in my opinion, the best balance between sharpness and softness.*
+> 📝 ***Best Encode:** The best encode available according to Sneedex and SeaDex.*  
 
-| Scenarios | Best Encode vs AnimeJaNai V3* vs AnimeJaNai V2 vs Anime4k |
+| Shaders | Extra Comparisons |
 |-|-|
-| A little bit of everything | [Link](https://slow.pics/c/XJtobDb0) |
+| Best Encode vs AnimeJaNai V3 C vs AnimeJaNai V2 UC vs Anime4k Mode A | [Link](https://slow.pics/c/XJtobDb0) |
+| Best Encode vs AnimeJaNai V3 C vs AnimeJaNai V3 Sharp SUC / UC / C vs AnimeJaNai V2 UC | [Link](https://slow.pics/c/3Cz5SCTY) |
+| Best Encode vs Anime4k Mode A vs AnimeJaNai V2 SUC vs AnimeJaNai V2 UC | [Link](https://slow.pics/c/QgO4Wf5i) |
 
-****AnimeJaNai V3** using the Compact model. The one that requires more power.*
+> 📝 *If you have a hard time seeing the differences between, for example, the 2nd and 4th, 5th... screenshots, use the Slider option.*  
+
+### My recommendation:  
+
+| Recommended Option | Shader and Model | Use cases |
+|-|-|-|
+| Option 1 | AnimeJaNai V2 UC | The sharpest, without being excessive (in my opinion, AnimeJaNai V2 C is too much). |
+| Option 2 | AnimeJaNai V3 Sharp C > UC > SUC | Recommended if you are more purist and want a good balance between sharpness and fidelity. |
+| Option 3 | AnimeJaNai V2 SUC > Anime4k | Recommended if you want more sharpness, but are limited by your GPU. (Both options blur the backgrounds a little, especially Anime4k). |
+| Option 4 | AnimeJaNai V3 C > UC > SUC | Recommended if you are really purist and only want to polish the image and remove all the artifacts that the encoding may have. |
 
 ## 🧰 Installation
 
@@ -301,11 +329,14 @@ It also includes a modern interface and extra features, making it a complete and
 4. In **NVIDIA GPUs**:
    - The first time you load any **AnimeJaNai** model, a terminal window will pop up. Don’t panic, the engine is creating a `.engine` profile for your PC.
    
-> Keep in mind AnimeJaNai is heavy: every time you enable it, it’ll take a few seconds to apply. Pause the video before switching models, and do not maximize nor enter full screen while the shader is still loading.  
-> *The AnimeJaNai build of mpvnet is very "sensitive", if it’s doing something like loading a model or fading the interface, wait until it finishes before doing something else like seeking backward/forward.*
+- Keep in mind AnimeJaNai is heavy: every time you enable it, it’ll take a few seconds to apply.  
+  Pause the video before switching models, and do not maximize nor enter full screen while the shader is still loading.
+
+- The AnimeJaNai build of mpvnet is very "sensitive", so treat it with care.  
+  If it’s doing something like loading a model or fading the interface, wait until it finishes before doing something else like seeking backward/forward.
 
 5. Now it’s time to learn the **keybinds** so you can actually fully use it :)  
-Also check the **changelog** (very interesting!) and the **documentation**. Don’t be lazy.
+Also check the **changelog** (very interesting!) and the **documentation** + the documentation of what's included if you want to know more.
 
 ### 🧯 Troubleshooting
 
@@ -319,33 +350,33 @@ Also check the **changelog** (very interesting!) and the **documentation**. Don�
 
 ### 🔧 Recommended Requirements
 
-- **AnimeJaNai:**
+- **AnimeJaNai**:
 
-| Profile | Model | GPU |
-|-|-|-|
-| 1 | Compact | RTX 4090 |
-| 2 | Ultra Compact | RTX 3080 |
-| 3 | Super Ultra Compact | RTX 3060 |
+| Model | GPU |
+|-|-|
+| Compact (C) | RTX 4090 |
+| Ultra Compact (UC) | RTX 3080 |
+| Super Ultra Compact (SUC) | RTX 3060 |
 
 - **Anime4K** *(lighter)*:
 
-| Your Screen Resolution | Profile | GPU |
+| Your Screen Resolution | Mode | GPU |
 |-|-|-|
-| 4K | Any Profile | Mid-high to high-end GPU |
-| 1080p | Any Profile | Mid-low to mid-range GPU |
+| 4K | Any Mode | Mid-high to high-end GPU |
+| 1080p | Any Mode | Mid-low to mid-range GPU |
 
 ### 🧩 What's included?
 
 | | Tipo | Descripción |
 |-|-|-|
-| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX | Remasters the image to 4K, drastically increasing the level of detail and sharpness while removing artifacts, but in some cases it may look strange in scenes with blur or chromatic aberration. V3: Recommended for purists. Remasters the image to 4K, maintaining all the details, fixing the line art, removing jagged edges and other artifacts that may be present, while preserving the original effects of blur, dithering, chromatic aberration... Although it is difficult to notice the difference. |
+| [**AnimeJaNai V2 & V3**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Shader ONNX | Remasters the image to 4K, drastically increasing the level of detail and sharpness while removing artifacts, but in some cases it may look strange in scenes with blur or chromatic aberration. V3: Recommended for purists. Remasters the image to 4K, maintaining all the details, fixing the line art, removing jagged edges and other artifacts that may be present, while preserving the original effects of blur, dithering, chromatic aberration... Although it's hard to see the difference. On the other hand, the Sharp version offers the same thing, but with a little more sharpness. |
 | [**Anime4K**](https://github.com/h5mcbox/anime4k) | Shader GLSL | Sharpens and removes artifacts, but softens the image a lot, losing some background and texture details. |
 | [**autoload**](https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua) | Script | Automatically loads all video files in the folder into the playlist. |
 | [**modernX**](https://github.com/zydezu/ModernX) | Script | Modern mpvnet interface with custom modifications. *(Using the most maintained branch.)* |
-| [**thumbfast**](https://github.com/po5/thumbfast) | Script | Displays thumbnails on the progress bar, just like YouTube. *(I use an old version on purpose.)* |
+| [**thumbfast**](https://github.com/po5/thumbfast) | Script | Displays thumbnails on the progress bar, just like YouTube. *(Using a previous commit to fix a bug.)* |
 | [**DiscordRPC**](https://github.com/tnychn/mpv-discord) | Script |  Discord Rich Presence integration. |
-| **Custom Config** | Configuración | Custom `mpv.conf`, `mpvnet.conf`, `input.conf`, and `script-opts`. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
-| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Base player | AnimeJaNai-modified version of mpvnet. |
+| **Custom Config** | Configuración | Custom player behavior, through modifications to: mpv.conf, mpvnet.conf, input.conf, animejanai.conf, and script-opts. Sources: [Ref1](https://github.com/the-database/mpv-upscale-2x_animejanai) · [Ref2](https://github.com/Tsubajashi/mpv-settings) |
+| [**mpvnet**](https://github.com/the-database/mpv-upscale-2x_animejanai) | Base player | AnimeJaNai modified version of mpvnet. |
 
 ### ⌨️ Keybinds
 
@@ -354,8 +385,11 @@ Also check the **changelog** (very interesting!) and the **documentation**. Don�
 - `Ctrl + E` ➝ Opens AnimeJaNai menu  
 - `Ctrl + J` ➝ Shows which AnimeJaNai model is active  
 - `C` ➝ Opens mpvnet menu *(please don’t mess around or you might break the config 😭🙏🏻 and it’ll be your fault, not mine)*  
-- `Ctrl + 1 / 2 / 3` ➝ Enable AnimeJaNai V2 (4090 / 3080 / 3060)  
-- `Shift + 1 / 2 / 3` ➝ Enable AnimeJaNai V3 (4090 / 3080 / 3060)  
+- `Ctrl + 1 / 2 / 3` ➝ Enable AnimeJaNai V2 (C / UC / SUC)
+- `Ctrl + 4 / 5 / 6` ➝ Enable AnimeJaNai V3 Sharp (C / UC / SUC)
+- `Ctrl + 7 / 8` ➝ Empty AnimeJaNai profiles, in case you want to chain several models into a new profile from the AnimeJaNai menu.
+- `Ctrl + 7` ➝ Enable AnimeJaNai V1 SD Beta  
+- `Shift + 1 / 2 / 3` ➝ Enable AnimeJaNai V3 (C / UC / SUC)  
 - `Ctrl + 0` ➝ Disable AnimeJaNai  
 - `1–6` ➝ Enable different Anime4K modes  
 - `0` ➝ Disable Anime4K  
