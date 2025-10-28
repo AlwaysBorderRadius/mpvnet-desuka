@@ -73,7 +73,7 @@ local function visibility_mode(mode) end
 
 local user_opts = {
     -- Language and display --
-    language = "es",                        -- en:English - .json translations need implementing
+    language = "en",                        -- en:English, es:Spanish - .json translations need implementing
     font = "mpv-osd-symbols",               -- font for the OSC (default: mpv-osd-symbols or the one set in mpv.conf)
     layout_option = "original",             -- use the original/reduced layout
     idle_screen = true,                     -- show mpv logo when idle

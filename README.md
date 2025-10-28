@@ -48,7 +48,7 @@ Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin pe
    - Edita la ruta en esta linea: `binary_path=C:\Program Files\mpvnet desuka\mpv-discord.exe`
 
 3. Para **GPUs AMD**:
-   - Ve a `mpvnet desuka > ctrl+E > Global Settings`
+   - Abre `mpvnet desuka > ctrl+E > Global Settings`
    - Y cambia `Upscaling Backend` de `TensorRT` a `DirectML`
 
 4. En **GPUs NVIDIA**:
@@ -323,7 +323,7 @@ It upscales to 4k the original image using real-time shaders, without losing any
    - Edit the line: `binary_path=C:\Program Files\mpvnet desuka\mpv-discord.exe`
 
 3. For **AMD GPUs**:
-   - Go to `mpvnet desuka > ctrl+E > Global Settings`
+   - Open `mpvnet desuka > ctrl+E > Global Settings`
    - Change `Upscaling Backend` from `TensorRT` to `DirectML`
 
 4. In **NVIDIA GPUs**:
@@ -422,7 +422,10 @@ Also check the **changelog** (very interesting!) and the **documentation** + the
 
 - Audio and subtitle tracks will load automatically in this order, regardless of their position (you can change it in `mpv.conf`):  
   → **Audio:** `Japanese`, `English`, `Spanish`, etc.  
-  → **Subtitles:** `Spanish`, `Latin`, `English`, etc.
+  → **Subtitles:** `Spanish`, `Latin Spanish`, `English`, etc.
+
+- You may want to change the language (of just few words) from `Spanish` to `English`:
+   → Go to `script-opts/modernx.conf` and add/change `language=es` to `en`.
 
 # ✨MPV DESUKA (LITTLE)✨
 
