@@ -3,7 +3,7 @@
 # ✨MPVNET DESUKA✨
 
 **mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de ver anime en la mejor calidad y comodidad posible.  
-Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas, a la vez que se eliminan los artefactos que puedan haber. Incluye tambien, una interfaz moderna y funciones extra, convirtiendolo asi en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base. 
+Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas, a la vez que se eliminan los artefactos mas visibles que puedan haber. Incluye tambien, una interfaz moderna y funciones extra, convirtiendolo asi en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base. 
 
 > 📝 *Tambien apto para pelis y series.*
 
@@ -162,7 +162,7 @@ Mi antigua version, actualizada con los cambios de la nueva.
 - También funciona en **Linux con Wine**
 - Para instalar, tan solo sigue los pasos 1 y 2
 
-> 📝 *Las Keybinds de teclas y la configuración son las mismas.*
+> 📝 *Las Keybinds y la configuración son las mismas.*
 
 ## 🆕 Changelog (Pre-GitHub)
 
@@ -273,12 +273,17 @@ Nuevas keybinds importantes:
   - Nueva versión de Autoload.
 </details>
 
+## ☕ **APOYA MI TRABAJO**
+
+> Si te gusta mi trabajo y quieres darme las gracias, puedes invitarme a un café :D\
+> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/edubalfego)
+
 ---
 
 # ✨MPVNET DESUKA (EN)✨
 
 **mpvnet desuka** is a custom build of mpvnet made to watch anime in the best possible quality and comfort.  
-It upscales to 4k the original image using real-time shaders, without losing any details in the background or textures, while eliminating any artifacts that may be present. It also includes a modern interface and extra features, making it a complete and easy-to-use player, unlike the base mpv/mpvnet. 
+It upscales to 4k the original image using real-time shaders, without losing any details in the background or textures, while eliminating the most noticeable artifacts that may be present. It also includes a modern interface and extra features, making it a complete and easy-to-use player, unlike the base mpv/mpvnet. 
 
 > 📝 *Also suitable for movies and series.*
 
@@ -516,6 +521,11 @@ My older build, updated with the latest changes.
 - Added Thumbfast for YouTube-like thumbnails.  
 - Other tweaks and cleanup.
 </details>
+
+## ☕ **SUPPORT MY WORK**
+
+> If you like my work and want to say thank you, you can buy me a coffee :D\
+> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/edubalfego)
 
 ---
 
