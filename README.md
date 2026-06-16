@@ -276,7 +276,7 @@ Nuevas keybinds importantes:
 ## ☕ **APOYA MI TRABAJO**
 
 > Si te gusta mi trabajo y quieres darme las gracias, puedes invitarme a un café :D\
-> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/edubalfego)
+> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/elgamereduard)
 
 ---
 
@@ -525,7 +525,7 @@ My older build, updated with the latest changes.
 ## ☕ **SUPPORT MY WORK**
 
 > If you like my work and want to say thank you, you can buy me a coffee :D\
-> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/edubalfego)
+> [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/elgamereduard)
 
 ---
 
