@@ -37,8 +37,8 @@ Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin pe
 
 ## 🧰 Instalación
 
-> 🪟 **Windows Only**  
-> 💻 *Puede que funcione en Linux mediante WINE, pero no te lo aseguro.*
+> 🪟 **Made for Windows**  
+> 💻 *Aunque tambien funciona en Linux mediante WINE o Proton.*
 
 1. **Extrae** la carpeta `mpvnet desuka` donde quieras.  
    - Recomendado: `C:\Program Files\mpvnet desuka` o `C:\APPs\mpvnet desuka` si eres especial como yo.
@@ -51,7 +51,7 @@ Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin pe
    - Abre `mpvnet desuka > ctrl+E > Global Settings`
    - Y cambia `Upscaling Backend` de `TensorRT` a `DirectML`
 
-4. En **GPUs NVIDIA**:
+4. En **GPUs NVIDIA RTX**:
    - La primera vez que cargues cada modelo de **AnimeJaNai**, se abrira una terminal. No te asustes, eso es el engine creando un perfil `.engine` para tu PC.  
 
 - Ten en cuenta que AnimeJaNai es un shader pesado y cada vez que lo actives tardara unos segundos en verse el cambio en el video.  
@@ -317,8 +317,8 @@ It upscales to 4k the original image using real-time shaders, without losing any
 
 ## 🧰 Installation
 
-> 🪟 **Windows only**  
-> 💻 *Might work on Linux with WINE, but idk.*
+> 🪟 **Made for Windows**  
+> 💻 *Although it also works on Linux using WINE or Proton.*
 
 1. **Extract** the `mpvnet desuka` folder wherever you want.  
    - Recommended: `C:\Program Files\mpvnet desuka` or `C:\APPs\mpvnet desuka` if you’re special like me.
@@ -331,7 +331,7 @@ It upscales to 4k the original image using real-time shaders, without losing any
    - Open `mpvnet desuka > ctrl+E > Global Settings`
    - Change `Upscaling Backend` from `TensorRT` to `DirectML`
 
-4. In **NVIDIA GPUs**:
+4. In **NVIDIA GPUs RTX**:
    - The first time you load any **AnimeJaNai** model, a terminal window will pop up. Don’t panic, the engine is creating a `.engine` profile for your PC.
    
 - Keep in mind AnimeJaNai is heavy: every time you enable it, it’ll take a few seconds to apply.  
