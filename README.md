@@ -66,7 +66,7 @@ Leete tambien el **changelog** (¡muy interesante!) y la **documentacion** + la 
 ### 🧯 Troubleshooting
 
 - Si AnimeJaNai no funciona (no carga o no ves cambios):  
-➝ Borra todos los `.engine` en `mpvnet desuka/animejanai/onnx`.
+➝ Borra todos los `.engine` en `mpvnet desuka/animejanai/onnx` (solo para GPUs NVIDIA RTX)
 
 - Si mpvnet o la interfaz se congela:  
 ➝ Abre el Administrador de tareas y mata el proceso de `mpvnet` y `mpv-discord.exe`. 
@@ -346,7 +346,7 @@ Also check the **changelog** (very interesting!) and the **documentation** + the
 ### 🧯 Troubleshooting
 
 - If AnimeJaNai doesn’t work (no load or no visible effect):  
-  ➝ Delete all `.engine` files in `mpvnet desuka/animejanai/onnx`.
+  ➝ Delete all `.engine` files in `mpvnet desuka/animejanai/onnx` (only for NVIDIA RTX GPUs).
 
 - If mpvnet or the interface freezes:  
   ➝ Open Task Manager and kill the mpvnet and mpv-discord.exe processes.  
