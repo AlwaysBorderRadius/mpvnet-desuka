@@ -1,5 +1,7 @@
 [🇪🇸 Español](#mpvnet-desuka) | [🇬🇧 English](#mpvnet-desuka-en)
 
+[![Downloads](https://img.shields.io/github/downloads/AlwaysBorderRadius/mpvnet-desuka/total?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases) [![Release](https://img.shields.io/github/v/release/AlwaysBorderRadius/mpvnet-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases) [![Stars](https://img.shields.io/github/stars/AlwaysBorderRadius/mpvnet-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/stargazers)
+
 # ✨MPVNET DESUKA✨
 
 **mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de ver anime en la mejor calidad y comodidad posible.  
