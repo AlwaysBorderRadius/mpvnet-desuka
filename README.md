@@ -1,8 +1,12 @@
+<div align="center">
+
 [🇪🇸 Español](#mpvnet-desuka) | [🇬🇧 English](#mpvnet-desuka-en)
 
 [![Downloads](https://img.shields.io/github/downloads/AlwaysBorderRadius/mpvnet-desuka/total?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases) [![Release](https://img.shields.io/github/v/release/AlwaysBorderRadius/mpvnet-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases) [![Stars](https://img.shields.io/github/stars/AlwaysBorderRadius/mpvnet-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/stargazers)
 
 # ✨MPVNET DESUKA✨
+
+</div>
 
 **mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de ver anime en la mejor calidad y comodidad posible.  
 Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas, a la vez que se eliminan los artefactos mas visibles que puedan haber. Incluye tambien, una interfaz moderna y funciones extra, convirtiendolo asi en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base. 
@@ -151,7 +155,11 @@ Leete tambien el **changelog** (¡muy interesante!) y la **documentacion** + la 
   → **Audio:** `Japones`, `Ingles`, `Español`, etc.  
   → **Subtitulos:** `Español`, `Latino`, `Ingles`, etc.
 
-# ✨MPV DESUKA (LITTLE)✨
+<div align="center">
+
+# ✨MPV DESUKA (LITE)✨
+
+</div>
 
 Mi antigua version, actualizada con los cambios de la nueva.
 
@@ -282,7 +290,11 @@ Nuevas keybinds importantes:
 
 ---
 
+<div align="center">
+
 # ✨MPVNET DESUKA (EN)✨
+
+</div>
 
 **mpvnet desuka** is a custom build of mpvnet made to watch anime in the best possible quality and comfort.  
 It upscales to 4k the original image using real-time shaders, without losing any details in the background or textures, while eliminating the most noticeable artifacts that may be present. It also includes a modern interface and extra features, making it a complete and easy-to-use player, unlike the base mpv/mpvnet. 
@@ -434,7 +446,11 @@ Also check the **changelog** (very interesting!) and the **documentation** + the
 - You may want to change the language (of just few words) from `Spanish` to `English`:
    → Go to `script-opts/modernx.conf` and add/change `language=es` to `en`.
 
-# ✨MPV DESUKA (LITTLE)✨
+<div align="center">
+	
+# ✨MPV DESUKA (LITE)✨
+
+</div>
 
 My older build, updated with the latest changes.
 
@@ -531,4 +547,8 @@ My older build, updated with the latest changes.
 
 ---
 
+<div align="center">
+
 ### 🇪🇸 MADE IN (S)PAIN 🇪🇸
+
+</div>
