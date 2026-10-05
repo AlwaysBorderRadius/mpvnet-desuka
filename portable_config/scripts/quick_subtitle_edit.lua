@@ -49,6 +49,94 @@ local font_dir_state = nil     -- { old } de osd-fonts-dir para el overlay del e
 local session_edit_dir = nil   -- carpeta temporal de sesión junto al vídeo (subedit.temp)
 local last_session_dir = nil   -- última carpeta de sesión conocida (para limpiarla al apagar aun sin estar activa)
 
+-- Toolbar (subtitle edit mode) - Fase 1: sin handle de 6 puntitos
+local toolbar = {
+  active = false,        -- modo subtitle edit mode activo
+  visible = false,
+  overlay = nil,         -- overlay principal de la barra
+  winctrl_overlay = nil, -- overlay separado para botones de ventana (TR)
+  handle_overlay = nil,  -- overlay para handle (solo Fase 2)
+  anchor = "top",
+  margin = 20,
+  margin_x = 0,
+  margin_y = 0,
+  ox = 0, oy = 0,
+  scale_windowed = 1,
+  scale_fullscreen = 1,
+  wc_color = "#FFFFFF",
+  wc_minmax_hover = "#53A4FC",
+  wc_close_hover = "#E81123",
+  raise_subs = true,
+  rect = {x=0,y=0,w=0,h=0},
+  buttons = {},       -- hitboxes de la barra principal
+  hover = nil,        -- id del boton bajo el cursor
+  pressed = nil,      -- id del boton pulsado
+  wc_buttons = {},    -- hitboxes de los controles de ventana
+  wc_hover = nil,
+  wc_pressed = nil,
+  drag = {
+    active = false,
+    mx0=0,my0=0,
+    ox0=0,oy0=0,
+    hovered = false,
+  },
+  modernx_hidden = false, -- ModernX ocultado por este modo
+}
+
+-- Script-opts para toolbar (subtitle edit mode)
+-- Fichero: portable_config/script-opts/quick_subtitle_edit.conf
+local toolbar_opts = {
+  -- Presets de ubicacion: mismos valores que volume_bar_position de ModernX.
+  toolbar_position = "top",               -- left | right | top | bottom | center
+  toolbar_margin = 20,                    -- margen en unidades de canvas (como ModernX)
+  toolbar_margin_x = 0,                   -- ajuste extra sobre el preset
+  toolbar_margin_y = 0,
+  toolbar_raise_subs_during_mode = true,
+  -- Multiplicador del tamano de los iconos de la barra (y del padding, que
+  -- va a fs_c/2.2). 1 = el tamano por defecto (ph/32 => 22 unidades de canvas).
+  -- Se puede subir a 1.2, 1.3... sin tocar el codigo.
+  toolbar_icon_scale = 1,
+  -- Escala del canvas de ModernX (vid_scale=yes => 720 unidades de alto).
+  -- Deben coincidir con scale_windowed / scale_fullscreen de modernx.conf.
+  toolbar_scale_windowed = 1,
+  toolbar_scale_fullscreen = 1,
+  -- Colores de los controles de ventana (mismos defaults que ModernX).
+  winctrl_color = "#FFFFFF",
+  winctrl_minmax_hover = "#53A4FC",
+  winctrl_close_hover = "#E81123",
+  toolbar_draggable = false,                -- reservado para Fase 2
+  toolbar_enable_overlap_detection = false, -- reservado para Fase 3
+}
+
+local function apply_toolbar_opts()
+  toolbar.anchor = toolbar_opts.toolbar_position
+  toolbar.margin = toolbar_opts.toolbar_margin
+  toolbar.margin_x = toolbar_opts.toolbar_margin_x
+  toolbar.margin_y = toolbar_opts.toolbar_margin_y
+  toolbar.scale_windowed = toolbar_opts.toolbar_scale_windowed
+  toolbar.scale_fullscreen = toolbar_opts.toolbar_scale_fullscreen
+  toolbar.wc_color = toolbar_opts.winctrl_color
+  toolbar.wc_minmax_hover = toolbar_opts.winctrl_minmax_hover
+  toolbar.wc_close_hover = toolbar_opts.winctrl_close_hover
+  toolbar.raise_subs = toolbar_opts.toolbar_raise_subs_during_mode
+  toolbar.icon_scale = toolbar_opts.toolbar_icon_scale
+  toolbar.ox = 0
+  toolbar.oy = 0
+end
+
+-- En esta build de mpv el modulo NO viene expuesto en la tabla mp: hay que
+-- cargarlo a mano, igual que hace modernx.lua:15. Sin esto mp.assdraw es nil y
+-- render_toolbar_ass() peta al entrar en modo edicion.
+mp.assdraw = require("mp.assdraw")
+
+require("mp.options").read_options(toolbar_opts, "quick_subtitle_edit", apply_toolbar_opts)
+apply_toolbar_opts()
+
+-- forward declaration: refresh_toolbar se define al final del script, pero los
+-- puntos donde cambia el estado del editor (start_edit, switch_edit, ...) lo
+-- necesitan antes.
+local refresh_toolbar
+
 local SECTION_KEYS = {}     -- (reservado para futuros modos)
 
 --------------------------------------------------------------------------
@@ -533,8 +621,16 @@ end
 --------------------------------------------------------------------------
 -- Estilo OSD compartido por toda la UI del script: texto blanco 100% opaco
 -- con borde negro, misma fuente/tamaño en todos los elementos.
+local function osd_w()
+    local w = mp.get_property_number("osd-width")
+    if w and w > 0 then return w end
+    return mp.get_property_number("display-width") or 1280
+end
+
 local function osd_h()
-    return mp.get_property_number("osd-height") or 720
+    local h = mp.get_property_number("osd-height")
+    if h and h > 0 then return h end
+    return mp.get_property_number("display-height") or 720
 end
 
 local function osd_style_tags()
@@ -583,7 +679,7 @@ local function show_loading()
         ui_msg("Buscando subtítulos...", 100)
         return
     end
-    local w = mp.get_property_number("osd-width") or 1280
+    local w = osd_w()
     local h = osd_h()
     local ov = mp.create_osd_overlay("ass-events")
     if not ov then
@@ -1290,6 +1386,105 @@ local function cleanup_disposable()
     end
 end
 
+local function toolbar_calc_rect(x, y, w, h)
+  toolbar.rect.x = x; toolbar.rect.y = y; toolbar.rect.w = w; toolbar.rect.h = h
+end
+
+-- Glyphs de la barra. Todos verificados contra la fuente instalada
+-- portable_config/fonts/fluent-system-icons.ttf (codepoints estables en el
+-- upstream oficial, asi que una actualizacion de la fuente no los rompe).
+local TB_FONT = "fluent-system-icons"
+local TB_GLYPH = {
+  prev     = "\239\138\170", -- ic_fluent_chevron_left_20_regular  U+F2AA
+  next     = "\239\138\176", -- ic_fluent_chevron_right_20_regular U+F2B0
+  edit     = "\239\143\158", -- ic_fluent_edit_24_regular          U+F3DE
+  save     = "\239\153\191", -- ic_fluent_save_20_regular           U+F67F
+  dismiss  = "\239\141\169", -- ic_fluent_dismiss_20_regular        U+F369
+}
+
+local function tb_bytes(name)
+  local v = TB_GLYPH[name]
+  if not v then return "" end
+  return (v:gsub("\\[0-9][0-9][0-9]", function(d)
+    return string.char(tonumber(d:sub(2)))
+  end))
+end
+
+-- Replica el canvas de ModernX (modernx.lua, osc_init): con vid_scale=yes el
+-- alto del canvas es 720/escala y el ancho sale de la display_aspect. k es el
+-- factor canvas -> pixeles reales del OSD, que es por el que multiplicamos
+-- para emitir el ASS en coordenadas reales (las hitboxes se comparan contra
+-- mp.get_mouse_pos(), que tambien devuelve pixeles reales).
+local function canvas()
+  local _, _, dar = mp.get_osd_size()
+  if not dar or dar <= 0 then
+    dar = osd_w() / math.max(1, osd_h())
+  end
+  local scale = mp.get_property_bool("fullscreen")
+      and toolbar.scale_fullscreen or toolbar.scale_windowed
+  if not scale or scale <= 0 then scale = 1 end
+  local ph = 720 / scale
+  return ph * dar, ph, osd_h() / ph
+end
+
+-- Ubica la barra replicando los presets de la barra de volumen TEMPORAL de
+-- ModernX (modernx.lua:5042-5061): mismo canvas,
+-- mismo margin, mismo "screen_w/2 - draw_width/2" para centrar y misma
+-- estructura if/elseif por preset.
+--
+-- Todo se devuelve en UNIDADES DE CANVAS, no en pixeles: los overlays se
+-- crearon con res_x = pw / res_y = ph, igual que ModernX hace en
+-- set_osd(playresy * display_aspect, playresy, ...), asi que el ASS se dibuja
+-- 1:1 en canvas y no hay que multiplicar por k. k se devuelve aparte solo para
+-- convertir a pixeles reales las hitboxes, porque mp.get_mouse_pos() devuelve
+-- pixeles.
+local function toolbar_get_pos(bw, bh)
+  local pw, ph, k = canvas()
+  local margin = toolbar.margin
+  local bx, by
+
+  if toolbar.anchor == "left" then
+    bx, by = margin, ph / 2 - bh / 2
+  elseif toolbar.anchor == "right" then
+    bx, by = pw - bw - margin, ph / 2 - bh / 2
+  elseif toolbar.anchor == "top" then
+    bx, by = pw / 2 - bw / 2, margin
+  elseif toolbar.anchor == "bottom" then
+    bx, by = pw / 2 - bw / 2, ph - bh - margin
+  else -- center
+    bx, by = pw / 2 - bw / 2, ph / 2 - bh / 2
+  end
+
+  -- Ajuste fino sobre el preset, tambien en unidades de canvas (antes se
+  -- multiplicaba por k porque todo se trabajaba en pixeles).
+  bx = bx + (toolbar.margin_x or 0) + (toolbar.ox or 0)
+  by = by + (toolbar.margin_y or 0) + (toolbar.oy or 0)
+
+  bx = math.floor(bx + 0.5); by = math.floor(by + 0.5)
+  -- clamp en unidades de canvas: la barra nunca se sale de la pantalla
+  bx = math.max(0, math.min(bx, math.floor(pw - bw + 0.5)))
+  by = math.max(0, math.min(by, math.floor(ph - bh + 0.5)))
+  return bx, by, k
+end
+
+local function destroy_toolbar()
+  if toolbar.handle_overlay then pcall(function() toolbar.handle_overlay:remove() end); toolbar.handle_overlay = nil end
+  if toolbar.winctrl_overlay then pcall(function() toolbar.winctrl_overlay:remove() end); toolbar.winctrl_overlay = nil end
+  if toolbar.overlay then pcall(function() toolbar.overlay:remove() end); toolbar.overlay = nil end
+  toolbar.visible = false
+  -- Los bindings de raton de la barra se desactivan aqui para no seguir
+  -- interceptando los clics una vez dismantled la barra.
+  mp.disable_key_bindings("qse_toolbar")
+end
+
+-- Declaracion adelantada: la integracion con ModernX (modernx_loaded,
+-- modernx_visible y set_modernx_hidden) se define mas abajo, junto al resto de
+-- la logica del modo. exit_mode la necesita aqui, y sin este local
+-- `modernx_loaded()` era un global inexistente (= nil) dentro de exit_mode:
+-- el `if modernx_loaded() then` nunca era cierto y ModernX NO se restauraba
+-- nunca al salir del modo de edicion.
+local set_modernx_hidden
+
 local function exit_mode(message, dur, discard)
     msg.info("[salida] exit_mode: mensaje=" .. tostring(message)
           .. " discard=" .. tostring(discard)
@@ -1303,6 +1498,16 @@ local function exit_mode(message, dur, discard)
     if help_overlay then
         help_overlay:remove()
         help_overlay = nil
+    end
+    -- Limpiar toolbar (subtitle edit mode) y devolver ModernX
+    destroy_toolbar()
+    toolbar.active = false
+    toolbar.hover = nil
+    toolbar.pressed = nil
+    toolbar.wc_hover = nil
+    toolbar.wc_pressed = nil
+    if toolbar.modernx_hidden then
+        set_modernx_hidden(false)
     end
     if edit then
         if edit.overlay then
@@ -1375,6 +1580,7 @@ local function render_selector()
     else
         ui_msg(table.concat(lines, "\n"), 100)
     end
+    if refresh_toolbar then refresh_toolbar() end
 end
 
 local function start_edit(cand)  -- forward declaration (definida más abajo)
@@ -1886,6 +2092,8 @@ local function render_editor()
     else
         render_editor_osd()
     end
+    -- La barra depende del estado (p.ej. nº de eventos solapados)
+    if refresh_toolbar then refresh_toolbar() end
 end
 
 local function save_subtitle()  -- forward declaration (definida más abajo)
@@ -2370,7 +2578,7 @@ local function edit_subtitle(mode)
             return a.event.start_time < b.event.start_time
         end)
 
-pause_enter()
+        pause_enter()
         -- Fuentes embebidas para el primer evento en edición (antes de crear
         -- el renderer en setup_screen). Por línea, se re-evalúan en switch_edit.
         ensure_edit_fonts(cands[1])
@@ -2387,16 +2595,508 @@ pause_enter()
     end)
 end
 
-mp.add_key_binding("Ctrl+z", "edit-subtitle", function()
-    edit_subtitle("screen")
-end)
-mp.add_key_binding("Ctrl+Z", "edit-subtitle-osd", function()
-    edit_subtitle("osd")
-end)
+-- Los keybinds se registran al final del script, junto a
+-- enter_subtitle_edit_mode, para que ambos usen el mismo flujo.
 
 -- Al cerrar mpv se restaura osd-fonts-dir y se borra TODO el directorio de
 -- sesión (incluida la cache de fuentes fonts/). Si mpv se mata por la fuerza
 -- quedará una subedit.temp vacía que la próxima sesión reutiliza.
+local function render_toolbar_ass()
+  -- Todo se mide y se dibuja en UNIDADES DE CANVAS, igual que ModernX: el
+  -- overlay se crea con res_x = pw / res_y = ph, asi que no hay que multiplicar
+  -- por k al emitir. k solo se usa para las hitboxes, que van en pixeles reales
+  -- porque mp.get_mouse_pos() devuelve pixeles.
+  local _, ph, k = canvas()
+
+  -- Tamano proporcional a la altura. ph/32 en vez de ph/40 sube el icono de 18
+  -- a 22 unidades (+22%) y fs_c/2.2 en vez de fs_c/3 sube el padding de 6 a 10,
+  -- que es lo que hacia que los iconos parecieran pegados.
+  -- toolbar_icon_scale permite ajustarlo desde quick_subtitle_edit.conf.
+  local icon_scale = toolbar.icon_scale or 1
+  if not icon_scale or icon_scale <= 0 then icon_scale = 1 end
+  local fs_c = math.max(12, math.floor(ph / 32 * icon_scale + 0.5))
+  local pad_c = math.max(6, math.floor(fs_c / 2.2))
+  local btn_w_c = fs_c + pad_c * 2
+  local bar_h_c = fs_c + pad_c * 2
+
+  -- Botones disponibles segun el estado actual
+  local multi = false
+  if state == "select" then
+    multi = candidates and #candidates > 1
+  elseif state == "edit" and edit then
+    multi = #edit_cycle_list() > 1
+  end
+
+  local buttons = {}
+  if multi then
+    table.insert(buttons, {id = "prev_cand", glyph = "prev", hint = "Anterior"})
+    table.insert(buttons, {id = "next_cand", glyph = "next", hint = "Siguiente"})
+    table.insert(buttons, {sep = true})
+  end
+  table.insert(buttons, {id = "toggle_mode", glyph = "edit",
+    hint = (editor_mode_request == "osd") and "Modo OSD" or "Modo Pantalla"})
+  table.insert(buttons, {sep = true})
+  table.insert(buttons, {id = "save", glyph = "save", hint = "Guardar"})
+  table.insert(buttons, {id = "cancel", glyph = "dismiss", hint = "Cancelar"})
+
+  local bar_w_c = #buttons * btn_w_c
+  local bar_x, bar_y = toolbar_get_pos(bar_w_c, bar_h_c)
+
+  -- Un evento ASS por elemento, igual que la barra de volumen temporal de
+  -- ModernX (modernx.lua:5064-5112). Antes todo el fondo y todos los iconos
+  -- iban concatenados en un UNICO evento, mezclando drawing \p1 con texto y
+  -- cambiando \an dentro del mismo evento; por eso el fondo y los iconos se
+  -- acababan situando en sitios distintos.
+  local ass = mp.assdraw.ass_new()
+
+  -- Evento 1: fondo. pos(0,0) + an(7) para coordenadas absolutas, igual que
+  -- ModernX. Rectangulo negro translucido (sin radio, como estaba).
+  ass:new_event()
+  ass:pos(0, 0)
+  ass:an(7)
+  ass:append("{\\blur0\\bord1\\3c&H000000&\\1c&H0A0A0A&\\alpha&H14&}")
+  ass:draw_start()
+  ass:rect_cw(bar_x, bar_y, bar_x + bar_w_c, bar_y + bar_h_c)
+  ass:draw_stop()
+
+  -- Iconos centrados en cada celda + hitboxes para el raton
+  toolbar.buttons = {}
+  for i, b in ipairs(buttons) do
+    local cx = math.floor(bar_x + (i - 0.5) * btn_w_c + 0.5)
+    local cy = math.floor(bar_y + bar_h_c / 2 + 0.5)
+    if b.sep then
+      -- Evento propio: separador vertical
+      ass:new_event()
+      ass:pos(0, 0)
+      ass:an(7)
+      ass:append("{\\blur0\\bord1\\3c&H000000&\\1c&HFFFFFF&\\alpha&H60&}")
+      ass:draw_start()
+      ass:rect_cw(cx - 0.5, bar_y + pad_c * 0.5, cx + 0.5, bar_y + bar_h_c - pad_c * 0.5)
+      ass:draw_stop()
+    else
+      local lit = (toolbar.hover == b.id) or (toolbar.pressed == b.id)
+      local fill = lit and "FFFFFF" or "CCCCCC"
+      -- Mismo estilo que el icono de volumen de ModernX (modernx.lua:5105):
+      -- an(5) centrado y un unico tag con \fs, \1c y \fn.
+      ass:new_event()
+      ass:pos(cx, cy)
+      ass:an(5)
+      ass:append(string.format(
+        "{\\blur0\\bord1\\3c&H000000&\\1c&H%s&\\alpha&H00&\\fn%s\\fs%d}",
+        fill, TB_FONT, fs_c))
+      ass:append(tb_bytes(b.glyph))
+      -- Hitbox en PIXELES REALES (mp.get_mouse_pos() los devuelve asi)
+      table.insert(toolbar.buttons, {
+        id = b.id,
+        hint = b.hint,
+        x0 = (bar_x + (i - 1) * btn_w_c) * k,
+        y0 = bar_y * k,
+        x1 = (bar_x + i * btn_w_c) * k,
+        y1 = (bar_y + bar_h_c) * k,
+      })
+    end
+  end
+
+  -- toolbar.rect esta en unidades de canvas, igual que el resto del dibujado
+  toolbar_calc_rect(bar_x, bar_y, bar_w_c, bar_h_c)
+  return ass.text
+end
+
+-- Controles de ventana: replica exacta de los de ModernX (mismos glyphs, misma
+-- fuente mpv-osd-symbols, mismo \fs22 y las MISMAS posiciones en unidades de
+-- canvas). ModernX calcula todo sobre su canvas y solo multiplica al renderizar
+-- (wc_geo.w = osc_param.playresx, controlbox_left = wc_geo.w - controlbox_w),
+-- asi que aqui se hace igual: cx = pw - WC_BOX_W + WC_OFFSET[i].
+local WC_GLYPH = {
+  minimize  = "\238\132\146", -- icons.window.minimize  U+E112
+  maximize  = "\238\132\147", -- icons.window.maximize  U+E113
+  unmaximize= "\238\132\148", -- icons.window.unmaximizeU+E114
+  close     = "\238\132\149", -- icons.window.close     U+E115
+}
+local WC_BOX_W = 138   -- window_control_box_width de ModernX
+local WC_OFFSET = {30, 74, 118} -- centro de cada boton respecto a controlbox_left
+local WC_FS = 22       -- \fs22 de osc_styles.window_control
+local WC_Y = 15        -- wc_geo.y - wc_geo.h/2 = 30 - 15
+local WC_BTN_W = 40    -- w de first/second/third_geo de ModernX
+local WC_BTN_H = 30    -- wc_geo.h de ModernX
+
+-- "#RRGGBB" -> "BBGGRR": ASS interpreta &H......& como BGR.
+local function ass_bgr(color)
+  local h = tostring(color or ""):gsub("#", "")
+  if #h ~= 6 then return "FFFFFF" end
+  return h:sub(5, 6) .. h:sub(3, 4) .. h:sub(1, 2)
+end
+
+local function render_winctrl()
+  if toolbar.winctrl_overlay then
+    pcall(function() toolbar.winctrl_overlay:remove() end)
+    toolbar.winctrl_overlay = nil
+  end
+  if not mp.create_osd_overlay then return end
+  local ov = mp.create_osd_overlay("ass-events")
+  if not ov then return end
+  -- Playres = canvas, igual que ModernX (set_osd(playresx, playresy, ...)).
+  -- Por eso TODO lo de aqui va en unidades de canvas sin multiplicar por k.
+  local pw, ph, k = canvas()
+  ov.res_x = pw; ov.res_y = ph
+  toolbar.winctrl_overlay = ov
+
+  local box_left = pw - WC_BOX_W
+  local full = mp.get_property_bool("fullscreen")
+  local maxed = mp.get_property_bool("window-maximized")
+
+  local col_normal = ass_bgr(toolbar.wc_color)
+  local col_minmax = ass_bgr(toolbar.wc_minmax_hover)
+  local col_close = ass_bgr(toolbar.wc_close_hover)
+
+  toolbar.wc_buttons = {}
+  local ids = {"minimize", "maximize", "close"}
+  local glyphs = {
+    minimize = WC_GLYPH.minimize,
+    maximize = (maxed or full) and WC_GLYPH.unmaximize or WC_GLYPH.maximize,
+    close    = WC_GLYPH.close,
+  }
+  -- Un evento ASS por boton, como en ModernX. Antes iban los tres concatenados
+  -- en un unico evento con \pos distinto para cada uno.
+  local ass = mp.assdraw.ass_new()
+  for i, id in ipairs(ids) do
+    local cx = math.floor(box_left + WC_OFFSET[i] + 0.5)
+    local cy = WC_Y
+    local lit = (toolbar.wc_hover == id) or (toolbar.wc_pressed == id)
+    local color = col_normal
+    if lit then
+      color = (id == "close") and col_close or col_minmax
+    end
+    -- {\blur1\bord0.5\1c&H<color>&\3c&H0&\fs22\fnmpv-osd-symbols}
+    ass:new_event()
+    ass:pos(cx, cy)
+    ass:an(5)
+    ass:append(string.format(
+      "{\\blur1\\bord0.5\\3c&H0&\\1c&H%s&\\fs%d\\fnmpv-osd-symbols}", color, WC_FS))
+    ass:append(glyphs[id])
+    -- Hitbox identica a la de ModernX (w = 40, h = wc_geo.h = 30) pero en
+    -- PIXELES REALES, que es lo que devuelve mp.get_mouse_pos().
+    table.insert(toolbar.wc_buttons, {
+      id = id,
+      x0 = (cx - WC_BTN_W / 2) * k, y0 = (cy - WC_BTN_H / 2) * k,
+      x1 = (cx + WC_BTN_W / 2) * k, y1 = (cy + WC_BTN_H / 2) * k,
+    })
+  end
+  ov.data = ass.text
+  ov:update()
+end
+
+-- --------------------------------------------------------------------------
+-- Toolbar: ciclo de vida
+-- --------------------------------------------------------------------------
+
+local function show_toolbar()
+  destroy_toolbar()
+  if not mp.create_osd_overlay then return end
+  local ov = mp.create_osd_overlay("ass-events")
+  if not ov then return end
+  -- Playres = canvas, igual que ModernX en set_osd(playresx, playresy, ...).
+  -- Todo render_toolbar_ass() devuelve en unidades de canvas.
+  local pw, ph = canvas()
+  ov.res_x = pw; ov.res_y = ph
+  toolbar.overlay = ov
+  toolbar.visible = true
+  -- Los bindings forzados de raton solo existen mientras la barra esta en
+  -- pantalla; si no, se comen los clics del OSC normal de ModernX.
+  mp.enable_key_bindings("qse_toolbar")
+  ov.data = render_toolbar_ass()
+  ov:update()
+  render_winctrl()
+end
+
+refresh_toolbar = function()
+  if not toolbar.visible or not toolbar.overlay then return end
+  toolbar.overlay.data = render_toolbar_ass()
+  toolbar.overlay:update()
+end
+
+local function refresh_winctrl()
+  if not toolbar.visible then return end
+  render_winctrl()
+end
+
+local function hide_toolbar()
+  destroy_toolbar()
+end
+
+-- ModernX solo se oculta si esta cargado. ModernX publica un marcador propio
+-- al inicializarse, porque user-data/osc/visibility tambien lo define el OSC
+-- builtin de mpv. Al ocultarlo, ModernX desactiva sus propios bindings de raton
+-- (su render comprueba state.osc_visible), asi que no hay conflicto con la barra.
+--
+-- OJO: hay que leer con get_property_native. Las propiedades user-data/ son de
+-- tipo Any, y mp.get_property devuelve la representacion textual CON comillas
+-- ('"yes"'), con lo que comparar contra "yes" nunca era cierto y el OSC no se
+-- ocultaba nunca.
+local function modernx_loaded()
+  return mp.get_property_native("user-data/osc/mpvnet-modernx-loaded") == "yes"
+end
+
+-- user-data/osc/mpvnet-osc-visible es el espejo que ModernX escribe en
+-- osc_visible(): "yes" visible, "no" oculto. Se devuelve tal cual (puede ser
+-- nil si ModernX aun no ha publicado nada) porque nil NO equivale a "oculto":
+-- ModernX escribe el estado inicial al arrancar, pero si el script se recarga
+-- o falla antes, tratar nil como "ya esta oculto" impedia lanzar el hide.
+local function modernx_visible()
+  return mp.get_property_native("user-data/osc/mpvnet-osc-visible")
+end
+
+local MODERNX_ENFORCE_WINDOW = 0.5  -- segundos manteniendo la imposicion
+local MODERNX_ENFORCE_TICK = 0.1    -- cadencia de comprobacion
+
+-- No se llama a hide_osc()/show_osc() directamente, sino a lock_osc()/unlock_osc().
+-- Motivo (medido con el raton real): con bottom_hover=no, CADA movimiento del
+-- raton ejecuta show_osc() desde el bloque mouse_move, y show_osc() hace
+-- anitype=nil, con lo que cancela el fade de 150 ms que hide_osc() acaba de
+-- iniciar. El OSC reaparece al primer movimiento y se queda visible, que es
+-- justo lo que se quejaba. lock_osc()/unlock_osc() mantienen un flag interno
+-- que show_osc() respeta, de modo que el raton ya no puede resucitar el OSC y
+-- el desvanecimiento se completa.
+--
+-- Aun asi se comprueba el espejo y se reintenta el binding un par de veces por
+-- si este se perdiera (recarga de ModernX, carrera al abrir el modo en el mismo
+-- frame en que se carga el script).
+local function enforce_modernx_visibility(hidden, deadline)
+  if not modernx_loaded() then return end
+  -- nil != "no" y nil != "yes": si el espejo aun no existe, se lanza el
+  -- binding igualmente en vez de asumir que ya estamos en el estado pedido.
+  local want = hidden and "no" or "yes"
+  -- En cuanto el espejo coincide se para la cadena. Sin esta comprobacion
+  -- primero, el enforcer seguia reemitiendo el binding durante toda la ventana
+  -- y se peleaba con el auto-hide normal de ModernX (que oculta el OSC a los
+  -- ~200ms si el raton no se mueve), viendo el OSC parpadear al salir.
+  if modernx_visible() == want then return end
+  if mp.get_time() > deadline then return end
+  pcall(function()
+    mp.commandv("script-binding", hidden and "lock_osc" or "unlock_osc")
+  end)
+  mp.add_timeout(MODERNX_ENFORCE_TICK, function()
+    enforce_modernx_visibility(hidden, deadline)
+  end)
+end
+
+-- (set_modernx_hidden esta declarado como local mas arriba, porque exit_mode,
+-- que se define antes que este bloque, tambien lo necesita.)
+set_modernx_hidden = function(hidden)
+  if hidden == toolbar.modernx_hidden then return end
+  if not modernx_loaded() then return end
+  toolbar.modernx_hidden = hidden
+  enforce_modernx_visibility(hidden, mp.get_time() + MODERNX_ENFORCE_WINDOW)
+end
+
+local function editor_busy()
+  return state == "edit" or state == "select" or edit ~= nil or screen ~= nil
+end
+
+-- Punto de entrada unico del modo. Lo usan los dos keybinds y los dos
+-- script-message, de modo que abrir con Ctrl+z y con el boton de ModernX
+-- hace exactamente lo mismo.
+local function enter_subtitle_edit_mode(mode)
+  editor_mode_request = (mode == "osd") and "osd" or "screen"
+  toolbar.active = true
+  set_modernx_hidden(true)
+  -- edit_subtitle() es asincrono (mp.add_timeout): si no hay nada que editar
+  -- retorna sin haber puesto loading, y en ese caso no dejamos barra colgando.
+  edit_subtitle(editor_mode_request)
+  if loading or editor_busy() then
+    show_toolbar()
+  else
+    toolbar.active = false
+    set_modernx_hidden(false)
+  end
+end
+
+local function activate_subtitle_edit_mode()
+  enter_subtitle_edit_mode(editor_mode_request)
+end
+
+local function exit_subtitle_edit_mode()
+  exit_mode("Modo de edicion de subtitulos cerrado", 800, true)
+end
+
+-- --------------------------------------------------------------------------
+-- Toolbar: raton
+-- --------------------------------------------------------------------------
+-- mpv no da callbacks de raton a los osd-overlay, asi que se usan key
+-- bindings forzados como hace ModernX con su OSC. Solo seactuan si el clic cae
+-- dentro de un hitbox propio, y se consumen para no llegar a otros scripts.
+
+local function hit_test(list, x, y)
+  for _, b in ipairs(list or {}) do
+    if x >= b.x0 and x < b.x1 and y >= b.y0 and y < b.y1 then return b end
+  end
+  return nil
+end
+
+local function do_toolbar_action(id)
+  if state == "select" then
+    if id == "prev_cand" then selector_key("UP")
+    elseif id == "next_cand" then selector_key("DOWN")
+    elseif id == "save" then selector_key("ENTER")
+    elseif id == "cancel" then selector_key("ESC")
+    elseif id == "toggle_mode" then
+      enter_subtitle_edit_mode(editor_mode_request == "screen" and "osd" or "screen")
+    end
+    return
+  end
+  if state == "edit" then
+    if id == "prev_cand" then switch_edit(-1)
+    elseif id == "next_cand" then switch_edit(1)
+    elseif id == "save" then save_subtitle()
+    elseif id == "cancel" then cancel_edit()
+    elseif id == "toggle_mode" then
+      enter_subtitle_edit_mode(editor_mode_request == "screen" and "osd" or "screen")
+    end
+    return
+  end
+  if id == "cancel" then exit_subtitle_edit_mode() end
+end
+
+local function do_wc_action(id)
+  if id == "close" then
+    mp.commandv("quit")
+  elseif id == "minimize" then
+    mp.commandv("cycle", "window-minimized")
+  elseif id == "maximize" then
+    if mp.get_property_bool("fullscreen") then
+      mp.commandv("cycle", "fullscreen")
+    else
+      mp.commandv("cycle", "window-maximized")
+    end
+  end
+end
+
+-- mpv no expone callbacks de raton a los osd-overlay, asi que se usan key
+-- bindings forzados como hace ModernX con su OSC.
+--
+-- Esta build no expone mp.get_key_state, y ademas mpv SI distingue press y
+-- release: llama al 3er elemento de la tupla en el press y al 2o en el release
+-- (medido con un hold de 400 ms: 415 ms entre ambos callbacks). Ese es el mismo
+-- convenio que usa ModernX al escribir { "mbtn_left", fn_up, fn_down }.
+local function toolbar_mouse(which, down)
+  return function()
+    if not toolbar.visible then return false end
+    local x, y = mp.get_mouse_pos()
+    if not x then return false end
+
+    if which == "move" then
+      local b = hit_test(toolbar.buttons, x, y)
+      local wb = hit_test(toolbar.wc_buttons, x, y)
+      local h = b and b.id or nil
+      local wh = wb and wb.id or nil
+      if h ~= toolbar.hover or wh ~= toolbar.wc_hover then
+        toolbar.hover = h
+        toolbar.wc_hover = wh
+        refresh_toolbar()
+        refresh_winctrl()
+      end
+      return false
+    end
+
+    if which == "leave" then
+      if toolbar.hover or toolbar.wc_hover then
+        toolbar.hover = nil
+        toolbar.wc_hover = nil
+        refresh_toolbar()
+        refresh_winctrl()
+      end
+      return false
+    end
+
+    local b = hit_test(toolbar.buttons, x, y)
+    local wb = hit_test(toolbar.wc_buttons, x, y)
+
+    if down then
+      -- press: solo marcar. Un clic en el video vacio cae aqui con b == nil y no
+      -- ejecuta nada, que es lo que evita que el raton pause el video.
+      toolbar.pressed = b and b.id or nil
+      toolbar.wc_pressed = wb and wb.id or nil
+      refresh_toolbar()
+      refresh_winctrl()
+      return false
+    end
+
+    -- release: la accion sale solo si el boton sigue bajo el raton y es el mismo
+    -- que se pulso, para que arrastrar fuera del boton lo cancele.
+    local id, wc_id = toolbar.pressed, toolbar.wc_pressed
+    toolbar.pressed = nil
+    toolbar.wc_pressed = nil
+    refresh_toolbar()
+    refresh_winctrl()
+    if wc_id and wb and wb.id == wc_id then
+      do_wc_action(wc_id)
+      return true
+    end
+    if id and b and b.id == id then
+      do_toolbar_action(id)
+      return true
+    end
+    return false
+  end
+end
+
+-- Se usa set_key_bindings + enable/disable_key_bindings("force") porque en esta
+-- build mp.add_forced_key_bindings no existe.
+mp.set_key_bindings({
+  { "mbtn_left",  toolbar_mouse("left", false),  toolbar_mouse("left", true)  },
+  { "mbtn_right", toolbar_mouse("right", false), toolbar_mouse("right", true) },
+  { "mouse_move", toolbar_mouse("move") },
+  { "mouse_leave", toolbar_mouse("leave") },
+}, "qse_toolbar", "force")
+-- El grupo arranca desactivado y solo se activa con la barra visible: siempre
+-- activo se comia los clics del raton sobre el OSC normal de ModernX (el pause
+-- del play/pause dejo de funcionar).
+mp.disable_key_bindings("qse_toolbar")
+
+-- Reconstruir la barra al cambiar el tamaño de la ventana y al conmutar
+-- fullscreen/maximizado (los controles de ventana cambian de glyph).
+mp.observe_property("osd-dimensions", "native", function()
+    if not toolbar.visible then return end
+    -- La barra se dibuja en coordenadas de lienzo, no en píxeles de OSD: si no,
+    -- al redimensionar la ventana el fondo se va del sitio al no compartir
+    -- escala con los ASS de texto.
+    local pw, ph = canvas()
+    if toolbar.overlay then
+        toolbar.overlay.res_x = pw
+        toolbar.overlay.res_y = ph
+    end
+    if toolbar.winctrl_overlay then
+        toolbar.winctrl_overlay.res_x = pw
+        toolbar.winctrl_overlay.res_y = ph
+    end
+    refresh_toolbar()
+    refresh_winctrl()
+end)
+mp.observe_property("fullscreen", "native", function() if toolbar.visible then refresh_winctrl() end end)
+mp.observe_property("window-maximized", "native", function() if toolbar.visible then refresh_winctrl() end end)
+
+mp.add_key_binding("Ctrl+z", "edit-subtitle", function()
+    enter_subtitle_edit_mode("screen")
+end)
+mp.add_key_binding("Ctrl+Z", "edit-subtitle-osd", function()
+    enter_subtitle_edit_mode("osd")
+end)
+
+mp.register_script_message("activate-subtitle-edit-mode", function()
+    enter_subtitle_edit_mode("screen")
+end)
+mp.register_script_message("activate-subtitle-edit-mode-osd", function()
+    enter_subtitle_edit_mode("osd")
+end)
+mp.register_script_message("exit-subtitle-edit-mode", exit_subtitle_edit_mode)
+mp.register_script_message("toggle-subtitle-edit-mode", function()
+    if editor_busy() then
+      exit_subtitle_edit_mode()
+    else
+      enter_subtitle_edit_mode(editor_mode_request)
+    end
+end)
+
 mp.register_event("shutdown", function()
     msg.info("[apagado] cerrar mpv: restore_edit_fonts + remove_session_edit_dir(true)")
     pcall(function()

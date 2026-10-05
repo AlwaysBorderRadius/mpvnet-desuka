@@ -175,6 +175,8 @@ local user_opts = {
     download_button = true,            -- show download button on web videos (requires yt-dlp and ffmpeg)
     download_path = "~/Pictures/mpv/", -- default download directory for videos (https://mpv.io/manual/master/#paths)
 
+    subtitle_edit_button = true,        -- show quick subtitle edit button
+
     loop_button = false,               -- show loop button
     loop_in_pause = true,              -- enable looping by right-clicking pause
 
@@ -315,6 +317,14 @@ local icons = {
     download = "\239\133\144",
     download_initiated = "\239\140\174",
 
+    -- >>> CUSTOM quick subtitle edit <<<
+    -- ic_fluent_slide_text_edit_24_regular (U+F03C6). Solo existe en
+    -- FluentSystemIcons-Regular.ttf, asi que el boton lleva su propio \fn.
+    -- El renderer de botones inserta `content` en crudo, por eso el override
+    -- va aqui y no hace falta tocar render_elements().
+    subtitle_edit = "{\\fnFluentSystemIcons-Regular}\243\176\143\134",
+    -- <<< CUSTOM quick subtitle edit <<<
+
     loop_off = "\239\133\178",
     loop_on = "\239\133\181",
 
@@ -381,6 +391,8 @@ local language = {
         download_in_progress = "Download in progress",
         downloading = "Downloading",
         downloaded = "Already downloaded",
+        subtitle_edit = "Quick subtitle edit (L: screen",
+        subtitle_edit_hint = "R: OSD)",
     },
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -412,6 +424,8 @@ local language = {
         download_in_progress = "Descargando",
         downloading = "Descargando",
         downloaded = "Ya descargado",
+        subtitle_edit = "Edición rápida de subtítulos (Izq: pantalla",
+        subtitle_edit_hint = "Der: OSD)",
     }
     -- <<< CUSTOM AlwaysBorderRadius >>>
 }
@@ -558,6 +572,15 @@ local osc_styles = {
 local state = {
     showtime = nil,                          -- time of last invocation (last mouse move)
     osc_visible = false,
+    -- >>> CUSTOM subtitle_edit <<<
+    -- Bloqueo externo (quick_subtitle_edit abre un editor modal sobre el video).
+    -- Con bottom_hover=no, CADA mouse_move llama a show_osc(), que ademas hace
+    -- anitype=nil y por tanto cancela el fade-out que hide_osc() acaba de
+    -- iniciar. Sin este flag el OSC no se puede ocultar nunca: reaparece en el
+    -- primer movimiento del raton, dentro o fuera de la ventana de 150 ms del
+    -- fade. Mientras sea true, show_osc() no hace nada.
+    external_hidden = false,
+    -- <<< CUSTOM subtitle_edit <<<
     anistart = nil,                          -- time when the animation started
     anitype = nil,                           -- current type of animation
     animation = nil,                         -- current animation alpha
@@ -1409,6 +1432,106 @@ local function draw_sponsorblock_ranges(element, elem_ass, xp, rh)
     end
 end
 
+-- >>> CUSTOM subtitle_edit <<<
+-- Separacion en unidades de canvas entre el boton y el tooltip, para que el
+-- recuadro no quede pegado al borde de la hitbox.
+local TOOLTIP_BUTTON_GAP = 6
+
+-- Elementos cuyo tooltip se ancla por POSICION y no estimando el ancho.
+--
+-- Son los dos bloques de botones de la barra inferior: el izquierdo (pistas y
+-- volumen) y el derecho (edicion rapida, captura, informacion, anclar, pantalla
+-- completa). La regla posicional les da un anclaje estable que no cambia segun
+-- la longitud de la etiqueta.
+--
+-- La lista es deliberadamente corta: el resto de elementos (sliders, controles
+-- de ventana, loop, descarga) ya se dibujan bien con la regla de ancho de abajo
+-- y no hay que tocarlos. vol_ctrl no tiene tooltipF, asi que nunca dibuja
+-- tooltip y figura aqui solo por completitud del bloque.
+local TOOLTIP_ANCHOR_BY_SIDE = {
+    cy_video = true,
+    cy_audio = true,
+    cy_sub = true,
+    vol_ctrl = true,
+    subtitle_edit = true,
+    screenshot = true,
+    tog_info = true,
+    tog_ontop = true,
+    tog_fs = true
+}
+
+-- Ancho aproximado de un texto, en unidades de canvas.
+--
+-- mpv no expone ninguna forma de medir texto: el modulo mp.assdraw solo
+-- exporta ass_new (NO tiene ass_estimate_text), asi que no hay forma exacta.
+-- Solo se usa para decidir si el tooltip cabe hacia la izquierda del boton, de
+-- modo que una aproximacion es suficiente: si falla, el tooltip se ancla al
+-- otro lado, y en los botones del centro ambos lados son validos.
+--
+-- Se cuentan puntos de codigo UTF-8 en vez de bytes: `#s` cuenta por bytes y
+-- los acentos de "Edicion rapida de subtitulos" (2 bytes) inflarian el ancho
+-- al doble, que es justo el defecto del ajuste de upstream. El avance medio
+-- del glifo se aproxima como la mitad del fontsize.
+local function estimate_text_width(str, font_size)
+    if type(str) ~= 'string' then return 0 end
+    local codepoints = 0
+    for i = 1, #str do
+        local b = str:byte(i)
+        -- 0x80..0xBF son bytes de continuacion UTF-8: no cuentan como caracter
+        if b < 0x80 or b >= 0xC0 then codepoints = codepoints + 1 end
+    end
+    return codepoints * font_size * 0.5
+end
+
+-- >>> CUSTOM subtitle_edit <<<
+-- Posicion y alineacion del tooltip de un elemento. Devuelve an, tx, ty.
+--
+-- El tooltip se ancla al BOTON, no al raton. En vertical va al borde de la
+-- hitbox: debajo si el boton esta en la mitad superior, encima si esta en la
+-- inferior.
+--
+-- En horizontal hay dos reglas distintas:
+--
+-- 1. Elementos de TOOLTIP_ANCHOR_BY_SIDE (los dos bloques de botones): se
+--    abren hacia el lado del lienzo donde esta el boton, de forma puramente
+--    posicional. El centro de la hitbox se compara con la mitad del lienzo
+--    mediante x1 + x2 < playresx (equivale a dividir entre dos, pero evita la
+--    division). Asi el anclaje no depende de la longitud de la etiqueta y es
+--    siempre el mismo para un boton dado.
+--
+-- 2. El resto de elementos: mantiene la regla de upstream, que ancla a la
+--    derecha del boton y solo voltea a la izquierda si el texto no cabe.
+--
+-- En ambos casos la alineacion la hace ASS con \an, que ya es exacta. upstream
+-- ademas ajusta la posicion a mano con `tx - string.len(label) * 8`, que
+-- contaba BYTES (los acentos de "Edicion rapida de subtitulos" duplican el
+-- conteo) y por eso el texto nunca terminaba donde tocaba; aqui no hace falta
+-- ningun ajuste manual.
+local function tooltip_anchor(element, tooltiplabel)
+    local hb = element.hitbox
+    local below = hb.y1 < osc_param.playresy / 2
+    local ty = below and (hb.y2 + TOOLTIP_BUTTON_GAP)
+                            or (hb.y1 - TOOLTIP_BUTTON_GAP)
+    local an, tx
+    if TOOLTIP_ANCHOR_BY_SIDE[element.name] then
+        if hb.x1 + hb.x2 < osc_param.playresx then
+            an, tx = below and 9 or 3, hb.x1
+        else
+            an, tx = below and 8 or 2, hb.x2
+        end
+    else
+        local tw = estimate_text_width(tooltiplabel,
+                        user_opts.time_font_size)
+        if hb.x2 - tw >= 0 then
+            an, tx = below and 8 or 2, hb.x2
+        else
+            an, tx = below and 9 or 3, hb.x1
+        end
+    end
+    return an, tx, ty
+end
+-- <<< CUSTOM subtitle_edit <<<
+
 function render_elements(master_ass)
     -- when the slider is dragged or hovered and we have a target chapter name
     -- then we use it instead of the normal title. we calculate it before the
@@ -1659,17 +1782,8 @@ function render_elements(master_ass)
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
                 if mouse_hit(element) then
-                    local tooltiplabel = element.tooltipF
-                    local an = 1
-                    local ty = element.hitbox.y1
-                    local tx = get_virt_mouse_pos()
-
-                    if ty < osc_param.playresy / 2 then
-                        ty = element.hitbox.y2
-                        an = 7
-                    end
-
                     -- tooltip label
+                    local tooltiplabel
                     if element.enabled then
                         if type(element.tooltipF) == 'function' then
                             tooltiplabel = element.tooltipF()
@@ -1680,9 +1794,7 @@ function render_elements(master_ass)
                         tooltiplabel = element.nothingavailable
                     end
 
-                    if tx > osc_param.playresx / 2 then --move tooltip to left side of mouse cursor
-                        tx = tx - string.len(tooltiplabel) * 8
-                    end
+                    local an, tx, ty = tooltip_anchor(element, tooltiplabel)
 
                     elem_ass:new_event()
                     elem_ass:pos(tx, ty)
@@ -3006,6 +3118,43 @@ end
 
 local layouts = {}
 
+-- >>> CUSTOM subtitle_edit <<<
+-- Ancho de una ranura del cluster derecho. Los offsetshistoricos de los
+-- layouts se calculan con los flags de opcion, pero la visibilidad real de
+-- un elemento depende tambien de cosas dinamicas (download exige state.is_URL,
+-- varios elementos tienen gates de anchura). visible_slot() devuelve el
+-- desplazamiento real para que un boton no deje huecos en el cluster.
+--
+-- OJO: solo es valido dentro de los layouts, que se ejecutan desde
+-- osc_init() (linea ~4622) DESPUES de todos los new_element(). Si upstream
+-- moviera la llamada a layouts[]() antes de crearlos, elements[name] seria
+-- nil y todos los slots devolverian 0.
+local function visible_slot(name)
+    local e = elements[name]
+    -- Hace falta las tres condiciones: que el elemento exista, que tenga layout
+    -- (si el boton esta apagado por config, los layouts nunca le llaman a
+    -- add_layout y se queda sin layout -> no se dibuja) y que el layout lo haya
+    -- dejado visible. Ojo: el visible que decide prepare_elements() es el del
+    -- ELEMENTO (new_element), no el del layout.
+    if e ~= nil and e.layout ~= nil and e.visible then return 45 end
+    return 0
+end
+
+-- Desplazamiento acumulado de los botones visibles que quedan a la derecha
+-- de subtitle_edit, para colocarlo pegado a ellos sin huecos. El cluster
+-- derecho va de derecha a izquierda: fs, loop, ontop, info, screenshot,
+-- download. subtitle_edit es el mas a la izquierda del grupo, asi que cuenta
+-- el cluster entero.
+local function cluster_shift_after()
+    local shift = 0
+    for _, n in ipairs({ 'tog_fs', 'tog_loop', 'tog_ontop', 'tog_info',
+        'screenshot', 'download' }) do
+        shift = shift + visible_slot(n)
+    end
+    return shift
+end
+-- <<< CUSTOM subtitle_edit <<<
+
 -- Default layout
 layouts["original"] = function()
     local osc_geo = {
@@ -3319,6 +3468,25 @@ layouts["original"] = function()
         lo.style = osc_styles.control_3
         lo.visible = (osc_param.playresx >= 400 - outeroffset)
     end
+
+    -- >>> CUSTOM quick subtitle edit <<<
+    -- x derivado de la visibilidad REAL de los botones a su derecha en vez de
+    -- los flags de opcion: `download` solo se dibuja con state.is_URL, asi que
+    -- con un fichero local el offset historico (w-307 + ...) dejaba un hueco
+    -- de 45 unidades. cluster_shift_after suma 45 por cada boton visible.
+    if user_opts.subtitle_edit_button then
+        lo = add_layout('subtitle_edit')
+        lo.geometry = {
+            x = osc_geo.w - 37 - cluster_shift_after(),
+            y = refY - 40,
+            an = 5,
+            w = 24,
+            h = 24
+        }
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 350 - outeroffset)
+    end
+    -- <<< CUSTOM quick subtitle edit <<<
 end
 
 -- Reduced occupation layout
@@ -3600,6 +3768,25 @@ layouts["reduced"] = function()
         lo.style = osc_styles.control_3
         lo.visible = (osc_param.playresx >= 400 - outeroffset)
     end
+
+    -- >>> CUSTOM quick subtitle edit <<<
+    -- x derivado de la visibilidad REAL de los botones a su derecha en vez de
+    -- los flags de opcion: `download` solo se dibuja con state.is_URL, asi que
+    -- con un fichero local el offset historico (w-307 + ...) dejaba un hueco
+    -- de 45 unidades. cluster_shift_after suma 45 por cada boton visible.
+    if user_opts.subtitle_edit_button then
+        lo = add_layout('subtitle_edit')
+        lo.geometry = {
+            x = osc_geo.w - 37 - cluster_shift_after(),
+            y = refY - 40,
+            an = 5,
+            w = 24,
+            h = 24
+        }
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 350 - outeroffset)
+    end
+    -- <<< CUSTOM quick subtitle edit <<<
 end
 
 -- Validate string type user options
@@ -4177,6 +4364,29 @@ local function osc_init()
         end
     end
 
+    -- >>> CUSTOM quick subtitle edit <<<
+    -- Lanza el editor rapido de subtitulos (quick_subtitle_edit.lua).
+    -- Clic izquierdo -> edicion en pantalla; clic derecho -> edicion en OSD.
+    ne = new_element("subtitle_edit", "button")
+    ne.content = icons.subtitle_edit
+    ne.visible = (osc_param.playresx >= 350 - outeroffset) and
+        mp.get_property_bool("current-tracks/sub/selected")
+    ne.tooltip_style = osc_styles.tooltip
+    -- Una sola linea por compacidad. Ya no hace falta por el desplazamiento
+    -- `string.len(label) * 8` (eliminado en render_elements): el tooltip se
+    -- ancla con alineacion ASS (an=8/2, y an=9/3 si no cabe hacia la
+    -- izquierda) y admite varias lineas.
+    ne.tooltipF = function()
+        return texts.subtitle_edit .. " / " .. texts.subtitle_edit_hint
+    end
+    ne.eventresponder["mbtn_left_up"] = function()
+        mp.commandv("script-message-to", "quick_subtitle_edit", "activate-subtitle-edit-mode")
+    end
+    ne.eventresponder["mbtn_right_up"] = function()
+        mp.commandv("script-message-to", "quick_subtitle_edit", "activate-subtitle-edit-mode-osd")
+    end
+    -- <<< CUSTOM quick subtitle edit <<<
+
     --screenshot
     ne = new_element("screenshot", "button")
     ne.content = icons.screenshot
@@ -4558,6 +4768,13 @@ end
 -- Other important stuff
 --
 function show_osc()
+    -- >>> CUSTOM subtitle_edit <<<
+    -- Bloqueado por otro script (editor de subtitulos abierto): el raton no
+    -- puede resucitar el OSC. Tiene que ir PRIMERO, antes de state.showtime,
+    -- para no refrescar tampoco el temporizador de auto-hide.
+    if state.external_hidden then return end
+    -- <<< CUSTOM subtitle_edit <<<
+
     -- show when disabled can happen (e.g. mouse_move) due to async/delayed unbinding
     if not state.enabled then return end
 
@@ -4593,9 +4810,54 @@ function hide_osc()
     end
 end
 
+-- >>> CUSTOM subtitle_edit <<<
+-- Bloqueo/desbloqueo del OSC para otros scripts (quick_subtitle_edit).
+--
+-- No basta con llamar a hide_osc(): su fade de 150 ms lo cancela cualquier
+-- mouse_move, porque con bottom_hover=no show_osc() se llama en CADA
+-- movimiento y ademas pone anitype=nil. Asi que lock_osc() marca el flag que
+-- show_osc() respeta y silencia las secciones showhide (que tick() vuelve a
+-- activar cada frame mientras state.enabled sea true, por eso el guard en
+-- show_osc es imprescindible y no basta con desactivar las secciones).
+--
+-- hide_osc() se mantiene para que el ocultado siga siendo un desvanecimiento
+-- y no un corte seco.
+function lock_osc()
+    if not state.enabled then return end
+    state.external_hidden = true
+    if state.showhide_enabled then
+        mp.disable_key_bindings('showhide')
+        mp.disable_key_bindings('showhide_wc')
+        state.showhide_enabled = false
+    end
+    hide_osc()
+end
+
+function unlock_osc()
+    state.external_hidden = false
+    -- Se reactivan las secciones a mano en vez de llamar a
+    -- do_enable_key_bindings() porque esa es una local: usarla como global
+    -- rompia en tiempo de ejecucion.
+    if state.enabled and not state.showhide_enabled then
+        mp.enable_key_bindings('showhide', 'allow-vo-dragging+allow-hide-cursor')
+        mp.enable_key_bindings('showhide_wc', 'allow-vo-dragging+allow-hide-cursor')
+        state.showhide_enabled = true
+    end
+    show_osc()
+end
+-- <<< CUSTOM subtitle_edit <<<
+
 function osc_visible(visible)
     if state.osc_visible ~= visible then
         state.osc_visible = visible
+        -- >>> CUSTOM subtitle_edit <<<
+        -- Espejo del estado real de visibilidad. user-data/osc/visibility solo
+        -- refleja el MODO (auto/always/never) que fija visibility_mode(), asi
+        -- que no sirve para saber si el OSC esta oculto ahora mismo. Este si,
+        -- y permite que quick_subtitle_edit compruebe que hide_osc ha hecho
+        -- efecto en vez de solo confiar de que el script-binding se lanzo.
+        mp.set_property_native("user-data/osc/mpvnet-osc-visible", visible and "yes" or "no")
+        -- <<< CUSTOM subtitle_edit <<<
         adjust_subtitles(true) -- raise subtitles
     end
     request_tick()
@@ -5266,9 +5528,21 @@ if user_opts.key_bindings then
     end);
 
     mp.add_key_binding("ctrl+s", "shuffle_playlist", shuffle_playlist);
-
-    mp.add_key_binding(nil, 'show_osc', function() show_osc() end)
 end
+
+-- >>> CUSTOM subtitle_edit <<<
+-- Registrados FUERA del bloque `key_bindings` a proposito: con
+-- key_bindings=no no se creaban nunca, y otros scripts (ej.
+-- quick_subtitle_edit) los usan para ocultar y restaurar el OSC mediante
+-- `script-binding`. Un binding con tecla nil no crea ningun atajo de
+-- usuario, asi que sacarlos de aqui no cambia el resto de atajos.
+mp.add_key_binding(nil, 'show_osc', function() show_osc() end)
+mp.add_key_binding(nil, 'hide_osc', function() hide_osc() end)
+-- El editor de subtitulos usa estos dos en vez de hide_osc/show_osc: el OSC no
+-- debe reaparecer con el raton mientras el editor esta abierto.
+mp.add_key_binding(nil, 'lock_osc', function() lock_osc() end)
+mp.add_key_binding(nil, 'unlock_osc', function() unlock_osc() end)
+-- <<< CUSTOM subtitle_edit <<<
 
 mp.observe_property('fullscreen', 'bool',
     function(_, val)
@@ -5387,6 +5661,17 @@ mp.enable_key_bindings('window-controls')
 function reset_timeout()
     state.showtime = mp.get_time()
 end
+
+-- Marcador de presencia para otros scripts (ej. quick_subtitle_edit).
+-- user-data/osc/visibility no sirve: el OSC builtin de mpv tambien la define.
+mp.set_property_native("user-data/osc/mpvnet-modernx-loaded", "yes")
+
+-- >>> CUSTOM subtitle_edit <<<
+-- Se publica tambien el estado inicial. Sin esto la propiedad no existe hasta
+-- la primera llamada a osc_visible(), y quick_subtitle_edit leia nil y daba por
+-- hecho que el OSC ya estaba oculto (por eso no se ocultaba al entrar).
+mp.set_property_native("user-data/osc/mpvnet-osc-visible", state.osc_visible and "yes" or "no")
+-- <<< CUSTOM subtitle_edit <<<
 
 -- mode can be auto/always/never/cycle
 -- the modes only affect internal variables and not stored on its own.
