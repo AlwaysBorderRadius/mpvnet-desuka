@@ -670,6 +670,10 @@ local CHAR_ADVANCE = {
 -- average latin advance, for codepoints the table does not cover
 local ADVANCE_FALLBACK = 8
 
+-- advances the table above does not carry: the track list bullets, measured
+-- the same way at \fs20 (● = U+25CF, ○ = U+25CB)
+local MSG_ADVANCE = { [9679] = 9.831, [9675] = 13.879 }
+
 -- mpv runs Lua 5.1, which has no utf8 library, so decode by hand
 local function utf8_codepoints(str)
     local codes = {}
@@ -700,7 +704,7 @@ local function text_width(str, fontsize)
     local fs = fontsize or user_opts.time_font_size or ADVANCE_FS
     local total = 0
     for _, code in ipairs(utf8_codepoints(str)) do
-        total = total + (CHAR_ADVANCE[code] or ADVANCE_FALLBACK)
+        total = total + (MSG_ADVANCE[code] or CHAR_ADVANCE[code] or ADVANCE_FALLBACK)
     end
     return total * (fs / ADVANCE_FS)
 end
@@ -946,6 +950,7 @@ local state = {
 
     message_text = nil, -- TODO: needs to be removed
     message_hide_timer = nil, ---@type mp.Timer? -- TODO: needs to be removed
+    message_meta = nil, -- structured track list rows for render_message_block
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Estado de las barras temporales de volumen y seek / State for the temporary volume & seek bars
@@ -1266,12 +1271,16 @@ function update_tracklist()
 end
 
 -- return a nice list of tracks of the given type (video, audio, sub)
+-- The optional second return value carries the structured rows so
+-- render_message_block can position every line and drop vector flags in place.
 function get_tracklist(type)
     update_tracklist()
     local message = valid_types[type] .. texts.track
+    local meta = nil
     if not tracks_osc or #tracks_osc[type] == 0 then
         message = texts.none
     else
+        meta = { rows = { { text = message } } }
         for n = 1, #tracks_osc[type] do
             local track = tracks_osc[type][n]
             local lang, title, selected = 'unknown', '', '○'
@@ -1297,10 +1306,21 @@ function get_tracklist(type)
             else
                 label = title
             end
-            message = message .. '\n' .. selected .. ' ' .. n .. ': ' .. label
+            local full = selected .. ' ' .. n .. ': ' .. label
+            message = message .. '\n' .. full
+            local row = { full = full }
+            if flag_drawn(lang) then
+                local lang_label = format_track_label(lang, "name")
+                row.head = selected .. ' ' .. n .. ':'
+                if lang_label and label:sub(1, #lang_label) == lang_label then
+                    row.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
+                end
+                row.flag_lang = lang
+            end
+            meta.rows[#meta.rows + 1] = row
         end
     end
-    return message
+    return message, meta
 end
 
 -- relatively change the track of given <type> by <next> tracks
@@ -2903,7 +2923,7 @@ local function make_sponsorblock_segments()
     print("Added SponsorBlock segments")
 end
 
-function show_message(text, duration)
+function show_message(text, duration, meta)
     if state.showingDescription then
         destroy_scrolling_keys()
     end
@@ -2921,6 +2941,11 @@ function show_message(text, duration)
     text = string.gsub(text, '\n', '\\N')
     text = "\\N" .. text
     state.message_text = text
+    state.message_meta = meta
+    if meta then
+        -- render_message only takes the block path while both still match
+        meta.render_text = text
+    end
 
     if not state.message_hide_timer then
         state.message_hide_timer = mp.add_timeout(0, request_tick)
@@ -2930,6 +2955,41 @@ function show_message(text, duration)
     state.message_hide_timer:resume()
     request_tick()
 end
+
+-- show the track list of <type>; uses the explicitly positioned block layout
+-- with vector flags whenever get_tracklist could build the row metadata
+function show_tracklist(type)
+    local message, meta = get_tracklist(type)
+    show_message(message, nil, meta)
+end
+
+-- show only the row of the currently selected track in the same block layout
+-- as the full list; used by the cycle-sub keybinds (input.conf script-messages)
+function show_selected_track_row(type)
+    local _, meta = get_tracklist(type)
+    local row
+    if meta then
+        local n = get_track(type)
+        if n > 0 then
+            row = meta.rows[n + 1] -- rows[1] holds the list header
+        end
+    end
+    if not row then
+        show_message(valid_types[type] .. ': ' .. texts.off)
+        return
+    end
+    show_message(row.full, nil, { rows = { row } })
+end
+
+mp.register_script_message("cycle-sub", function()
+    mp.commandv("no-osd", "cycle", "sub")
+    show_selected_track_row("sub")
+end)
+
+mp.register_script_message("cycle-sub-down", function()
+    mp.commandv("no-osd", "cycle", "sub", "down")
+    show_selected_track_row("sub")
+end)
 
 function bind_keys(keys, name, func, opts)
     if not keys then
@@ -3200,6 +3260,7 @@ function show_description(text)
     state.descriptionBaseText = text
     text = "\\N" .. apply_link_highlight(text)
     state.message_text = text
+    state.message_meta = nil
 
     if not state.message_hide_timer then
         state.message_hide_timer = mp.add_timeout(0, request_tick)
@@ -3212,6 +3273,64 @@ function reset_desc_timer()
     state.message_hide_timer:kill()
     state.message_hide_timer.timeout = 10
     state.message_hide_timer:resume()
+end
+
+-- Calibrated with compute_bounds against the default OSD pen: with these
+-- constants the explicitly positioned block lands on the same pixels as the
+-- old implicitly positioned text (delta 0 px), so the list keeps its place
+-- while every row gets its own \pos for the flag to hang off. show_message
+-- prepends an empty line, so the header sits one line below the pen, and
+-- both offsets scale with the runtime font size (fs20 -> 31.759 / 20.048).
+local BLOCK_PEN_X = 25.06
+local BLOCK_PEN_Y = 21.928
+local BLOCK_EMPTY_ADV = 0.49155
+local BLOCK_PITCH = 1.0024
+
+local function render_message_block(ass, meta, fontsize, outline)
+    local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
+    local gap = user_opts.track_flag_gap or 2
+    local y0 = BLOCK_PEN_Y + BLOCK_EMPTY_ADV * fontsize
+    for i = 1, #meta.rows do
+        local row = meta.rows[i]
+        local y = y0 + (i - 1) * BLOCK_PITCH * fontsize
+
+        local head = row.head and row.head:gsub("%s+$", "")
+        local tail = row.tail and row.tail:gsub("^%s+", "")
+        local asset, _, flag_w, flag_h
+        if row.flag_lang then
+            asset, _, flag_w, flag_h = get_flag_geometry(row.flag_lang)
+        end
+
+        if not head or not asset then
+            ass:new_event()
+            ass:pos(BLOCK_PEN_X, y)
+            ass:an(7)
+            ass:append(style)
+            ass:append(row.full or row.text or "")
+        else
+            ass:new_event()
+            ass:pos(BLOCK_PEN_X, y)
+            ass:an(7)
+            ass:append(style)
+            ass:append(head)
+
+            local flag_x = BLOCK_PEN_X + text_width(head, fontsize) + gap
+            local flag_ass = render_flag(row.flag_lang, flag_x,
+                y + (fontsize - flag_h) / 2)
+            if flag_ass then
+                ass:new_event()
+                ass:merge(flag_ass)
+            end
+
+            if tail and tail ~= "" then
+                ass:new_event()
+                ass:pos(flag_x + flag_w + gap, y)
+                ass:an(7)
+                ass:append(style)
+                ass:append(tail)
+            end
+        end
+    end
 end
 
 function render_message(ass)
@@ -3241,6 +3360,12 @@ function render_message(ass)
 
         local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
 
+        local meta = state.message_meta
+        if meta and meta.render_text == state.message_text and not state.showingDescription then
+            render_message_block(ass, meta, fontsize, outline)
+            return
+        end
+
         ass:new_event()
         ass:append(style .. state.message_text)
 
@@ -3249,6 +3374,7 @@ function render_message(ass)
         end
     else
         state.message_text = nil
+        state.message_meta = nil
         if state.showingDescription then destroy_scrolling_keys() end
     end
 end
@@ -4320,26 +4446,26 @@ local function osc_init()
     ne.eventresponder['mbtn_left_up'] =
         function()
             set_track('video', 1)
-            show_message(get_tracklist('video'))
+            show_tracklist('video')
         end
     ne.eventresponder['enter'] =
         function()
             set_track('video', 1)
-            show_message(get_tracklist('video'))
+            show_tracklist('video')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
             set_track('video', -1)
-            show_message(get_tracklist('video'))
+            show_tracklist('video')
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function()
             set_track('video', 1)
-            show_message(get_tracklist('video'))
+            show_tracklist('video')
         end
     ne.eventresponder['shift+mbtn_right_down'] =
         function()
-            show_message(get_tracklist('video'))
+            show_tracklist('video')
         end
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -4369,31 +4495,31 @@ local function osc_init()
         function()
             mp.set_property("lavfi-complex", "")
             set_track('audio', 1)
-            show_message(get_tracklist('audio'))
+            show_tracklist('audio')
         end
     ne.eventresponder['enter'] =
         function()
             mp.set_property("lavfi-complex", "")
             set_track('audio', 1)
-            show_message(get_tracklist('audio'))
+            show_tracklist('audio')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
             mp.set_property("lavfi-complex", "")
             set_track('audio', -1)
-            show_message(get_tracklist('audio'))
+            show_tracklist('audio')
         end
     ne.eventresponder['wheel_up_press'] =
         function()
             mp.set_property("lavfi-complex", "")
             set_track('audio', 1)
-            show_message(get_tracklist('audio'))
+            show_tracklist('audio')
         end
     ne.eventresponder['wheel_down_press'] =
         function()
             mp.set_property("lavfi-complex", "")
             set_track('audio', -1)
-            show_message(get_tracklist('audio'))
+            show_tracklist('audio')
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function() mp.commandv("script-binding", "select/select-aid") end
@@ -4427,31 +4553,31 @@ local function osc_init()
         function()
             mp.set_property_number("secondary-sid", 0)
             set_track('sub', 1)
-            show_message(get_tracklist("sub"))
+            show_tracklist("sub")
         end
     ne.eventresponder['enter'] =
         function()
             mp.set_property_number("secondary-sid", 0)
             set_track('sub', 1)
-            show_message(get_tracklist('sub'))
+            show_tracklist('sub')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
             mp.set_property_number("secondary-sid", 0)
             set_track('sub', -1)
-            show_message(get_tracklist('sub'))
+            show_tracklist('sub')
         end
     ne.eventresponder['wheel_up_press'] =
         function()
             mp.set_property_number("secondary-sid", 0)
             set_track('sub', 1)
-            show_message(get_tracklist('sub'))
+            show_tracklist('sub')
         end
     ne.eventresponder['wheel_down_press'] =
         function()
             mp.set_property_number("secondary-sid", 0)
             set_track('sub', -1)
-            show_message(get_tracklist('sub'))
+            show_tracklist('sub')
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function()
@@ -5619,7 +5745,7 @@ if user_opts.key_bindings then
     mp.add_key_binding("z", "cycleaudiotracks", function()
         mp.set_property_number("secondary-sid", 0)
         set_track("audio", 1)
-        show_message(get_tracklist("audio"))
+        show_tracklist("audio")
     end);
 
     mp.add_key_binding("Z", "selectaudiotrack", function()
@@ -5629,7 +5755,7 @@ if user_opts.key_bindings then
     mp.add_key_binding("c", "cyclecaptions", function()
         mp.set_property_number("secondary-sid", 0)
         set_track("sub", 1)
-        show_message(get_tracklist("sub"))
+        show_tracklist("sub")
     end);
 
     mp.add_key_binding("C", "selectsubtitletrack", function()
