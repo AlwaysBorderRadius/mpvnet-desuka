@@ -163,6 +163,11 @@ local user_opts = {
     chapter_softrepeat = false,     -- enable continuous skipping when holding down chapter skip buttons
     track_nextprev_buttons = true,  -- show next/previous playlist track buttons
 
+    -- Track tooltip/menu display for cy_audio/cy_video/cy_sub
+    track_tooltip_mode = "code",  -- "code" | "name" | "flag"
+    track_flag_size = 16,         -- height of the flag vector, snapped to the nearest power of two
+    track_flag_gap = 2,           -- space on each side of the flag in the tooltip
+
     volume_control = true,          -- show mute button and volume slider
     volume_control_type = "linear", -- volume scale type: "linear" or "logarithmic"
 
@@ -416,6 +421,317 @@ local language = {
     -- <<< CUSTOM AlwaysBorderRadius >>>
 }
 local texts = language[user_opts.language] or language["en"]
+
+-- Track name mappings for tooltips/menus
+local track_names = {}
+track_names["en"] = {
+    ["es"] = "Spanish", ["es-ES"] = "Spanish (Spain)", ["es-419"] = "Latin American Spanish", ["es-MX"] = "Spanish (Mexico)", ["es-AR"] = "Spanish (Argentina)", ["es-CO"] = "Spanish (Colombia)", ["es-CL"] = "Spanish (Chile)", ["es-PE"] = "Spanish (Peru)", ["es-VE"] = "Spanish (Venezuela)",
+    ["en"] = "English", ["en-US"] = "English (US)", ["en-GB"] = "English (UK)", ["en-CA"] = "English (Canada)", ["en-AU"] = "English (Australia)", ["en-NZ"] = "English (New Zealand)", ["en-IE"] = "English (Ireland)",
+    ["ja"] = "Japanese", ["ja-JP"] = "Japanese",
+    ["fr"] = "French", ["fr-FR"] = "French (France)", ["fr-CA"] = "French (Canada)", ["fr-BE"] = "French (Belgium)", ["fr-CH"] = "French (Switzerland)",
+    ["pt"] = "Portuguese", ["pt-PT"] = "Portuguese (Portugal)", ["pt-BR"] = "Portuguese (Brazil)",
+    ["de"] = "German", ["de-DE"] = "German (Germany)", ["de-AT"] = "German (Austria)", ["de-CH"] = "German (Switzerland)",
+    ["it"] = "Italian", ["it-IT"] = "Italian (Italy)",
+    ["ru"] = "Russian", ["ru-RU"] = "Russian (Russia)",
+    ["ko"] = "Korean", ["ko-KR"] = "Korean (South Korea)",
+    ["zh"] = "Chinese", ["zh-CN"] = "Chinese (Simplified)", ["zh-TW"] = "Chinese (Traditional)", ["zh-HK"] = "Chinese (Hong Kong)", ["zh-Hans"] = "Chinese (Simplified)", ["zh-Hant"] = "Chinese (Traditional)",
+    ["tr"] = "Turkish", ["tr-TR"] = "Turkish",
+    ["ar"] = "Arabic", ["ar-SA"] = "Arabic (Saudi Arabia)",
+    ["pl"] = "Polish", ["pl-PL"] = "Polish",
+    ["nl"] = "Dutch", ["nl-NL"] = "Dutch",
+    ["sv"] = "Swedish", ["sv-SE"] = "Swedish",
+    ["da"] = "Danish", ["da-DK"] = "Danish",
+    ["no"] = "Norwegian", ["nb-NO"] = "Norwegian (Bokmål)",
+    ["fi"] = "Finnish", ["fi-FI"] = "Finnish",
+    ["vi"] = "Vietnamese", ["vi-VN"] = "Vietnamese",
+    ["th"] = "Thai", ["th-TH"] = "Thai",
+    ["id"] = "Indonesian", ["id-ID"] = "Indonesian",
+    ["hi"] = "Hindi", ["hi-IN"] = "Hindi",
+    ["und"] = "Unknown", [""] = "Unknown", ["unknown"] = "Unknown",
+}
+
+track_names["es"] = {
+    ["es"] = "Español", ["es-ES"] = "Español (España)", ["es-419"] = "Español latinoamericano", ["es-MX"] = "Español (México)", ["es-AR"] = "Español (Argentina)", ["es-CO"] = "Español (Colombia)", ["es-CL"] = "Español (Chile)", ["es-PE"] = "Español (Perú)", ["es-VE"] = "Español (Venezuela)",
+    ["en"] = "Inglés", ["en-US"] = "Inglés (EE. UU.)", ["en-GB"] = "Inglés (Reino Unido)", ["en-CA"] = "Inglés (Canadá)", ["en-AU"] = "Inglés (Australia)",
+    ["ja"] = "Japonés", ["fr"] = "Francés", ["pt"] = "Portugués", ["pt-BR"] = "Portugués (Brasil)",
+    ["de"] = "Alemán", ["it"] = "Italiano", ["ru"] = "Ruso", ["ko"] = "Coreano",
+    ["zh"] = "Chino", ["zh-CN"] = "Chino (simplificado)", ["zh-TW"] = "Chino (tradicional)",
+    ["tr"] = "Turco", ["ar"] = "Árabe", ["pl"] = "Polaco", ["nl"] = "Neerlandés", ["sv"] = "Sueco",
+    ["da"] = "Danés", ["no"] = "Noruego", ["fi"] = "Finés", ["vi"] = "Vietnamita", ["th"] = "Tailandés",
+    ["id"] = "Indonesio", ["hi"] = "Hindi",
+    ["und"] = "Desconocido", [""] = "Desconocido", ["unknown"] = "Desconocido",
+}
+
+local function get_track_name_map()
+    local ui = user_opts.language or "en"
+    return track_names[ui] or track_names["en"] or {}
+end
+
+local lang_to_flag = {
+    ["es"] = "🇪🇸", ["es-ES"] = "🇪🇸", ["es-419"] = "🇲🇽",
+    ["es-MX"] = "🇲🇽", ["es-AR"] = "🇦🇷", ["es-CO"] = "🇨🇴", ["es-CL"] = "🇨🇱", ["es-PE"] = "🇵🇪", ["es-VE"] = "🇻🇪", ["es-EC"] = "🇪🇨", ["es-BO"] = "🇧🇴", ["es-UY"] = "🇺🇾", ["es-PY"] = "🇵🇾", ["es-CR"] = "🇨🇷", ["es-GT"] = "🇬🇹", ["es-HN"] = "🇭🇳", ["es-NI"] = "🇳🇮", ["es-PA"] = "🇵🇦", ["es-DO"] = "🇩🇴", ["es-CU"] = "🇨🇺", ["es-PR"] = "🇵🇷",
+    ["en"] = "🇬🇧", ["en-GB"] = "🇬🇧", ["en-US"] = "🇺🇸", ["en-CA"] = "🇨🇦", ["en-AU"] = "🇦🇺", ["en-NZ"] = "🇳🇿", ["en-IE"] = "🇮🇪",
+    ["ja"] = "🇯🇵", ["ja-JP"] = "🇯🇵",
+    ["fr"] = "🇫🇷", ["fr-FR"] = "🇫🇷", ["fr-CA"] = "🇨🇦", ["fr-BE"] = "🇧🇪", ["fr-CH"] = "🇨🇭",
+    ["pt"] = "🇵🇹", ["pt-PT"] = "🇵🇹", ["pt-BR"] = "🇧🇷",
+    ["de"] = "🇩🇪", ["de-DE"] = "🇩🇪", ["de-AT"] = "🇦🇹", ["de-CH"] = "🇨🇭",
+    ["it"] = "🇮🇹", ["it-IT"] = "🇮🇹",
+    ["ru"] = "🇷🇺", ["ru-RU"] = "🇷🇺",
+    ["ko"] = "🇰🇷", ["ko-KR"] = "🇰🇷",
+    ["zh"] = "🇨🇳", ["zh-CN"] = "🇨🇳", ["zh-TW"] = "🇹🇼", ["zh-HK"] = "🇭🇰", ["zh-Hans"] = "🇨🇳", ["zh-Hant"] = "🇹🇼",
+    ["tr"] = "🇹🇷", ["tr-TR"] = "🇹🇷",
+    ["ar"] = "🇸🇦", ["ar-SA"] = "🇸🇦", ["ar-EG"] = "🇪🇬", ["ar-AE"] = "🇦🇪",
+    ["pl"] = "🇵🇱", ["pl-PL"] = "🇵🇱",
+    ["nl"] = "🇳🇱", ["nl-NL"] = "🇳🇱", ["nl-BE"] = "🇧🇪",
+    ["sv"] = "🇸🇪", ["sv-SE"] = "🇸🇪",
+    ["da"] = "🇩🇰", ["da-DK"] = "🇩🇰",
+    ["no"] = "🇳🇴", ["nb-NO"] = "🇳🇴", ["nn-NO"] = "🇳🇴",
+    ["fi"] = "🇫🇮", ["fi-FI"] = "🇫🇮",
+    ["vi"] = "🇻🇳", ["vi-VN"] = "🇻🇳",
+    ["th"] = "🇹🇭", ["th-TH"] = "🇹🇭",
+    ["id"] = "🇮🇩", ["id-ID"] = "🇮🇩",
+    ["hi"] = "🇮🇳", ["hi-IN"] = "🇮🇳",
+    ["ca"] = "🇪🇸", ["eu"] = "🇪🇸", ["gl"] = "🇪🇸",
+    ["cs"] = "🇨🇿", ["sk"] = "🇸🇰", ["hu"] = "🇭🇺", ["ro"] = "🇷🇴", ["bg"] = "🇧🇬", ["uk"] = "🇺🇦", ["sr"] = "🇷🇸", ["hr"] = "🇭🇷", ["sl"] = "🇸🇮", ["mk"] = "🇲🇰",
+    ["he"] = "🇮🇱", ["fa"] = "🇮🇷", ["ms"] = "🇲🇾", ["ta"] = "🇮🇳", ["te"] = "🇮🇳", ["bn"] = "🇧🇩",
+}
+
+-- lang -> ISO country code, decoded from the regional indicator pair in
+-- lang_to_flag so that both tables always stay in sync. LuaJIT has no utf8
+-- library, so the decoding is done by hand.
+local lang_to_cc = {}
+do
+    for lang, emoji in pairs(lang_to_flag) do
+        local letters, n = {}, 0
+        local i = 1
+        while i <= #emoji do
+            local b = string.byte(emoji, i)
+            local cp, size
+            if b < 0x80 then
+                cp, size = b, 1
+            elseif b < 0xE0 then
+                cp, size = b - 0xC0, 2
+            elseif b < 0xF0 then
+                cp, size = b - 0xE0, 3
+            else -- 4 byte sequence, which is what a flag emoji uses
+                local b1, b2, b3 = string.byte(emoji, i + 1, i + 3)
+                cp = (b - 0xF0) * 0x40000 + (b1 - 0x80) * 0x1000
+                    + (b2 - 0x80) * 0x40 + (b3 - 0x80)
+                size = 4
+            end
+            if cp >= 0x1F1E6 and cp <= 0x1F1FF then
+                n = n + 1
+                letters[n] = string.char(cp - 0x1F1E6 + 65)
+            end
+            i = i + size
+        end
+        if n == 2 then
+            lang_to_cc[lang] = letters[1] .. letters[2]
+        end
+    end
+end
+
+-- fixed location of the generated vector flags, next to this script inside the
+-- portable config folder (~~ is portable_config)
+local FLAG_ASSETS_PATH = "~~/scripts/flag-assets.lua"
+
+-- vector flag artwork generated by tools/twemoji2ass_flags.py; absent means the
+-- tooltip falls back to the plain language code
+local flag_assets = nil
+do
+    local path = FLAG_ASSETS_PATH
+    if path:sub(1, 2) == "~~" then
+        local ok, expanded = pcall(mp.command_native, { "expand-path", path })
+        if ok and type(expanded) == "string" and expanded ~= "" then
+            path = expanded
+        end
+    end
+    local okload, mod = pcall(dofile, path)
+    if okload and type(mod) == "table" then
+        flag_assets = mod
+    else
+        mp.msg.warn("modernx: could not load " .. FLAG_ASSETS_PATH
+            .. ", track tooltips will use language codes")
+    end
+end
+
+local function get_flag_asset(lang)
+    if not lang or lang == "" or not flag_assets then
+        return nil
+    end
+    local cc = lang_to_cc[lang]
+    if not cc then
+        local base = lang:match("^([^-_]+)")
+        if base then cc = lang_to_cc[base] end
+    end
+    if not cc then
+        return nil
+    end
+    return flag_assets[string.lower(cc)]
+end
+
+-- \pN divides drawing coordinates by 2**(N-1), and the artwork is 256 units
+-- tall, so the reachable sizes are 256/2**(N-1)
+local function get_flag_scale(size)
+    local best, best_diff = 5, math.huge
+    for n = 0, 7 do
+        local height = 256 / 2 ^ (n - 1)
+        local diff = math.abs(height - size)
+        if diff < best_diff then
+            best, best_diff = n, diff
+        end
+    end
+    return best
+end
+
+-- artwork plus the \pN that hits the requested size, so callers can align the
+-- flag before any event is built
+local function get_flag_geometry(lang)
+    local asset = get_flag_asset(lang)
+    if not asset or not asset.d or #asset.d == 0 then
+        return nil
+    end
+    local p = get_flag_scale(user_opts.track_flag_size or 16)
+    local height = 256 / 2 ^ (p - 1)
+    return asset, p, height * asset.w, height
+end
+
+local function format_track_label(lang, mode_override)
+    if not lang or lang == "" then
+        return nil
+    end
+    local l = lang
+    local mode = mode_override or user_opts.track_tooltip_mode or "code"
+    if mode == "flag" then
+        -- the flag is drawn as an ASS vector next to the tooltip, so the text
+        -- only needs the code when there is no artwork for this language
+        if get_flag_asset(l) or get_flag_asset(l:match("^([^-_]+)")) then
+            return nil
+        end
+        return "[" .. l .. "]"
+    elseif mode == "name" then
+        local map = get_track_name_map()
+        local n = map[l]
+        if not n then
+            local base = l:match("^([^-_]+)")
+            if base then n = map[base] end
+        end
+        if n then return n end
+        return l
+    else -- code
+        return "[" .. l .. "]"
+    end
+end
+
+-- whether the language slot is filled by a vector flag instead of a text label
+local function flag_drawn(lang)
+    if (user_opts.track_tooltip_mode or "code") ~= "flag" then
+        return false
+    end
+    return get_flag_asset(lang) ~= nil
+end
+
+-- Font size the advance table below was measured at. Anything else is scaled.
+local ADVANCE_FS = 20
+
+-- Per character advances of Segoe UI at \fs20, in playres units. Measured by
+-- rendering with libass and reading the pen position, so the tooltip slots sit
+-- exactly where the text they follow actually ends. If you change `font` in
+-- modernx.conf these numbers stop matching and the spacing drifts.
+local CHAR_ADVANCE = {
+    [32] = 4.2, [33] = 4.3, [34] = 5.81, [35] = 8.91, [36] = 8.21, [37] = 12.21,
+    [38] = 12.11, [39] = 3.5, [40] = 4.6, [41] = 4.6, [42] = 6.21, [43] = 10.31,
+    [44] = 3.3, [45] = 6.01, [46] = 3.3, [47] = 5.81, [48] = 8.21, [49] = 8.21,
+    [50] = 8.21, [51] = 8.21, [52] = 8.21, [53] = 8.21, [54] = 8.21, [55] = 8.21,
+    [56] = 8.21, [57] = 8.21, [58] = 3.3, [59] = 3.3, [60] = 10.31, [61] = 10.31,
+    [62] = 10.31, [63] = 6.71, [64] = 14.31, [65] = 9.71, [66] = 8.61, [67] = 9.31,
+    [68] = 10.61, [69] = 7.61, [70] = 7.41, [71] = 10.31, [72] = 10.71, [73] = 4,
+    [74] = 5.41, [75] = 8.61, [76] = 7.11, [77] = 13.51, [78] = 11.21, [79] = 11.41,
+    [80] = 8.51, [81] = 11.41, [82] = 9.01, [83] = 7.91, [84] = 7.91, [85] = 10.31,
+    [86] = 9.31, [87] = 14.01, [88] = 8.91, [89] = 8.31, [90] = 8.61, [91] = 4.6,
+    [92] = 22.82, [93] = 4.6, [94] = 10.31, [95] = 6.21, [96] = 4, [97] = 7.61,
+    [98] = 8.91, [99] = 6.91, [100] = 8.91, [101] = 7.81, [102] = 4.7, [103] = 8.91,
+    [104] = 8.51, [105] = 3.6, [106] = 3.6, [107] = 7.41, [108] = 3.6, [109] = 12.91,
+    [110] = 8.51, [111] = 8.91, [112] = 8.91, [113] = 8.91, [114] = 5.31, [115] = 6.41,
+    [116] = 5.11, [117] = 8.51, [118] = 7.21, [119] = 10.81, [120] = 6.91, [121] = 7.21,
+    [122] = 6.81, [123] = 10.31, [124] = 3.6, [125] = 10.31, [126] = 10.31,
+    [160] = 4.2, [161] = 4.3, [171] = 7.61, [173] = 0, [183] = 3.3, [187] = 7.61,
+    [191] = 6.71, [193] = 9.71, [199] = 9.31, [201] = 7.61, [205] = 4, [209] = 11.21,
+    [211] = 11.41, [214] = 11.41, [218] = 10.31, [220] = 10.31, [223] = 8.21,
+    [224] = 7.61, [225] = 7.61, [226] = 7.61, [228] = 7.61, [229] = 8.91, [231] = 6.91,
+    [232] = 7.81, [233] = 7.81, [234] = 7.81, [235] = 8.91, [236] = 3.6, [237] = 3.6,
+    [238] = 3.6, [241] = 8.51, [242] = 8.91, [243] = 8.91, [244] = 8.91, [246] = 8.91,
+    [249] = 8.51, [250] = 8.51, [251] = 8.51, [252] = 8.51,
+    [8199] = 8.21, [8201] = 2.9, [8211] = 7.51, [8212] = 15.02, [8216] = 3.5,
+    [8217] = 3.5, [8220] = 5.71, [8221] = 5.71, [8230] = 11.01, [8249] = 4.7,
+    [8250] = 4.7, [8725] = 2.6,
+}
+
+-- average latin advance, for codepoints the table does not cover
+local ADVANCE_FALLBACK = 8
+
+-- mpv runs Lua 5.1, which has no utf8 library, so decode by hand
+local function utf8_codepoints(str)
+    local codes = {}
+    local i, n = 1, #str
+    while i <= n do
+        local c = string.byte(str, i)
+        local len, code = 1, c
+        if c >= 0xF0 then
+            len, code = 4, c - 0xF0
+        elseif c >= 0xE0 then
+            len, code = 3, c - 0xE0
+        elseif c >= 0xC0 then
+            len, code = 2, c - 0xC0
+        end
+        for k = 2, len do
+            local cc = string.byte(str, i + k - 1)
+            if cc == nil then break end
+            code = code * 64 + (cc - 0x80)
+        end
+        codes[#codes + 1] = code
+        i = i + len
+    end
+    return codes
+end
+
+-- width of str in playres units at the given font size
+local function text_width(str, fontsize)
+    local fs = fontsize or user_opts.time_font_size or ADVANCE_FS
+    local total = 0
+    for _, code in ipairs(utf8_codepoints(str)) do
+        total = total + (CHAR_ADVANCE[code] or ADVANCE_FALLBACK)
+    end
+    return total * (fs / ADVANCE_FS)
+end
+
+-- Splits a track tooltip around the language slot, so the vector flag can be
+-- drawn exactly where [es] used to be. Returns the text before the slot and the
+-- text after it.
+--   keep_title  whether the title follows the slot; video and audio only carry
+--               it when the slot became a flag, subtitles always do
+local function tooltip_parts(prefix, lang, title, keep_title)
+    local lang_ok = lang ~= nil and lang ~= "" and lang ~= texts.na
+    local title_ok = title ~= nil and title ~= "" and title ~= texts.na
+
+    if lang_ok then
+        if flag_drawn(lang) then
+            return prefix .. " ", (keep_title and title_ok) and (" " .. title) or ""
+        end
+        local label = format_track_label(lang)
+        if label then
+            if keep_title and title_ok then
+                return prefix .. " " .. label .. " ", title
+            end
+            return prefix .. " " .. label, ""
+        end
+    end
+
+    if title_ok then
+        return prefix .. " " .. title, ""
+    end
+    return prefix, ""
+end
 
 local function contains(list, item)
     local t = {}
@@ -968,7 +1284,19 @@ function get_tracklist(type)
             if (track.id == tonumber(mp.get_property(type))) then
                 selected = '●'
             end
-            local label = (lang ~= 'unknown') and '[' .. lang .. '] ' .. title or title
+            local label
+            if lang ~= nil and lang ~= 'unknown' and lang ~= '' then
+                -- the menu always spells the language out; track_tooltip_mode
+                -- only drives the hover tooltips
+                local lang_label = format_track_label(lang, "name")
+                if lang_label ~= nil then
+                    label = lang_label .. " — " .. title
+                else
+                    label = title
+                end
+            else
+                label = title
+            end
             message = message .. '\n' .. selected .. ' ' .. n .. ': ' .. label
         end
     end
@@ -1409,6 +1737,28 @@ local function draw_sponsorblock_ranges(element, elem_ass, xp, rh)
     end
 end
 
+-- Builds the ASS events for a vector flag. Returns the assembled ass object and
+-- the drawn width in playres units, or nil when there is no artwork for lang.
+-- Every colour has to be its own event at the same position, in order. libass
+-- only accepts one drawing per \p block, so a multi colour flag cannot live in
+-- a single event: an override between two paths cancels the whole drawing, and
+-- repeating \p makes the pen advance once per colour instead of once per flag.
+local function render_flag(lang, x, y)
+    local asset, p, width = get_flag_geometry(lang)
+    if not asset then
+        return nil, 0
+    end
+    local flag_ass = mp.assdraw.ass_new()
+    for _, part in ipairs(asset.d) do
+        flag_ass:new_event()
+        flag_ass:pos(x, y)
+        flag_ass:an(7)
+        flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H00&}")
+        flag_ass:append((part:gsub("\\p1", "\\p" .. p)))
+    end
+    return flag_ass, width
+end
+
 function render_elements(master_ass)
     -- when the slider is dragged or hovered and we have a target chapter name
     -- then we use it instead of the normal title. we calculate it before the
@@ -1440,6 +1790,9 @@ function render_elements(master_ass)
 
     for n = 1, #elements do
         local element = elements[n]
+        -- built apart from elem_ass, so the flag never shares an event stream
+        -- with the button glyphs or the hover glow
+        local flag_ass = nil
         local style_ass = mp.assdraw.ass_new()
         style_ass:merge(element.style_ass)
         ass_append_alpha(style_ass, element.layout.alpha, 0)
@@ -1659,7 +2012,6 @@ function render_elements(master_ass)
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
                 if mouse_hit(element) then
-                    local tooltiplabel = element.tooltipF
                     local an = 1
                     local ty = element.hitbox.y1
                     local tx = get_virt_mouse_pos()
@@ -1669,31 +2021,95 @@ function render_elements(master_ass)
                         an = 7
                     end
 
-                    -- tooltip label
+                    -- tooltip label, split around the language slot so the flag
+                    -- can be drawn exactly where [es] used to be
+                    local head, tail = "", ""
                     if element.enabled then
                         if type(element.tooltipF) == 'function' then
-                            tooltiplabel = element.tooltipF()
+                            head, tail = element.tooltipF()
                         else
-                            tooltiplabel = element.tooltipF
+                            head = element.tooltipF
                         end
                     else
-                        tooltiplabel = element.nothingavailable
+                        head = element.nothingavailable
+                    end
+                    head = head or ""
+                    tail = tail or ""
+
+                    -- One knob for both sides of the flag. Advances give pen positions, and the
+-- ink of ']' ends only 3 units before its pen does while a letter starts 1
+-- unit after, so the two gaps end up within ~2 units of each other without
+-- any per glyph fudging.
+local gap = user_opts.track_flag_gap or 2
+                    local flag_lang, flag_w, flag_h = nil, 0, 0
+                    if element.enabled and type(element.flagF) == 'function'
+                        and (user_opts.track_tooltip_mode or "code") == "flag" then
+                        local lang = element.flagF()
+                        if lang ~= nil and lang ~= "" then
+                            local asset, _, w, h = get_flag_geometry(lang)
+                            if asset ~= nil then
+                                flag_lang, flag_w, flag_h = lang, w, h
+                            end
+                        end
+                    end
+
+                    -- tooltip_parts pads head with a trailing space and tail
+                    -- with a leading one. With a flag in the middle those
+                    -- spaces would fight the configured gaps, so drop them and
+                    -- let the gaps be the only separators.
+                    local head_text, tail_text
+                    if flag_lang ~= nil then
+                        head_text = head:gsub("%s+$", "")
+                        tail_text = tail:gsub("^%s+", "")
+                    else
+                        head_text, tail_text = head, tail
+                    end
+
+                    local fontsize = user_opts.time_font_size or ADVANCE_FS
+                    local head_w = text_width(head_text, fontsize)
+                    local tail_w = text_width(tail_text, fontsize)
+                    local total_w = head_w + tail_w
+                    if flag_lang ~= nil then
+                        total_w = total_w + gap + gap + flag_w
                     end
 
                     if tx > osc_param.playresx / 2 then --move tooltip to left side of mouse cursor
-                        tx = tx - string.len(tooltiplabel) * 8
+                        tx = tx - total_w
+                    end
+
+                    local flag_x
+                    if flag_lang ~= nil then
+                        -- centre the flag on the text block, which sits above
+                        -- ty when an == 1 and below it when an == 7
+                        local top = (an == 1) and (ty - fontsize) or ty
+                        flag_x = tx + head_w + gap
+                        flag_ass = render_flag(flag_lang, flag_x,
+                            top + (fontsize - flag_h) / 2)
                     end
 
                     elem_ass:new_event()
                     elem_ass:pos(tx, ty)
                     elem_ass:an(an)
                     elem_ass:append(element.tooltip_style)
-                    elem_ass:append(tooltiplabel)
+                    elem_ass:append(head_text)
+
+                    if tail_text ~= "" then
+                        elem_ass:new_event()
+                        elem_ass:pos((flag_x and (flag_x + flag_w + gap))
+                            or (tx + head_w), ty)
+                        elem_ass:an(an)
+                        elem_ass:append(element.tooltip_style)
+                        elem_ass:append(tail_text)
+                    end
                 end
             end
         end
 
         master_ass:merge(elem_ass)
+        if flag_ass ~= nil then
+            master_ass:new_event()
+            master_ass:merge(flag_ass)
+        end
     end
 end
 
@@ -3886,24 +4302,19 @@ local function osc_init()
     ne.visible = (osc_param.playresx >= 550 - outeroffset)
     ne.content = icons.video
     ne.tooltip_style = osc_styles.tooltip
+    ne.flagF = function()
+        return mp.get_property("current-tracks/video/lang")
+    end
     ne.tooltipF = function()
         local track_id = get_track("video")
-        local message = texts.off
         if track_id ~= 0 then
             local total = #tracks_osc.video
-            message = string.format("%s [%d ∕ %d]", texts.video, track_id, total)
-            local prop = mp.get_property("current-tracks/video/lang")
-                or mp.get_property("current-tracks/video/title")
-
-            if prop and prop ~= texts.na then
-                message = string.format("%s [%s]", message, prop)
-            end
-        else
-            if not ne.enabled then
-                message = texts.novideo
-            end
+            local message = string.format("%s [%d ∕ %d]", texts.video, track_id, total)
+            local prop_lang = mp.get_property("current-tracks/video/lang")
+            local prop_title = mp.get_property("current-tracks/video/title")
+            return tooltip_parts(message, prop_lang, prop_title, flag_drawn(prop_lang))
         end
-        return message
+        return (not ne.enabled) and texts.novideo or texts.off, ""
     end
     ne.nothingavailable = texts.novideo
     ne.eventresponder['mbtn_left_up'] =
@@ -3939,24 +4350,19 @@ local function osc_init()
     ne.visible = (osc_param.playresx >= 500 - outeroffset)
     ne.content = icons.audio
     ne.tooltip_style = osc_styles.tooltip
+    ne.flagF = function()
+        return mp.get_property("current-tracks/audio/lang")
+    end
     ne.tooltipF = function()
         local track_id = get_track("audio")
-        local message = texts.off
         if track_id ~= 0 then
             local total = #tracks_osc.audio
-            message = string.format("%s [%d ∕ %d]", texts.audio, track_id, total)
-            local prop = mp.get_property("current-tracks/audio/title")
-                or mp.get_property("current-tracks/audio/lang")
-
-            if prop and prop ~= texts.na then
-                message = string.format("%s [%s]", message, prop)
-            end
-        else
-            if not ne.enabled then
-                message = "No audio tracks"
-            end
+            local message = string.format("%s [%d ∕ %d]", texts.audio, track_id, total)
+            local prop_lang = mp.get_property("current-tracks/audio/lang")
+            local prop_title = mp.get_property("current-tracks/audio/title")
+            return tooltip_parts(message, prop_lang, prop_title, flag_drawn(prop_lang))
         end
-        return message
+        return (not ne.enabled) and "No audio tracks" or texts.off, ""
     end
     ne.nothingavailable = texts.noaudio
     ne.eventresponder['mbtn_left_up'] =
@@ -4001,23 +4407,20 @@ local function osc_init()
     ne.visible = (osc_param.playresx >= 600 - outeroffset)
     ne.content = icons.subtitle
     ne.tooltip_style = osc_styles.tooltip
+    ne.flagF = function()
+        return mp.get_property("current-tracks/sub/lang")
+    end
     ne.tooltipF = function()
         local sub_id = get_track("sub")
-        local message = texts.off
-        if sub_id ~= 0 then
-            message = string.format("%s [%d ∕ %d]", texts.subtitle, sub_id, #tracks_osc.sub)
-            local lang = mp.get_property("current-tracks/sub/lang")
-            local title = mp.get_property("current-tracks/sub/title")
-
-            if lang and lang ~= texts.na then
-                message = string.format("%s [%s]", message, lang)
-            end
-
-            if title then
-                message = message .. " " .. title
-            end
+        if sub_id == 0 then
+            return texts.off, ""
         end
-        return message
+        local message = string.format("%s [%d ∕ %d]", texts.subtitle, sub_id, #tracks_osc.sub)
+        local lang = mp.get_property("current-tracks/sub/lang")
+        local title = mp.get_property("current-tracks/sub/title")
+        -- subtitles carry the title even when the slot is a text label, so the
+        -- flag lands between the label and the title instead of replacing it
+        return tooltip_parts(message, lang, title, true)
     end
     ne.nothingavailable = texts.nosub
     ne.eventresponder['mbtn_left_up'] =
