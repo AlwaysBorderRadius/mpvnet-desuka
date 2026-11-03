@@ -166,7 +166,7 @@ local user_opts = {
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track tooltip/menu display for cy_audio/cy_video/cy_sub
     track_language_mode = "code",  -- "code" | "name" | "flag"
-    track_flag_size = 16,         -- height of the flag vector, snapped to the nearest power of two
+    track_flag_size = 14,         -- height of the flag vector in playres units (exact, aspect preserved)
     track_flag_gap = 2,           -- space on each side of the flag in the tooltip
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -628,30 +628,44 @@ local function get_flag_asset(lang)
     return flag_assets[string.lower(cc)]
 end
 
--- \pN divides drawing coordinates by 2**(N-1), and the artwork is 256 units
--- tall, so the reachable sizes are 256/2**(N-1)
-local function get_flag_scale(size)
-    local best, best_diff = 5, math.huge
-    for n = 0, 7 do
-        local height = 256 / 2 ^ (n - 1)
-        local diff = math.abs(height - size)
-        if diff < best_diff then
-            best, best_diff = n, diff
-        end
-    end
-    return best
-end
+-- Scaled artwork cache: coordinates are stored for a 256-unit height and \pN
+-- only allows powers of two, so scale them once per (lang, size) to hit the
+-- requested height exactly. Aspect is preserved (X and Y share one factor).
+local scaled_flag_cache = {}
 
--- artwork plus the \pN that hits the requested size, so callers can align the
--- flag before any event is built
+-- artwork scaled to the requested size, so callers can align the flag
+-- before any event is built. Returns the scaled asset, width and height.
 local function get_flag_geometry(lang)
+    if type(lang) ~= "string" then
+        return nil
+    end
     local asset = get_flag_asset(lang)
     if not asset or not asset.d or #asset.d == 0 then
         return nil
     end
-    local p = get_flag_scale(user_opts.track_flag_size or 16)
-    local height = 256 / 2 ^ (p - 1)
-    return asset, p, height * asset.w, height
+    local size = user_opts.track_flag_size or 14
+    if type(size) ~= "number" or size <= 0 then
+        size = 14
+    end
+    local key = lang .. ":" .. tostring(size)
+    local scaled = scaled_flag_cache[key]
+    if not scaled then
+        local f = size / 256
+        local d = {}
+        for i, part in ipairs(asset.d) do
+            local head, tail = part:match("^%s*({[^}]*%})(.*)$")
+            if not tail or tail:find("{", 1, true) then
+                head = "{\\p1}"
+                tail = part:gsub("{[^}]*%}", "", 1)
+            end
+            d[i] = head .. tail:gsub("(-?%d+%.?%d*)", function(s)
+                return ("%.2f"):format(tonumber(s) * f)
+            end)
+        end
+        scaled = { w = asset.w, d = d }
+        scaled_flag_cache[key] = scaled
+    end
+    return scaled, size * scaled.w, size
 end
 
 local function format_track_label(lang, mode_override, name_map)
@@ -1823,15 +1837,17 @@ local function draw_sponsorblock_ranges(element, elem_ass, xp, rh)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- Builds the ASS events for a vector flag from precomputed geometry; one event per colour (libass cancels a multi-path override and repeating \p advances the pen).
-local function render_flag_geometry(asset, p, x, y)
+-- Builds the ASS events for a vector flag from scaled geometry (coordinates
+-- already carry the requested size, always drawn with \p1); one event per
+-- colour (libass cancels a multi-path override and repeating \p advances the pen).
+local function render_flag_geometry(asset, x, y)
     local flag_ass = mp.assdraw.ass_new()
     for _, part in ipairs(asset.d) do
         flag_ass:new_event()
         flag_ass:pos(x, y)
         flag_ass:an(7)
         flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H00&}")
-        flag_ass:append((part:gsub("\\p1", "\\p" .. p)))
+        flag_ass:append(part)
     end
     return flag_ass
 end
@@ -2117,14 +2133,14 @@ function render_elements(master_ass)
 
                     -- one gap on each side of the flag (advances give the pen positions)
                     local gap = user_opts.track_flag_gap or 2
-                    local flag_lang, flag_asset, flag_p, flag_w, flag_h = nil, nil, 0, 0, 0
+                    local flag_lang, flag_asset, flag_w, flag_h = nil, nil, 0, 0
                     if element.enabled and type(element.flagF) == 'function'
                         and (user_opts.track_language_mode or "code") == "flag" then
                         local lang = element.flagF()
                         if lang ~= nil and lang ~= "" then
-                            local asset, p, w, h = get_flag_geometry(lang)
+                            local asset, w, h = get_flag_geometry(lang)
                             if asset ~= nil then
-                                flag_lang, flag_asset, flag_p, flag_w, flag_h = lang, asset, p, w, h
+                                flag_lang, flag_asset, flag_w, flag_h = lang, asset, w, h
                             end
                         end
                     end
@@ -2155,7 +2171,7 @@ function render_elements(master_ass)
                         -- centre the flag on the text block (above ty when an == 1, below when an == 7)
                         local top = (an == 1) and (ty - fontsize) or ty
                         flag_x = tx + head_w + gap
-                        flag_ass = render_flag_geometry(flag_asset, flag_p, flag_x,
+                        flag_ass = render_flag_geometry(flag_asset, flag_x,
                             top + (fontsize - flag_h) / 2)
                     end
 
@@ -3356,9 +3372,9 @@ local function render_message_block(ass, meta, fontsize, outline)
 
         local head = row.head and row.head:gsub("%s+$", "")
         local tail = row.tail and row.tail:gsub("^%s+", "")
-        local asset, p, flag_w, flag_h
+        local asset, flag_w, flag_h
         if row.flag_lang then
-            asset, p, flag_w, flag_h = get_flag_geometry(row.flag_lang)
+            asset, flag_w, flag_h = get_flag_geometry(row.flag_lang)
         end
 
         if not head or not asset then
@@ -3375,7 +3391,7 @@ local function render_message_block(ass, meta, fontsize, outline)
             ass:append(head)
 
             local flag_x = BLOCK_PEN_X + text_width(head, fontsize) + gap
-            local flag_ass = render_flag_geometry(asset, p, flag_x,
+            local flag_ass = render_flag_geometry(asset, flag_x,
                 y + (fontsize - flag_h) / 2)
             if flag_ass then
                 ass:new_event()
@@ -4238,8 +4254,8 @@ function validate_user_opts()
         user_opts.track_flag_gap = 2
     end
     if type(user_opts.track_flag_size) ~= "number" or user_opts.track_flag_size <= 0 then
-        mp.msg.warn("track_flag_size must be a positive number. Using 16.")
-        user_opts.track_flag_size = 16
+        mp.msg.warn("track_flag_size must be a positive number. Using 14.")
+        user_opts.track_flag_size = 14
     end
 end
 

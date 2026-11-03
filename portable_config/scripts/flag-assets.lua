@@ -9,9 +9,9 @@
 -- be rendered as its own event at the same position, in order: libass ends
 -- a drawing at the first override block it meets, so a single event cannot
 -- carry more than one colour.
--- Coordinates are normalised to 256 units of height and \pN divides them by
--- 2**(N-1), so the drawn height is 256 / 2**(N-1) playres units
--- (\p4 == 32 units, \p5 == 16 units).
+-- Coordinates are normalised to 256 units of height. modernx pre-scales them
+-- to the requested size and always draws with \p1, so the drawn height is
+-- exactly track_flag_size playres units (aspect preserved).
 --
 -- 67 flags
 return {
