@@ -4614,7 +4614,7 @@ local function osc_init()
         local track_id = get_track("video")
         if track_id ~= 0 then
             local total = #tracks_osc.video
-            local message = string.format("%s [%d ∕ %d]", texts.video, track_id, total)
+            local message = string.format("%s (%d ∕ %d)", texts.video, track_id, total)
             local prop_lang = mp.get_property("current-tracks/video/lang")
             local prop_title = mp.get_property("current-tracks/video/title")
             return tooltip_parts(message, prop_lang, prop_title)
@@ -4664,7 +4664,7 @@ local function osc_init()
         local track_id = get_track("audio")
         if track_id ~= 0 then
             local total = #tracks_osc.audio
-            local message = string.format("%s [%d ∕ %d]", texts.audio, track_id, total)
+            local message = string.format("%s (%d ∕ %d)", texts.audio, track_id, total)
             local prop_lang = mp.get_property("current-tracks/audio/lang")
             local prop_title = mp.get_property("current-tracks/audio/title")
             return tooltip_parts(message, prop_lang, prop_title)
@@ -4725,7 +4725,7 @@ local function osc_init()
         if sub_id == 0 then
             return texts.off, ""
         end
-        local message = string.format("%s [%d ∕ %d]", texts.subtitle, sub_id, #tracks_osc.sub)
+        local message = string.format("%s (%d ∕ %d)", texts.subtitle, sub_id, #tracks_osc.sub)
         local lang = mp.get_property("current-tracks/sub/lang")
         local title = mp.get_property("current-tracks/sub/title")
         -- subtitles carry the title even when the slot is a text label, so the
