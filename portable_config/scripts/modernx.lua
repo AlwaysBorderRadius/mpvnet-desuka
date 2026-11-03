@@ -789,10 +789,19 @@ local function tooltip_parts(prefix, lang, title)
     local title_ok = title ~= nil and title ~= "" and title ~= texts.na
 
     if lang_ok then
-        if flag_drawn(lang) then
+        local mode = user_opts.track_language_mode or "code"
+        -- resolve the artwork once; the fallback below reuses the verdict
+        -- instead of looking the asset up again
+        local asset = (mode == "flag") and get_flag_asset(lang) or nil
+        if asset then
             return prefix .. " ", title_ok and (" " .. title) or ""
         end
-        local label = format_track_label(lang)
+        local label
+        if mode == "flag" and type(lang) == "string" then
+            label = "[" .. lang .. "]"
+        else
+            label = format_track_label(lang, mode)
+        end
         if label then
             if title_ok then
                 return prefix .. " " .. label .. " ", title
@@ -990,8 +999,6 @@ local state = {
     file_size_bytes = 0,
     file_size_normalized = "Approximating size...",
     is_URL = false,
-    URL_path = "",                 -- used for yt-dlp downloading
-    videoCantBeDownloaded = false, -- TODO: needs to be removed
 
     localDescription = nil,
     localDescriptionClick = nil,
@@ -1015,8 +1022,8 @@ local state = {
 
     sponsor_segments = {},
 
-    message_text = nil, -- TODO: needs to be removed
-    message_hide_timer = nil, ---@type mp.Timer? -- TODO: needs to be removed
+    message_text = nil,
+    message_hide_timer = nil, ---@type mp.Timer?
     message_meta = nil, -- structured track list rows for render_message_block
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -4783,36 +4790,32 @@ local function osc_init()
             (texts.download .. " (" .. state.file_size_normalized .. ")")
     end
     ne.eventresponder["mbtn_left_up"] = function()
-        if not state.videoCantBeDownloaded then
-            local localpath = mp.command_native({ "expand-path", user_opts.download_path })
+        local localpath = mp.command_native({ "expand-path", user_opts.download_path })
 
-            if state.downloaded_once then
-                show_message("{\\an9}" .. texts.downloaded .. "...")
-            elseif state.downloading then
-                show_message("{\\an9}" .. texts.download_in_progress .. "...")
-            else
-                show_message("{\\an9}" .. texts.downloading .. "...")
-                state.downloading = true
-
-                -- use current or default ytdl-format
-                local mpv_ytdl = (user_opts.ytdl_format and user_opts.ytdl_format ~= "") and user_opts.ytdl_format or
-                    mp.get_property("file-local-options/ytdl-format") or mp.get_property("ytdl-format") or ""
-
-                local command = {
-                    "yt-dlp",
-                    mpv_ytdl,
-                    "--remux", "mp4",
-                    "--add-metadata",
-                    "--embed-subs",
-                    "-o", "%(title)s.%(ext)s",
-                    "-P", localpath,
-                    state.url_path
-                }
-
-                exec_async(command, download_done)
-            end
+        if state.downloaded_once then
+            show_message("{\\an9}" .. texts.downloaded .. "...")
+        elseif state.downloading then
+            show_message("{\\an9}" .. texts.download_in_progress .. "...")
         else
-            show_message("{\\an9}Can't be downloaded")
+            show_message("{\\an9}" .. texts.downloading .. "...")
+            state.downloading = true
+
+            -- use current or default ytdl-format
+            local mpv_ytdl = (user_opts.ytdl_format and user_opts.ytdl_format ~= "") and user_opts.ytdl_format or
+                mp.get_property("file-local-options/ytdl-format") or mp.get_property("ytdl-format") or ""
+
+            local command = {
+                "yt-dlp",
+                mpv_ytdl,
+                "--remux", "mp4",
+                "--add-metadata",
+                "--embed-subs",
+                "-o", "%(title)s.%(ext)s",
+                "-P", localpath,
+                state.url_path
+            }
+
+            exec_async(command, download_done)
         end
     end
 
