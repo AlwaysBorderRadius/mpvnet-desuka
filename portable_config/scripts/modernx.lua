@@ -3346,7 +3346,7 @@ local function render_toast(ass)
     -- text (centered, multiline via \N)
     local body = table.concat(lines, "\\N")
     ass:new_event()
-    ass:pos(cx + 8, cy)
+    ass:pos(cx - 2, cy)
     ass:an(5)
     ass:append(text_style .. body)
 end
