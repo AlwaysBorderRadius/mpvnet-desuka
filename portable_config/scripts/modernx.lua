@@ -289,7 +289,9 @@ local user_opts = {
     toast_enabled = true,          -- route all script OSD through the modernx toast
     toast_font_size = 20,          -- toast text size
     toast_max_width = 900,         -- max toast pill width (playres units)
-    toast_top_margin = 80,         -- fixed distance from top edge (top-center, ignores OSC)
+    toast_top_margin = 80,         -- fixed distance from top edge (ignores OSC)
+    toast_position = "top-center", -- "top-left" | "top-center" | "top-right"
+    toast_side_margin = 25,        -- distance from side edge for corner positions
     toast_info_color = "#1D96F5",      -- info accent (seekbar blue)
     toast_success_color = "#00D400",   -- success accent
     toast_warn_color = "#FFC107",      -- warning accent
@@ -3070,8 +3072,8 @@ end
 -- >>> CUSTOM desuka: unified toast channel <<<
 -- Central OSD replacement: one visible toast, new toast kills the previous
 -- one (no queue). Toast is a separate slot from the modal message
--- (tracklist/description): toast renders top-center fixed, modal renders
--- top-left, so they never overlap on screen.
+-- (tracklist/description): toast renders fixed at the top (position opt),
+-- modal renders top-left, so they never overlap on screen.
 local TOAST_KINDS = { info = true, success = true, warn = true, error = true, persistent = true }
 
 -- Strip quotes/spaces from script-opt colors (mp.options may keep them
@@ -3202,6 +3204,22 @@ function clear_toast(source, force)
     request_tick()
 end
 
+-- Width without ASS escape artifacts (stored text escapes "{" as "\{").
+local function toast_measure(s, fontsize)
+    return text_width((tostring(s or ""):gsub("\\{", "{")), fontsize)
+end
+
+-- Cut a single line with "…" until it fits max_w (UTF-8 safe).
+local function truncate_to_fit(s, max_w, fontsize)
+    s = tostring(s or "")
+    if toast_measure(s, fontsize) <= max_w then return s end
+    local ell = "…"
+    while #s > 0 and toast_measure(s .. ell, fontsize) > max_w do
+        s = s:gsub("[%z\1-\127\194-\244][\128-\191]*$", "")
+    end
+    return s .. ell
+end
+
 local function render_toast(ass)
     if not user_opts.toast_enabled then return end
     if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled() and state.toast_text) then
@@ -3210,51 +3228,81 @@ local function render_toast(ass)
             state.toast_head = nil
             state.toast_tail = nil
             state.toast_flag_lang = nil
+            state.toast_kind = "info"
+            state.toast_source = ""
         end
         return
     end
     local fontsize = tonumber(user_opts.toast_font_size) or 20
     local gap = tonumber(user_opts.track_flag_gap) or 2
+    local cap = tonumber(user_opts.toast_max_width) or 900
     -- flag row (track cycle): head + vector flag + tail, centered
     local asset, flag_w, flag_h = nil, 0, 0
-    if state.toast_flag_lang and state.toast_head then
+    if state.toast_flag_lang and state.toast_head and state.toast_head ~= "" then
         asset, flag_w, flag_h = get_flag_geometry(state.toast_flag_lang)
         if not asset then
             asset, flag_w, flag_h = nil, 0, 0
         end
     end
     local pad_x, pad_y = 22, 12
-    local cx = osc_param.playresx / 2
-    -- fixed top-center: never moves with the OSC
-    local cy = (tonumber(user_opts.toast_top_margin) or 80)
+    local content_max = cap - pad_x * 2 - 10
     local pill_w, pill_h, head_w, tail_w
+    local lines = nil
     if asset then
-        head_w = text_width(state.toast_head, fontsize)
-        tail_w = state.toast_tail and text_width(state.toast_tail, fontsize) or 0
+        head_w = toast_measure(state.toast_head, fontsize)
+        if state.toast_tail then
+            local budget = content_max - head_w - gap - flag_w - gap
+            if toast_measure(state.toast_tail, fontsize) > budget then
+                if budget > 30 then
+                    state.toast_tail = truncate_to_fit(state.toast_tail, budget, fontsize)
+                else
+                    state.toast_tail = nil
+                end
+            end
+            tail_w = state.toast_tail and toast_measure(state.toast_tail, fontsize) or 0
+        else
+            tail_w = 0
+        end
         local total = head_w + gap + flag_w
         if state.toast_tail then total = total + gap + tail_w end
-        pill_w = math.min(total + pad_x * 2 + 10, tonumber(user_opts.toast_max_width) or 900)
+        pill_w = math.min(total + pad_x * 2 + 10, cap)
         pill_h = math.max(fontsize * 1.35, flag_h) + pad_y * 2
     else
-        local lines = {}
+        lines = {}
         for line in (state.toast_text .. "\\N"):gmatch("(.-)\\N") do lines[#lines + 1] = line end
         if #lines == 0 then return end
+        for i, line in ipairs(lines) do
+            lines[i] = truncate_to_fit(line, content_max - 12, fontsize)
+        end
         local maxw = 0
         for _, line in ipairs(lines) do
-            local w = text_width(line, fontsize)
+            local w = toast_measure(line, fontsize)
             if w > maxw then maxw = w end
         end
-        pill_w = math.min(maxw + pad_x * 2 + 10, tonumber(user_opts.toast_max_width) or 900)
+        pill_w = maxw + pad_x * 2 + 10
         pill_h = #lines * fontsize * 1.35 + pad_y * 2
     end
+    -- fixed position: top-left | top-center | top-right, never moves with the OSC
+    local pos = user_opts.toast_position or "top-center"
+    local side = tonumber(user_opts.toast_side_margin) or 25
+    local cy = (tonumber(user_opts.toast_top_margin) or 80)
+    local cx = osc_param.playresx / 2
+    if pos == "top-left" then
+        cx = side + pill_w / 2
+    elseif pos == "top-right" then
+        cx = osc_param.playresx - side - pill_w / 2
+    end
+    -- keep the pill on screen (narrow/portrait video, wide pill)
+    cx = math.min(math.max(cx, pill_w / 2), math.max(pill_w / 2, osc_param.playresx - pill_w / 2))
+    if cy - pill_h / 2 < 0 then cy = pill_h / 2 end
     local x0, y0 = cx - pill_w / 2, cy - pill_h / 2
     local x1, y1 = cx + pill_w / 2, cy + pill_h / 2
     local r = math.min(12, pill_h / 2)
-    -- background pill
+    -- background pill, opaque
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord0\\1c&H000000&\\alpha&H66&}")
+    ass:append("{\\blur0\\bord0\\1c&H000000&\\alpha&H00&}")
     ass:draw_start()
     ass:round_rect_cw(x0, y0, x1, y1, r)
     ass:draw_stop()
@@ -3283,17 +3331,23 @@ local function render_toast(ass)
         end
         return
     end
-    -- accent dot
+    -- accent bar (vertical)
     local accent = toast_accent(state.toast_kind)
+    local bar_w = 4
+    local bar_h = pill_h - pad_y
     ass:new_event()
-    ass:pos(x0 + pad_x - 6, cy)
-    ass:an(5)
-    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(accent) .. "&\\fs" .. math.floor(fontsize * 0.7) .. "}●")
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(accent) .. "&}")
+    ass:draw_start()
+    ass:round_rect_cw(x0 + pad_x, cy - bar_h / 2, x0 + pad_x + bar_w, cy + bar_h / 2, 2)
+    ass:draw_stop()
     -- text (centered, multiline via \N)
+    local body = table.concat(lines, "\\N")
     ass:new_event()
     ass:pos(cx + 8, cy)
     ass:an(5)
-    ass:append(text_style .. state.toast_text)
+    ass:append(text_style .. body)
 end
 -- <<< CUSTOM desuka >>>
 
@@ -4606,9 +4660,18 @@ function validate_user_opts()
         mp.msg.warn("toast_max_width must be a positive number. Using 900.")
         user_opts.toast_max_width = 900
     end
-    if type(user_opts.toast_top_margin) ~= "number" or user_opts.toast_top_margin < 0 then
-        mp.msg.warn("toast_top_margin must be a non-negative number. Using 80.")
+    if type(user_opts.toast_top_margin) ~= "number" or user_opts.toast_top_margin <= 0 then
+        mp.msg.warn("toast_top_margin must be a positive number. Using 80.")
         user_opts.toast_top_margin = 80
+    end
+    if user_opts.toast_position ~= "top-left" and user_opts.toast_position ~= "top-center"
+        and user_opts.toast_position ~= "top-right" then
+        mp.msg.warn("toast_position must be top-left, top-center or top-right. Using top-center.")
+        user_opts.toast_position = "top-center"
+    end
+    if type(user_opts.toast_side_margin) ~= "number" or user_opts.toast_side_margin < 0 then
+        mp.msg.warn("toast_side_margin must be a non-negative number. Using 25.")
+        user_opts.toast_side_margin = 25
     end
     local _fallback = { info = "#1D96F5", success = "#00D400", warn = "#FFC107", error = "#E81123", persistent = "#9D96F5" }
     for _, k in ipairs({ "info", "success", "warn", "error", "persistent" }) do
