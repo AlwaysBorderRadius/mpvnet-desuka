@@ -590,10 +590,13 @@ local function ensure_flag_assets()
     local okload, mod = pcall(dofile, path)
     if okload and type(mod) == "table" then
         flag_assets = mod
-        local missing = {}
+        local seen, missing = {}, {}
         for _, cc in pairs(lang_to_cc) do
-            if flag_assets[string.lower(cc)] == nil then
-                missing[#missing + 1] = cc
+            if not seen[cc] then
+                seen[cc] = true
+                if flag_assets[string.lower(cc)] == nil then
+                    missing[#missing + 1] = cc
+                end
             end
         end
         if #missing > 0 then
@@ -608,7 +611,7 @@ local function ensure_flag_assets()
 end
 
 local function get_flag_asset(lang)
-    if not lang or lang == "" then
+    if type(lang) ~= "string" or lang == "" then
         return nil
     end
     if not ensure_flag_assets() then
@@ -652,7 +655,7 @@ local function get_flag_geometry(lang)
 end
 
 local function format_track_label(lang, mode_override, name_map)
-    if not lang or lang == "" then
+    if type(lang) ~= "string" or lang == "" then
         return nil
     end
     local l = lang
@@ -1336,6 +1339,8 @@ function get_tracklist(type)
             elseif track.metadata and track.metadata["name"] then
                 title = track.metadata["name"]
             end
+            -- one track, one row: stray line breaks would desync the block layout
+            title = title:gsub("[\r\n]+", " ")
             if (track.id == tonumber(mp.get_property(type))) then
                 selected = '●'
             end
@@ -1818,7 +1823,7 @@ local function draw_sponsorblock_ranges(element, elem_ass, xp, rh)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- Builds the ASS events for a vector flag; one event per colour (libass cancels a multi-path override and repeating \p advances the pen). Returns the ass and drawn width.
+-- Builds the ASS events for a vector flag from precomputed geometry; one event per colour (libass cancels a multi-path override and repeating \p advances the pen).
 local function render_flag_geometry(asset, p, x, y)
     local flag_ass = mp.assdraw.ass_new()
     for _, part in ipairs(asset.d) do
@@ -1829,14 +1834,6 @@ local function render_flag_geometry(asset, p, x, y)
         flag_ass:append((part:gsub("\\p1", "\\p" .. p)))
     end
     return flag_ass
-end
-
-local function render_flag(lang, x, y)
-    local asset, p, width = get_flag_geometry(lang)
-    if not asset then
-        return nil, 0
-    end
-    return render_flag_geometry(asset, p, x, y), width
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -3026,6 +3023,7 @@ function show_tracklist(type)
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
 -- show only the row of the current track in the same block layout (used by the cycle-sub keybinds)
 function show_selected_track_row(type)
     local _, meta = get_tracklist(type)
@@ -3052,6 +3050,7 @@ mp.register_script_message("cycle-sub-down", function()
     mp.commandv("no-osd", "cycle", "sub", "down")
     show_selected_track_row("sub")
 end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 function bind_keys(keys, name, func, opts)
     if not keys then
@@ -4233,6 +4232,15 @@ function validate_user_opts()
         mp.msg.warn("track_language_mode cannot be '" .. tostring(user_opts.track_language_mode) .. "'. Using 'code'.")
         user_opts.track_language_mode = "code"
     end
+
+    if type(user_opts.track_flag_gap) ~= "number" or user_opts.track_flag_gap < 0 then
+        mp.msg.warn("track_flag_gap must be a non-negative number. Using 2.")
+        user_opts.track_flag_gap = 2
+    end
+    if type(user_opts.track_flag_size) ~= "number" or user_opts.track_flag_size <= 0 then
+        mp.msg.warn("track_flag_size must be a positive number. Using 16.")
+        user_opts.track_flag_size = 16
+    end
 end
 
 function update_options(_)
@@ -4513,7 +4521,7 @@ local function osc_init()
             local message = string.format("%s [%d ∕ %d]", texts.video, track_id, total)
             local prop_lang = mp.get_property("current-tracks/video/lang")
             local prop_title = mp.get_property("current-tracks/video/title")
-            return tooltip_parts(message, prop_lang, prop_title, flag_drawn(prop_lang))
+            return tooltip_parts(message, prop_lang, prop_title, true)
         end
         return (not ne.enabled) and texts.novideo or texts.off, ""
     end
@@ -4563,9 +4571,9 @@ local function osc_init()
             local message = string.format("%s [%d ∕ %d]", texts.audio, track_id, total)
             local prop_lang = mp.get_property("current-tracks/audio/lang")
             local prop_title = mp.get_property("current-tracks/audio/title")
-            return tooltip_parts(message, prop_lang, prop_title, flag_drawn(prop_lang))
+            return tooltip_parts(message, prop_lang, prop_title, true)
         end
-        return (not ne.enabled) and "No audio tracks" or texts.off, ""
+        return (not ne.enabled) and texts.noaudio or texts.off, ""
     end
     ne.nothingavailable = texts.noaudio
     ne.eventresponder['mbtn_left_up'] =

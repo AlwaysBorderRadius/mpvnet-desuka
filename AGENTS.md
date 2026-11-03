@@ -37,9 +37,9 @@ opciones, keybinds) + tooling en `tools/`.
 - Validar opciones nuevas en `validate_user_opts()` (aviso + default seguro).
 - Medición de tooltips: avances calibrados para la `font` del conf; si cambia
   la fuente hay que recalibrar `CHAR_ADVANCE`.
-- **Nunca commitear ajustes de máquina**: `mpv.conf` (`log-file` local),
-  `script-opts/discord.conf` (`active=no`), `script-opts/update-checker.conf`
-  (`check_on_startup=no`).
+- Los `.conf` de `portable_config/` se commitean en cada rama como parte del
+  estado portable (incluidos `mpv.conf`, `discord.conf` y `update-checker.conf`
+  con sus ajustes locales).
 
 ## Workflow (resumen; detalle en docs/workflow.md)
 
