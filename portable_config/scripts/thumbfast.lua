@@ -145,6 +145,7 @@ local script_written = false
 local spawn_seq = 0
 local spawn_start = 0
 local pipe_logged = false
+local last_error_toast = -10
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
 local dirty = false
@@ -305,6 +306,16 @@ if mpv_path == "mpv" and os_name == "darwin" and unique then
         end
     end
 end
+-- >>> CUSTOM AlwaysBorderRadius: log resolved backend binary <<<
+do
+    local backend_exists = "n/a"
+    if mpv_path ~= "mpv" then
+        local backend_info = mp.utils.file_info(mpv_path)
+        backend_exists = (backend_info and backend_info.is_file) and "yes" or "no"
+    end
+    mp.msg.warn(string.format("thumbfast: backend mpv_path=%s frontend=%s exists=%s", tostring(mpv_path), tostring(frontend_path), backend_exists))
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 local function vo_tone_mapping()
     local passes = mp.get_property_native("vo-passes")
@@ -441,6 +452,17 @@ local activity_timer
 local function spawn(time)
     if disabled then return end
 
+    -- EDIT AlwaysBorderRadius: late-resolve frontend exe (startup race)
+    if mpv_path == "mpv" and os_name == "windows" then
+        local late_path = mp.get_property_native("user-data/frontend/process-path")
+        local late_info = late_path and mp.utils.file_info(late_path)
+        if late_info and late_info.is_file then
+            frontend_path = late_path
+            mpv_path = late_path
+            mp.msg.warn("thumbfast: mpv_path late-resolved to " .. tostring(late_path))
+        end
+    end
+
     local path = properties["path"]
     if path == nil then return end
 
@@ -535,9 +557,14 @@ local function spawn(time)
                 options.tone_mapping = "no"
                 mp.msg.error("mpv subprocess create failed")
                 if not spawn_working then -- notify users of required configuration
-                    -- >>> CUSTOM desuka: errors go to the unified toast (no native OSD overlap) <<<
+                    -- >>> CUSTOM AlwaysBorderRadius: errors go to the unified toast (no native OSD overlap) <<<
                     local function toast_err(text)
+                        -- EDIT AlwaysBorderRadius: throttle error toasts
+                        local now = mp.get_time()
+                        if now - last_error_toast < 10 then return false end
+                        last_error_toast = now
                         mp.commandv("script-message-to", "modernx", "modernx-toast", "error", "thumbfast", text, "5000")
+                        return true
                     end
                     if options.mpv_path == "mpv" then
                         if properties["current-vo"] == "libmpv" then
@@ -549,19 +576,26 @@ local function spawn(time)
                                     force_disabled = true
                                     info(real_w or effective_w, real_h or effective_h)
                                 end
-                                toast_err("thumbfast: ERROR! cannot create mpv subprocess")
-                                mp.commandv("script-message-to", "implay", "show-message", "thumbfast initial setup", "Set mpv_path=PATH_TO_ImPlay in thumbfast config:\n" .. string.gsub(mp.command_native({"expand-path", "~~/script-opts/thumbfast.conf"}), "[/\\]", path_separator).."\nand restart ImPlay")
+                                if toast_err("thumbfast: ERROR! cannot create mpv subprocess") then
+                                    mp.commandv("script-message-to", "implay", "show-message", "thumbfast initial setup", "Set mpv_path=PATH_TO_ImPlay in thumbfast config:\n" .. string.gsub(mp.command_native({"expand-path", "~~/script-opts/thumbfast.conf"}), "[/\\]", path_separator).."\nand restart ImPlay")
+                                end
                             end
                         else
-                            toast_err("thumbfast: ERROR! cannot create mpv subprocess")
-                            -- NOTE desuka: no mpvnet show-text here, the toast is the only channel
+                            -- EDIT AlwaysBorderRadius: hint at missing binary when no frontend path
+                            if frontend_path == nil then
+                                toast_err("thumbfast: mpv not found, set mpv_path in thumbfast.conf")
+                            else
+                                toast_err("thumbfast: ERROR! cannot create mpv subprocess")
+                            end
+                            -- NOTE AlwaysBorderRadius: no mpvnet show-text here, the toast is the only channel
                         end
                     else
-                        toast_err("thumbfast: ERROR! cannot create mpv subprocess")
                         -- found ImPlay but not defined in config
-                        mp.commandv("script-message-to", "implay", "show-message", "thumbfast", "Set mpv_path=PATH_TO_ImPlay in thumbfast config:\n" .. string.gsub(mp.command_native({"expand-path", "~~/script-opts/thumbfast.conf"}), "[/\\]", path_separator).."\nand restart ImPlay")
+                        if toast_err("thumbfast: ERROR! cannot create mpv subprocess") then
+                            mp.commandv("script-message-to", "implay", "show-message", "thumbfast", "Set mpv_path=PATH_TO_ImPlay in thumbfast config:\n" .. string.gsub(mp.command_native({"expand-path", "~~/script-opts/thumbfast.conf"}), "[/\\]", path_separator).."\nand restart ImPlay")
+                        end
                     end
-                    -- <<< CUSTOM desuka >>>
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
                 end
             elseif success == true and (result.status == 0 or result.status == -2) then
                 if not spawn_working and properties["current-vo"] == "libmpv" and options.mpv_path ~= mpv_path then
@@ -930,6 +964,12 @@ local function file_load()
     if spawn_waiting then
         mp.msg.warn(string.format("thumbfast: file-load abandoned spawn #%d elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
     end
+    -- EDIT AlwaysBorderRadius: never keep thumbs disabled across files
+    force_disabled = false
+    -- EDIT AlwaysBorderRadius: drop stale spawn state from previous file
+    spawn_waiting = false
+    pipe_logged = false
+    last_error_toast = -10
     clear()
     spawned = false
     real_w, real_h = nil, nil
