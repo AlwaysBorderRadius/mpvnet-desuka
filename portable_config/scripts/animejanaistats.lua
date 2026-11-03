@@ -1,12 +1,23 @@
 local open = io.open
 
 local showingMessage = false
-local MAX_DURATION = 2147483
+
+local function read_file(path)
+    local file = open(path, "r") -- r read mode and b binary mode
+    if not file then return nil end
+    local content = file:read "*a" -- *a or *all reads the whole file
+    file:close()
+    return content
+end
 
 -- Function to be called when the custom action is triggered
+-- >>> CUSTOM desuka: persistent toast with source-aware clear <<<
+-- New toasts preempt (no queue). Clear only clears our own toast, so if an
+-- important toast replaced us, the next toggle just resyncs instead of
+-- killing someone else's message.
 function show_animejanai_stats()
     if showingMessage then
-        mp.osd_message("")  -- Clear the OSD message
+        mp.commandv("script-message-to", "modernx", "modernx-toast-clear", "animejanai")
         showingMessage = false
     else
         local message = ""
@@ -17,23 +28,17 @@ function show_animejanai_stats()
             local data_file_path = (mp.command_native({'expand-path', "~~/../animejanai/core/currentanimejanai.log"}))
             message = read_file(data_file_path)
 
-            if message == "" then
+            if message == "" or message == nil then
                 message = "Error during upscale; press ~ to view error in console"
             end
         end
-        
-        mp.osd_message(message, MAX_DURATION)
+
+        mp.commandv("script-message-to", "modernx", "modernx-toast",
+            "persistent", "animejanai", message)
         showingMessage = true
     end
 end
-
-function read_file(path)
-    local file = open(path, "r") -- r read mode and b binary mode
-    if not file then return nil end
-    local content = file:read "*a" -- *a or *all reads the whole file
-    file:close()
-    return content
-end
+-- <<< CUSTOM desuka >>>
 
 
 -- Register the custom action to a key binding (e.g., "Ctrl+Shift+C")

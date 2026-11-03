@@ -60,7 +60,12 @@ function check_for_update()
     
     if latest then
         if latest ~= current_version then
-            mp.osd_message("¡Nueva actualización de mpvnet-desuka disponible! \nVersión: " .. latest .. "\nActual: " .. current_version .. "\nVisita el repo en GitHub.", 5)
+            -- >>> CUSTOM desuka: important message preempts any toast (no queue) <<<
+            mp.commandv("script-message-to", "modernx", "modernx-toast",
+                "warn", "update-checker",
+                "Nueva actualización disponible: " .. latest .. " (actual: " .. current_version .. ")",
+                "6000")
+            -- <<< CUSTOM desuka >>>
             msg.info("Nueva versión detectada: " .. latest)
         else
             msg.info("La versión actual es la más reciente.")

@@ -516,6 +516,10 @@ local function spawn(time)
                 options.tone_mapping = "no"
                 mp.msg.error("mpv subprocess create failed")
                 if not spawn_working then -- notify users of required configuration
+                    -- >>> CUSTOM desuka: errors go to the unified toast (no native OSD overlap) <<<
+                    local function toast_err(text)
+                        mp.commandv("script-message-to", "modernx", "modernx-toast", "error", "thumbfast", text, "5000")
+                    end
                     if options.mpv_path == "mpv" then
                         if properties["current-vo"] == "libmpv" then
                             if options.mpv_path == mpv_path then -- attempt to locate ImPlay
@@ -526,21 +530,19 @@ local function spawn(time)
                                     force_disabled = true
                                     info(real_w or effective_w, real_h or effective_h)
                                 end
-                                mp.commandv("show-text", "thumbfast: ERROR! cannot create mpv subprocess", 5000)
+                                toast_err("thumbfast: ERROR! cannot create mpv subprocess")
                                 mp.commandv("script-message-to", "implay", "show-message", "thumbfast initial setup", "Set mpv_path=PATH_TO_ImPlay in thumbfast config:\n" .. string.gsub(mp.command_native({"expand-path", "~~/script-opts/thumbfast.conf"}), "[/\\]", path_separator).."\nand restart ImPlay")
                             end
                         else
-                            mp.commandv("show-text", "thumbfast: ERROR! cannot create mpv subprocess", 5000)
-                            if os_name == "windows" and frontend_path == nil then
-                                mp.commandv("script-message-to", "mpvnet", "show-text", "thumbfast: ERROR! install standalone mpv, see README", 5000, 20)
-                                mp.commandv("script-message", "mpv.net", "show-text", "thumbfast: ERROR! install standalone mpv, see README", 5000, 20)
-                            end
+                            toast_err("thumbfast: ERROR! cannot create mpv subprocess")
+                            -- NOTE desuka: no mpvnet show-text here, the toast is the only channel
                         end
                     else
-                        mp.commandv("show-text", "thumbfast: ERROR! cannot create mpv subprocess", 5000)
+                        toast_err("thumbfast: ERROR! cannot create mpv subprocess")
                         -- found ImPlay but not defined in config
                         mp.commandv("script-message-to", "implay", "show-message", "thumbfast", "Set mpv_path=PATH_TO_ImPlay in thumbfast config:\n" .. string.gsub(mp.command_native({"expand-path", "~~/script-opts/thumbfast.conf"}), "[/\\]", path_separator).."\nand restart ImPlay")
                     end
+                    -- <<< CUSTOM desuka >>>
                 end
             elseif success == true and (result.status == 0 or result.status == -2) then
                 if not spawn_working and properties["current-vo"] == "libmpv" and options.mpv_path ~= mpv_path then

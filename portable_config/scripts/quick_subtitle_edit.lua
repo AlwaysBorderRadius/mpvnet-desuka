@@ -552,10 +552,18 @@ local function osd_corner_style()
     return "{\\an7\\pos(" .. fs .. "," .. fs .. ")" .. osd_style_tags() .. "}"
 end
 
--- Mensajes puntuales: show-text escapa las etiquetas ASS, así que se pasa
--- el texto plano y queda en la posición/estilo por defecto del OSD.
-local function ui_msg(text, dur)
-    mp.osd_message(text, dur)
+-- Mensajes puntuales: van al toast unificado de modernx (un solo slot,
+-- preemptivo, sin cola). El editor/selector usan overlays propios arriba-izq;
+-- el toast va abajo-centro para no taparlos.
+local function ui_msg(text, dur, kind)
+    local ms
+    if dur ~= nil then
+        ms = math.floor(tonumber(dur) * 1000)
+        -- los fallback antiguos usaban dur=100s: caparlos para no secuestrar el toast
+        if ms > 8000 then ms = 8000 end
+    end
+    mp.commandv("script-message-to", "modernx", "modernx-toast",
+        kind or "info", "subedit", tostring(text or ""), ms and tostring(ms) or "")
 end
 
 -- Animación de puntos braille recorriendo el perímetro de un cuadrado
@@ -2293,7 +2301,7 @@ local function edit_subtitle(mode)
           .. " sid=" .. tostring(mp.get_property("sid"))
           .. " secondary-sid=" .. tostring(mp.get_property("secondary-sid")))
     if state ~= "idle" then
-        ui_msg("Ya hay una edición en curso", 1.5)
+        ui_msg("Ya hay una edición en curso", 1.5, "warn")
         return
     end
     if loading then return end
@@ -2302,13 +2310,13 @@ local function edit_subtitle(mode)
 
     local t = mp.get_property_number("time-pos")
     if not t then
-        ui_msg("No hay reproducción activa", 2)
+        ui_msg("No hay reproducción activa", 2, "warn")
         return
     end
 
     local subs = get_sub_tracks()
     if #subs == 0 then
-        ui_msg("No hay ninguna pista de subtítulos seleccionada", 2.5)
+        ui_msg("No hay ninguna pista de subtítulos seleccionada", 2.5, "warn")
         return
     end
 
@@ -2334,7 +2342,7 @@ local function edit_subtitle(mode)
         loading = false
         if not ok then
             cleanup_disposable()
-            ui_msg("Error al buscar subtítulos", 3)
+            ui_msg("Error al buscar subtítulos", 3, "error")
             return
         end
 
@@ -2344,7 +2352,7 @@ local function edit_subtitle(mode)
             if #errs > 0 then
                 extra = " (" .. table.concat(errs, " · ") .. ")"
             end
-            ui_msg("No hay subtítulo en este momento" .. extra, 3)
+            ui_msg("No hay subtítulo en este momento" .. extra, 3, "warn")
             return
         end
 
@@ -2358,7 +2366,7 @@ local function edit_subtitle(mode)
         end
         if #filtered == 0 then
             cleanup_disposable()
-            ui_msg("Subtítulo demasiado complejo para edición (tags entre las palabras)", 3)
+            ui_msg("Subtítulo demasiado complejo para edición (tags entre las palabras)", 3, "warn")
             return
         end
         cands = filtered
