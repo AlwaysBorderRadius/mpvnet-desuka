@@ -141,6 +141,11 @@ local force_disabled = false
 local spawn_waiting = false
 local spawn_working = false
 local script_written = false
+-- >>> CUSTOM AlwaysBorderRadius: spawn timing instrumentation state <<<
+local spawn_seq = 0
+local spawn_start = 0
+local pipe_logged = false
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 local dirty = false
 
@@ -506,10 +511,24 @@ local function spawn(time)
     table.insert(args, path)
 
     spawned = true
+    -- EDIT AlwaysBorderRadius: capture overlap before overwriting spawn_waiting
+    local overlapped = spawn_waiting
     spawn_waiting = true
+    -- >>> CUSTOM AlwaysBorderRadius: spawn timing instrumentation <<<
+    spawn_seq = spawn_seq + 1
+    local this_seq = spawn_seq
+    local this_start = mp.get_time()
+    spawn_start = this_start
+    pipe_logged = false
+    mp.msg.warn(string.format("thumbfast: spawn #%d start seek=%s overlapped=%s path=%s", this_seq, tostring(time), tostring(overlapped), tostring(path)))
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     subprocess(args, true,
         function(success, result)
+            -- >>> CUSTOM AlwaysBorderRadius: spawn exit instrumentation <<<
+            local exit_status = result and result.status or nil
+            mp.msg.warn(string.format("thumbfast: spawn #%d exit elapsed=%.3fs success=%s status=%s waiting=%s working=%s", this_seq, mp.get_time() - this_start, tostring(success), tostring(exit_status), tostring(spawn_waiting), tostring(spawn_working)))
+            -- <<< CUSTOM AlwaysBorderRadius >>>
             if spawn_waiting and (success == false or (result.status ~= 0 and result.status ~= -2)) then
                 spawned = false
                 spawn_waiting = false
@@ -580,6 +599,11 @@ local function run(command)
         end
         if not file then
             file = io.open("\\\\.\\pipe\\"..options.socket, "r+b")
+            -- EDIT AlwaysBorderRadius: log first pipe miss while waiting
+            if not file and spawn_waiting and not pipe_logged then
+                pipe_logged = true
+                mp.msg.warn(string.format("thumbfast: spawn #%d pipe not ready elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
+            end
         end
     elseif pre_0_33_0 then
         subprocess({"/usr/bin/env", "sh", "-c", "echo '" .. command .. "' | socat - " .. options.socket})
@@ -688,7 +712,14 @@ local function check_new_thumb()
     move_file(options.thumbnail, tmp)
     local finfo = mp.utils.file_info(tmp)
     if not finfo then return false end
+    -- EDIT AlwaysBorderRadius: capture first-thumb transition before clearing flag
+    local was_waiting = spawn_waiting
     spawn_waiting = false
+    -- >>> CUSTOM AlwaysBorderRadius: first thumbnail timing <<<
+    if was_waiting then
+        mp.msg.warn(string.format("thumbfast: spawn #%d first-thumb elapsed=%.3fs size=%s", spawn_seq, mp.get_time() - spawn_start, tostring(finfo.size)))
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     local w, h = real_res(effective_w, effective_h, finfo.size)
     if w then -- only accept valid thumbnails
         move_file(tmp, options.thumbnail..".bgra")
@@ -811,6 +842,10 @@ local function watch_changes()
     if spawned then
         if resized then
             -- mpv doesn't allow us to change output size
+            -- EDIT AlwaysBorderRadius: log respawn overlap while waiting
+            if spawn_waiting then
+                mp.msg.warn(string.format("thumbfast: respawn overlap #%d elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
+            end
             local seek_time = last_seek_time
             run("quit")
             clear()
@@ -891,6 +926,10 @@ local function sync_changes(prop, val)
 end
 
 local function file_load()
+    -- EDIT AlwaysBorderRadius: log abandoned spawn on file load
+    if spawn_waiting then
+        mp.msg.warn(string.format("thumbfast: file-load abandoned spawn #%d elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
+    end
     clear()
     spawned = false
     real_w, real_h = nil, nil
