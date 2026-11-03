@@ -162,7 +162,9 @@ local function screenshot_done()
     local msg = options.short_saved_message
         and "Screenshot saved"
         or "Screenshot saved to: " .. mp.command_native({"expand-path", mp.get_property("screenshot-directory")}):gsub("\\", "/")
-    mp.osd_message(msg)
+    -- >>> CUSTOM desuka: unified toast (replaces native OSD) <<<
+    mp.commandv("script-message-to", "modernx", "modernx-toast", "success", "screenshot", msg)
+    -- <<< CUSTOM desuka >>>
 end
 
 mp.observe_property("screenshot-format", "string", function(_, value)

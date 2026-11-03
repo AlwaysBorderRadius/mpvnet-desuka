@@ -56,6 +56,12 @@ mp.set_property("input-ipc-server", socket_path)
 
 local cmd = nil
 
+-- >>> CUSTOM desuka: route through modernx toast (single slot, preemptive) <<<
+local function notify(kind, text)
+    mp.commandv("script-message-to", "modernx", "modernx-toast", kind, "discord", text)
+end
+-- <<< CUSTOM desuka >>>
+
 local function start()
 	if cmd == nil then
 		cmd = mp.command_native_async({
@@ -68,7 +74,7 @@ local function start()
 			},
 		}, function() end)
 		msg.info("launched subprocess")
-		mp.osd_message("Discord Rich Presence: Started")
+		notify("info", "Discord Rich Presence: Started")
 	end
 end
 
@@ -76,7 +82,7 @@ function stop()
 	mp.abort_async_command(cmd)
 	cmd = nil
 	msg.info("aborted subprocess")
-	mp.osd_message("Discord Rich Presence: Stopped")
+	notify("info", "Discord Rich Presence: Stopped")
 end
 
 if options.active then

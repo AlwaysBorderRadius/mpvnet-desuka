@@ -283,6 +283,20 @@ local user_opts = {
     seek_bar_orientation = "horizontal", -- "horizontal", "vertical"
     seek_bar_position = "bottom",        -- "center", "top", "bottom", "left", "right"
     -- <<< CUSTOM AlwaysBorderRadius >>>
+
+    -- >>> CUSTOM desuka: unified toast channel (replaces native OSD) <<<
+    -- Single visible toast, preemptive (no queue). kind: info|success|warn|error|persistent
+    toast_enabled = true,          -- route all script OSD through the modernx toast
+    toast_font_size = 20,          -- toast text size
+    toast_max_width = 900,         -- max toast pill width (playres units)
+    toast_y_offset = 200,          -- height above bottom edge when OSC is visible
+    toast_y_offset_hidden = 80,    -- height above bottom edge when OSC is hidden
+    toast_info_color = "#1D96F5",      -- info accent (seekbar blue)
+    toast_success_color = "#00D400",   -- success accent
+    toast_warn_color = "#FFC107",      -- warning accent
+    toast_error_color = "#E81123",     -- error accent
+    toast_persistent_color = "#9D96F5",-- persistent accent (chapter current)
+    -- <<< CUSTOM desuka >>>
 }
 -- read options from config and command-line
 require("mp.options").read_options(user_opts, 'modernx', function(list) update_options(list) end)
@@ -1028,6 +1042,13 @@ local state = {
     message_text = nil,
     message_hide_timer = nil, ---@type mp.Timer?
     message_meta = nil, -- structured track list rows for render_message_block
+
+    -- >>> CUSTOM desuka: unified toast (single slot, preemptive, no queue) <<<
+    toast_text = nil,       -- plain text with \N linebreaks (no ASS)
+    toast_kind = "info",    -- info|success|warn|error|persistent
+    toast_source = "",      -- sender id for source-aware clear
+    toast_hide_timer = nil, ---@type mp.Timer?
+    -- <<< CUSTOM desuka >>>
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- State for the temporary volume and seek bars
@@ -2766,11 +2787,11 @@ end
 
 local function download_done(success, _, error)
     if success then
-        show_message("{\\an9}Download saved to " .. mp.command_native({ "expand-path", user_opts.download_path }))
+        show_toast("Download saved to " .. mp.command_native({ "expand-path", user_opts.download_path }), "success", "modernx-download")
         state.downloaded_once = true
         print("Web video download completed")
     else
-        show_message("{\\an9}Download failed - " .. (error or "Unknown error"))
+        show_toast("Download failed - " .. (error or "Unknown error"), "error", "modernx-download")
         print("Web video download failed")
     end
     state.downloading = false
@@ -3043,6 +3064,127 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
     state.message_hide_timer:resume()
     request_tick()
 end
+
+-- >>> CUSTOM desuka: unified toast channel <<<
+-- Central OSD replacement: one visible toast, new toast kills the previous
+-- one (no queue). Toast is a separate slot from the modal message
+-- (tracklist/description): toast renders bottom-center, modal renders
+-- top-left, so they never overlap on screen.
+local TOAST_KINDS = { info = true, success = true, warn = true, error = true, persistent = true }
+
+local function toast_accent(kind)
+    if kind == "success" then return user_opts.toast_success_color
+    elseif kind == "warn" then return user_opts.toast_warn_color
+    elseif kind == "error" then return user_opts.toast_error_color
+    elseif kind == "persistent" then return user_opts.toast_persistent_color
+    else return user_opts.toast_info_color end
+end
+
+local function toast_default_duration(kind)
+    if kind == "persistent" then return 2147483 end
+    if kind == "error" then return 5 end
+    if kind == "warn" then return 4 end
+    local d = tonumber(mp.get_property('options/osd-duration')) or 2000
+    return d / 1000
+end
+
+local function escape_toast_text(s)
+    s = tostring(s or "")
+    -- plain-text toast: neutralise ASS tags, keep linebreaks as \N
+    s = s:gsub("{", "\\{")
+    s = s:gsub("\r\n", "\n"):gsub("\r", "\n")
+    s = s:gsub("\n", "\\N")
+    return string.sub(s, 1, 4000)
+end
+
+function show_toast(text, kind, source, duration)
+    if not user_opts.toast_enabled then
+        show_message(tostring(text or ""), duration)
+        return
+    end
+    kind = tostring(kind or "info")
+    if not TOAST_KINDS[kind] then
+        -- 2-arg call compat: show_toast(text) -> kind defaults to info
+        if text == nil then text = kind end
+        kind = "info"
+    end
+    source = tostring(source or "")
+    if duration == nil then
+        duration = toast_default_duration(kind)
+    else
+        duration = tonumber(duration) or toast_default_duration(kind)
+        if duration > 1000 then duration = duration / 1000 end -- allow ms from script-message
+    end
+    state.toast_text = escape_toast_text(text)
+    state.toast_kind = kind
+    state.toast_source = source
+    if not state.toast_hide_timer then
+        state.toast_hide_timer = mp.add_timeout(0, request_tick)
+    end
+    state.toast_hide_timer:kill()
+    state.toast_hide_timer.timeout = duration
+    state.toast_hide_timer:resume()
+    request_tick()
+end
+
+function clear_toast(source, force)
+    -- source-aware clear: a toggle (animejanai) must not kill someone else's toast.
+    if source ~= nil and source ~= "" and not force then
+        if state.toast_source ~= tostring(source) then return end
+    end
+    state.toast_text = nil
+    state.toast_source = ""
+    if state.toast_hide_timer then state.toast_hide_timer:kill() end
+    request_tick()
+end
+
+local function render_toast(ass)
+    if not user_opts.toast_enabled then return end
+    if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled() and state.toast_text) then
+        if state.toast_text ~= nil then state.toast_text = nil end
+        return
+    end
+    local fontsize = tonumber(user_opts.toast_font_size) or 20
+    local lines = {}
+    for line in (state.toast_text .. "\\N"):gmatch("(.-)\\N") do lines[#lines + 1] = line end
+    if #lines == 0 then return end
+    local maxw = 0
+    for _, line in ipairs(lines) do
+        local w = text_width(line, fontsize)
+        if w > maxw then maxw = w end
+    end
+    local pad_x, pad_y = 22, 12
+    local pill_w = math.min(maxw + pad_x * 2 + 10, tonumber(user_opts.toast_max_width) or 900)
+    local pill_h = #lines * fontsize * 1.35 + pad_y * 2
+    local cx = osc_param.playresx / 2
+    local lift = state.osc_visible and (tonumber(user_opts.toast_y_offset) or 200)
+        or (tonumber(user_opts.toast_y_offset_hidden) or 80)
+    local cy = osc_param.playresy - lift
+    local x0, y0 = cx - pill_w / 2, cy - pill_h / 2
+    local x1, y1 = cx + pill_w / 2, cy + pill_h / 2
+    local r = math.min(12, pill_h / 2)
+    -- background pill
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord0\\1c&H000000&\\alpha&H66&}")
+    ass:draw_start()
+    ass:round_rect_cw(x0, y0, x1, y1, r)
+    ass:draw_stop()
+    -- accent dot
+    local accent = toast_accent(state.toast_kind)
+    ass:new_event()
+    ass:pos(x0 + pad_x - 6, cy)
+    ass:an(5)
+    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(accent) .. "&\\fs" .. math.floor(fontsize * 0.7) .. "}●")
+    -- text (centered, multiline via \N)
+    ass:new_event()
+    ass:pos(cx + 8, cy)
+    ass:an(5)
+    ass:append("{\\blur0\\bord1\\1c&HFFFFFF&\\3c&H000000&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}" .. state.toast_text)
+end
+-- <<< CUSTOM desuka >>>
+
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
 -- show the track list of <ttype> in the positioned block layout (with flags when rows are available)
@@ -4412,7 +4554,7 @@ local function osc_init()
         mp.commandv("script-binding", "stats/display-page-1")
     end
     ne.eventresponder["shift+mbtn_left_down"] = function()
-        mp.commandv("show-text", mp.get_property_osd("media-title"))
+        show_toast(mp.get_property_osd("media-title"), "info", "modernx-title")
     end
     ne.eventresponder["mbtn_right_up"] =
         function()
@@ -4505,7 +4647,7 @@ local function osc_init()
     end
     ne.eventresponder["shift+mbtn_left_down"] = function()
         if user_opts.loop_in_pause then
-            show_message((state.looping and texts.loopdisable or texts.loopenable))
+            show_toast((state.looping and texts.loopdisable or texts.loopenable), "info", "modernx-loop")
             state.looping = not state.looping
             mp.set_property_native("loop-file", state.looping)
         end
@@ -4861,11 +5003,11 @@ local function osc_init()
         local localpath = mp.command_native({ "expand-path", user_opts.download_path })
 
         if state.downloaded_once then
-            show_message("{\\an9}" .. texts.downloaded .. "...")
+            show_toast(texts.downloaded .. "...", "info", "modernx-download")
         elseif state.downloading then
-            show_message("{\\an9}" .. texts.download_in_progress .. "...")
+            show_toast(texts.download_in_progress .. "...", "info", "modernx-download")
         else
-            show_message("{\\an9}" .. texts.downloading .. "...")
+            show_toast(texts.downloading .. "...", "info", "modernx-download")
             state.downloading = true
 
             -- use current or default ytdl-format
@@ -5525,6 +5667,7 @@ local function render()
 
     -- Messages
     render_message(ass)
+    render_toast(ass)
 
     -- actual OSC
     if state.osc_visible then
@@ -5840,6 +5983,12 @@ function tick()
             ass:an(8)
             ass:append("{\\fs24\\1c&H0&\\1c&HFFFFFF&}" .. texts.welcome)
         end
+        -- >>> CUSTOM desuka: toasts also visible on idle screen (e.g. update check) <<<
+        if osc_param.playresx <= 0 or osc_param.playresy <= 0 then
+            osc_param.playresx, osc_param.playresy = display_w, display_h
+        end
+        render_toast(ass)
+        -- <<< CUSTOM desuka >>>
         set_osd(display_w, display_h, ass.text)
 
         if state.showhide_enabled then
@@ -5970,11 +6119,11 @@ if user_opts.key_bindings then
         mp.commandv("cycle", "ontop")
         if state.initialborder == 'yes' then
             if mp.get_property('ontop') == 'yes' then
-                show_message("Pinned window")
+                show_toast("Pinned window", "info", "modernx-pin")
                 mp.commandv('set', 'border', "no")
                 mp.set_property("title", mp.get_property("media-title") .. " (Picture-in-Picture)")
             else
-                show_message("Unpinned window")
+                show_toast("Unpinned window", "info", "modernx-pin")
                 mp.commandv('set', 'border', "yes")
                 mp.set_property("title", mp.get_property("media-title"))
             end
@@ -6130,6 +6279,34 @@ mp.register_script_message("thumbfast-info", function(json)
 end)
 
 mp.register_script_message("sponsorblock-done", make_sponsorblock_segments)
+
+-- >>> CUSTOM desuka: unified toast inbox (all scripts -> modernx) <<<
+-- Usage from Lua: mp.commandv("script-message-to","modernx","modernx-toast","info","my-source","text","2500")
+--   1 arg: text (info) | 2 args: kind + text | 3 args: kind + source + text | 4 args: + duration_ms
+-- Usage from input.conf: script-message-to modernx modernx-toast info "text here"
+mp.register_script_message("modernx-toast", function(a1, a2, a3, a4)
+    local kind, source, text, dur = "info", "", "", nil
+    if a1 ~= nil and a2 == nil then
+        text = a1
+    elseif a1 ~= nil and a2 ~= nil and a3 == nil then
+        kind, text = a1, a2
+    elseif a3 ~= nil and a4 == nil then
+        kind, source, text = a1, a2, a3
+    elseif a4 ~= nil then
+        kind, source, text, dur = a1, a2, a3, a4
+    end
+    if kind == nil or kind == "" then kind = "info" end
+    if not TOAST_KINDS[tostring(kind)] then
+        -- first arg was actually text (unknown kind): shift
+        if text == nil or text == "" then text = tostring(kind) end
+        kind = "info"
+    end
+    show_toast(text, kind, source, dur)
+end)
+mp.register_script_message("modernx-toast-clear", function(source)
+    clear_toast(source, source == nil or source == "")
+end)
+-- <<< CUSTOM desuka >>>
 
 set_virt_mouse_area(0, 0, 0, 0, 'input')
 set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
