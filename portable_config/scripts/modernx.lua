@@ -166,7 +166,7 @@ local user_opts = {
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track tooltip/menu display for cy_audio/cy_video/cy_sub
     track_language_mode = "code",  -- "code" | "name" | "flag"
-    track_flag_size = 16,         -- height of the flag vector, snapped to the nearest power of two
+    track_flag_size = 16,         -- height of the flag vector in playres units (exact, aspect preserved)
     track_flag_gap = 2,           -- space on each side of the flag in the tooltip
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -438,11 +438,11 @@ track_names["en"] = {
     ["zh"] = "Chinese",
     ["tr"] = "Turkish", ["ar"] = "Arabic",
     ["pl"] = "Polish", ["nl"] = "Dutch",
-    ["sv"] = "Swedish", ["da"] = "Danish", ["no"] = "Norwegian", ["fi"] = "Finnish",
-    ["vi"] = "Vietnamese", ["th"] = "Thai", ["id"] = "Indonesian", ["hi"] = "Hindi",
+    ["sv"] = "Swedish", ["da"] = "Danish", ["no"] = "Norwegian", ["nb"] = "Norwegian (Bokmål)", ["fi"] = "Finnish",
+    ["vi"] = "Vietnamese", ["th"] = "Thai", ["id"] = "Indonesian", ["hi"] = "Hindi", ["fil"] = "Filipino",
     ["ca"] = "Catalan", ["eu"] = "Basque", ["gl"] = "Galician",
     ["cs"] = "Czech", ["sk"] = "Slovak", ["hu"] = "Hungarian", ["ro"] = "Romanian", ["bg"] = "Bulgarian", ["uk"] = "Ukrainian", ["sr"] = "Serbian", ["hr"] = "Croatian", ["sl"] = "Slovenian", ["mk"] = "Macedonian",
-    ["he"] = "Hebrew", ["fa"] = "Persian", ["ms"] = "Malay", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengali",
+    ["he"] = "Hebrew", ["fa"] = "Persian", ["ms"] = "Malay", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengali", ["el"] = "Greek",
     ["und"] = "Unknown", [""] = "Unknown", ["unknown"] = "Unknown",
 }
 
@@ -457,11 +457,11 @@ track_names["es"] = {
     ["zh"] = "Chino",
     ["tr"] = "Turco", ["ar"] = "Árabe",
     ["pl"] = "Polaco", ["nl"] = "Neerlandés",
-    ["sv"] = "Sueco", ["da"] = "Danés", ["no"] = "Noruego", ["fi"] = "Finés",
-    ["vi"] = "Vietnamita", ["th"] = "Tailandés", ["id"] = "Indonesio", ["hi"] = "Hindi",
+    ["sv"] = "Sueco", ["da"] = "Danés", ["no"] = "Noruego", ["nb"] = "Noruego (Bokmål)", ["fi"] = "Finés",
+    ["vi"] = "Vietnamita", ["th"] = "Tailandés", ["id"] = "Indonesio", ["hi"] = "Hindi", ["fil"] = "Filipino",
     ["ca"] = "Catalán", ["eu"] = "Euskera", ["gl"] = "Gallego",
     ["cs"] = "Checo", ["sk"] = "Eslovaco", ["hu"] = "Húngaro", ["ro"] = "Rumano", ["bg"] = "Búlgaro", ["uk"] = "Ucraniano", ["sr"] = "Serbio", ["hr"] = "Croata", ["sl"] = "Esloveno", ["mk"] = "Macedonio",
-    ["he"] = "Hebreo", ["fa"] = "Persa", ["ms"] = "Malayo", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengalí",
+    ["he"] = "Hebreo", ["fa"] = "Persa", ["ms"] = "Malayo", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengalí", ["el"] = "Griego",
     ["und"] = "Desconocido", [""] = "Desconocido", ["unknown"] = "Desconocido",
 }
 
@@ -543,6 +543,9 @@ local lang_to_cc = {
     ["ta"] = "IN", -- 🇮🇳
     ["te"] = "IN", -- 🇮🇳
     ["bn"] = "BD", -- 🇧🇩
+    ["el"] = "GR", -- 🇬🇷
+    ["fil"] = "PH", -- 🇵🇭
+    ["nb"] = "NO", -- 🇳🇴
 }
 
 -- The tables above must stay in sync: every display language needs a country
@@ -590,10 +593,14 @@ local function ensure_flag_assets()
     local okload, mod = pcall(dofile, path)
     if okload and type(mod) == "table" then
         flag_assets = mod
-        local missing = {}
+        local seen, missing = {}, {}
         for _, cc in pairs(lang_to_cc) do
-            if flag_assets[string.lower(cc)] == nil then
-                missing[#missing + 1] = cc
+            local k = string.lower(cc)
+            if not seen[k] then
+                seen[k] = true
+                if flag_assets[k] == nil then
+                    missing[#missing + 1] = cc
+                end
             end
         end
         if #missing > 0 then
@@ -608,7 +615,7 @@ local function ensure_flag_assets()
 end
 
 local function get_flag_asset(lang)
-    if not lang or lang == "" then
+    if type(lang) ~= "string" or lang == "" then
         return nil
     end
     if not ensure_flag_assets() then
@@ -625,41 +632,56 @@ local function get_flag_asset(lang)
     return flag_assets[string.lower(cc)]
 end
 
--- \pN divides drawing coordinates by 2**(N-1), and the artwork is 256 units
--- tall, so the reachable sizes are 256/2**(N-1)
-local function get_flag_scale(size)
-    local best, best_diff = 5, math.huge
-    for n = 0, 7 do
-        local height = 256 / 2 ^ (n - 1)
-        local diff = math.abs(height - size)
-        if diff < best_diff then
-            best, best_diff = n, diff
-        end
-    end
-    return best
-end
+-- Scaled artwork cache: coordinates are stored for a 256-unit height and \pN
+-- only allows powers of two, so scale them once per asset and size to hit the
+-- requested height exactly. Aspect is preserved (X and Y share one factor).
+local scaled_flag_cache = {}
 
--- artwork plus the \pN that hits the requested size, so callers can align the
--- flag before any event is built
+-- artwork scaled to the requested size, so callers can align the flag
+-- before any event is built. Returns the scaled asset, width and height.
 local function get_flag_geometry(lang)
+    if type(lang) ~= "string" then
+        return nil
+    end
     local asset = get_flag_asset(lang)
     if not asset or not asset.d or #asset.d == 0 then
         return nil
     end
-    local p = get_flag_scale(user_opts.track_flag_size or 16)
-    local height = 256 / 2 ^ (p - 1)
-    return asset, p, height * asset.w, height
+    local size = user_opts.track_flag_size or 16
+    if type(size) ~= "number" or size <= 0 then
+        size = 16
+    end
+    local key = tostring(asset) .. ":" .. tostring(size)
+    local scaled = scaled_flag_cache[key]
+    if not scaled then
+        local f = size / 256
+        local d = {}
+        for i, part in ipairs(asset.d) do
+            local head, tail = part:match("^%s*({[^}]*%})(.*)$")
+            if not tail or tail:find("{", 1, true) then
+                head = "{\\p1}"
+                tail = part:gsub("{[^}]*%}", "", 1)
+            end
+            d[i] = head .. tail:gsub("(-?%d+%.?%d*)", function(s)
+                return ("%.2f"):format(tonumber(s) * f)
+            end)
+        end
+        scaled = { w = asset.w, d = d }
+        scaled_flag_cache[key] = scaled
+    end
+    return scaled, size * scaled.w, size
 end
 
 local function format_track_label(lang, mode_override, name_map)
-    if not lang or lang == "" then
+    if type(lang) ~= "string" or lang == "" then
         return nil
     end
     local l = lang
     local mode = mode_override or user_opts.track_language_mode or "code"
     if mode == "flag" then
         -- with artwork the flag replaces the code, so no text is returned
-        if get_flag_asset(l) or get_flag_asset(l:match("^([^-_]+)")) then
+        -- (get_flag_asset already falls back to the base language itself)
+        if get_flag_asset(l) then
             return nil
         end
         return "[" .. l .. "]"
@@ -764,18 +786,27 @@ end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
 -- Splits a track tooltip around the language slot so the flag lands where [es] was.
---   keep_title  whether the title follows the slot (video/audio only when the slot is a flag; subtitles always)
-local function tooltip_parts(prefix, lang, title, keep_title)
+-- The title always follows the slot, in every mode.
+local function tooltip_parts(prefix, lang, title)
     local lang_ok = lang ~= nil and lang ~= "" and lang ~= texts.na
     local title_ok = title ~= nil and title ~= "" and title ~= texts.na
 
     if lang_ok then
-        if flag_drawn(lang) then
-            return prefix .. " ", (keep_title and title_ok) and (" " .. title) or ""
+        local mode = user_opts.track_language_mode or "code"
+        -- resolve the artwork once; the fallback below reuses the verdict
+        -- instead of looking the asset up again
+        local asset = (mode == "flag") and get_flag_asset(lang) or nil
+        if asset then
+            return prefix .. " ", title_ok and (" " .. title) or ""
         end
-        local label = format_track_label(lang)
+        local label
+        if mode == "flag" and type(lang) == "string" then
+            label = "[" .. lang .. "]"
+        else
+            label = format_track_label(lang, mode)
+        end
         if label then
-            if keep_title and title_ok then
+            if title_ok then
                 return prefix .. " " .. label .. " ", title
             end
             return prefix .. " " .. label, ""
@@ -971,8 +1002,6 @@ local state = {
     file_size_bytes = 0,
     file_size_normalized = "Approximating size...",
     is_URL = false,
-    URL_path = "",                 -- used for yt-dlp downloading
-    videoCantBeDownloaded = false, -- TODO: needs to be removed
 
     localDescription = nil,
     localDescriptionClick = nil,
@@ -996,8 +1025,8 @@ local state = {
 
     sponsor_segments = {},
 
-    message_text = nil, -- TODO: needs to be removed
-    message_hide_timer = nil, ---@type mp.Timer? -- TODO: needs to be removed
+    message_text = nil,
+    message_hide_timer = nil, ---@type mp.Timer?
     message_meta = nil, -- structured track list rows for render_message_block
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -1299,16 +1328,16 @@ function update_tracklist()
     tracks_mpv.video, tracks_mpv.audio, tracks_mpv.sub = {}, {}, {}
     for n = 1, #tracktable do
         if not (tracktable[n].type == 'unknown') then
-            local type = tracktable[n].type
+            local ttype = tracktable[n].type
             local mpv_id = tonumber(tracktable[n].id)
             ---@cast mpv_id number
 
             -- by osc_id
-            table.insert(tracks_osc[type], tracktable[n])
+            table.insert(tracks_osc[ttype], tracktable[n])
 
             -- by mpv_id
-            tracks_mpv[type][mpv_id] = tracktable[n]
-            tracks_mpv[type][mpv_id].osc_id = #tracks_osc[type]
+            tracks_mpv[ttype][mpv_id] = tracktable[n]
+            tracks_mpv[ttype][mpv_id].osc_id = #tracks_osc[ttype]
         end
     end
 end
@@ -1317,18 +1346,18 @@ end
 -- the second return value carries rows for render_message_block (positioned lines + flags)
 -- >>> CUSTOM AlwaysBorderRadius <<<
 -- Build the track menu text and the positioned rows (flag head/tail split).
-function get_tracklist(type)
+function get_tracklist(ttype)
     update_tracklist()
-    local message = valid_types[type] .. texts.track
+    local message = valid_types[ttype] .. texts.track
     local meta = nil
-    if not tracks_osc or #tracks_osc[type] == 0 then
+    if not tracks_osc or #tracks_osc[ttype] == 0 then
         message = texts.none
     else
         meta = { rows = { { text = message } } }
         local name_map = get_track_name_map()
         local mode = user_opts.track_language_mode or "code"
-        for n = 1, #tracks_osc[type] do
-            local track = tracks_osc[type][n]
+        for n = 1, #tracks_osc[ttype] do
+            local track = tracks_osc[ttype][n]
             local lang, title, selected = 'unknown', '', '○'
             if not (track.lang == nil) then lang = track.lang end
             if not (track.title == nil) then
@@ -1336,20 +1365,25 @@ function get_tracklist(type)
             elseif track.metadata and track.metadata["name"] then
                 title = track.metadata["name"]
             end
-            if (track.id == tonumber(mp.get_property(type))) then
+            -- one track, one row: stray line breaks would desync the block layout
+            if type(title) ~= "string" then
+                title = ""
+            end
+            title = title:gsub("[\r\n]+", " ")
+            if (track.id == tonumber(mp.get_property(ttype))) then
                 selected = '●'
             end
             local label, lang_label
+            local drew_flag = false
             if lang ~= nil and lang ~= 'unknown' and lang ~= '' then
                 -- the language slot follows track_language_mode like the hover
                 -- tooltips do; in flag mode the positioned rows still split on
                 -- the spelled-out name so the flag lands where it belongs
-                if mode == "flag" then
-                    if flag_drawn(lang) then
-                        lang_label = format_track_label(lang, "name", name_map)
-                    else
-                        lang_label = format_track_label(lang, "code")
-                    end
+                drew_flag = (mode == "flag") and flag_drawn(lang)
+                if drew_flag then
+                    lang_label = format_track_label(lang, "name", name_map)
+                elseif mode == "flag" then
+                    lang_label = format_track_label(lang, "code")
                 else
                     lang_label = format_track_label(lang, mode, name_map)
                 end
@@ -1368,7 +1402,7 @@ function get_tracklist(type)
             local full = selected .. ' ' .. n .. ': ' .. label
             message = message .. '\n' .. full
             local row = { full = full }
-            if flag_drawn(lang) then
+            if drew_flag then
                 row.head = selected .. ' ' .. n .. ':'
                 if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
                     row.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
@@ -1383,35 +1417,35 @@ function get_tracklist(type)
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
--- relatively change the track of given <type> by <next> tracks
+-- relatively change the track of given <ttype> by <step> tracks
 --(+1 -> next, -1 -> previous)
-function set_track(type, next)
+function set_track(ttype, step)
     local current_track_mpv, current_track_osc
     current_track_osc = 0
-    if (mp.get_property(type) == 'no') then
+    if (mp.get_property(ttype) == 'no') then
         current_track_osc = 0
     else
-        current_track_mpv = tonumber(mp.get_property(type))
-        if (tracks_mpv[type][current_track_mpv]) then
-            current_track_osc = tracks_mpv[type][current_track_mpv].osc_id
+        current_track_mpv = tonumber(mp.get_property(ttype))
+        if (tracks_mpv[ttype][current_track_mpv]) then
+            current_track_osc = tracks_mpv[ttype][current_track_mpv].osc_id
         end
     end
-    local new_track_osc = (current_track_osc + next) % (#tracks_osc[type] + 1)
+    local new_track_osc = (current_track_osc + step) % (#tracks_osc[ttype] + 1)
     local new_track_mpv
     if new_track_osc == 0 then
         new_track_mpv = 'no'
     else
-        new_track_mpv = tracks_osc[type][new_track_osc].id
+        new_track_mpv = tracks_osc[ttype][new_track_osc].id
     end
 
-    mp.commandv('set', type, new_track_mpv)
+    mp.commandv('set', ttype, new_track_mpv)
 end
 
--- get the currently selected track of <type>, OSC-style counted
-function get_track(type)
-    local track = mp.get_property(type)
+-- get the currently selected track of <ttype>, OSC-style counted
+function get_track(ttype)
+    local track = mp.get_property(ttype)
     if track ~= 'no' and track ~= nil then
-        local tr = tracks_mpv[type][tonumber(track)]
+        local tr = tracks_mpv[ttype][tonumber(track)]
         if tr then
             return tr.osc_id
         end
@@ -1818,25 +1852,19 @@ local function draw_sponsorblock_ranges(element, elem_ass, xp, rh)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- Builds the ASS events for a vector flag; one event per colour (libass cancels a multi-path override and repeating \p advances the pen). Returns the ass and drawn width.
-local function render_flag_geometry(asset, p, x, y)
+-- Builds the ASS events for a vector flag from scaled geometry (coordinates
+-- already carry the requested size, always drawn with \p1); one event per
+-- colour (libass cancels a multi-path override and repeating \p advances the pen).
+local function render_flag_geometry(asset, x, y)
     local flag_ass = mp.assdraw.ass_new()
     for _, part in ipairs(asset.d) do
         flag_ass:new_event()
         flag_ass:pos(x, y)
         flag_ass:an(7)
         flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H00&}")
-        flag_ass:append((part:gsub("\\p1", "\\p" .. p)))
+        flag_ass:append(part)
     end
     return flag_ass
-end
-
-local function render_flag(lang, x, y)
-    local asset, p, width = get_flag_geometry(lang)
-    if not asset then
-        return nil, 0
-    end
-    return render_flag_geometry(asset, p, x, y), width
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -2120,14 +2148,14 @@ function render_elements(master_ass)
 
                     -- one gap on each side of the flag (advances give the pen positions)
                     local gap = user_opts.track_flag_gap or 2
-                    local flag_lang, flag_asset, flag_p, flag_w, flag_h = nil, nil, 0, 0, 0
+                    local flag_lang, flag_asset, flag_w, flag_h = nil, nil, 0, 0
                     if element.enabled and type(element.flagF) == 'function'
                         and (user_opts.track_language_mode or "code") == "flag" then
                         local lang = element.flagF()
                         if lang ~= nil and lang ~= "" then
-                            local asset, p, w, h = get_flag_geometry(lang)
+                            local asset, w, h = get_flag_geometry(lang)
                             if asset ~= nil then
-                                flag_lang, flag_asset, flag_p, flag_w, flag_h = lang, asset, p, w, h
+                                flag_lang, flag_asset, flag_w, flag_h = lang, asset, w, h
                             end
                         end
                     end
@@ -2158,7 +2186,7 @@ function render_elements(master_ass)
                         -- centre the flag on the text block (above ty when an == 1, below when an == 7)
                         local top = (an == 1) and (ty - fontsize) or ty
                         flag_x = tx + head_w + gap
-                        flag_ass = render_flag_geometry(flag_asset, flag_p, flag_x,
+                        flag_ass = render_flag_geometry(flag_asset, flag_x,
                             top + (fontsize - flag_h) / 2)
                     end
 
@@ -2988,8 +3016,6 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
     end
     if duration == nil then
         duration = tonumber(mp.get_property('options/osd-duration')) / 1000
-    elseif not type(duration) == 'number' then
-        print('duration: ' .. duration)
     end
 
     -- cut the text short, otherwise the following functions
@@ -3019,25 +3045,26 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- show the track list of <type> in the positioned block layout (with flags when rows are available)
-function show_tracklist(type)
-    local message, meta = get_tracklist(type)
+-- show the track list of <ttype> in the positioned block layout (with flags when rows are available)
+function show_tracklist(ttype)
+    local message, meta = get_tracklist(ttype)
     show_message(message, nil, meta)
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
 -- show only the row of the current track in the same block layout (used by the cycle-sub keybinds)
-function show_selected_track_row(type)
-    local _, meta = get_tracklist(type)
+function show_selected_track_row(ttype)
+    local _, meta = get_tracklist(ttype)
     local row
     if meta then
-        local n = get_track(type)
+        local n = get_track(ttype)
         if n > 0 then
             row = meta.rows[n + 1] -- rows[1] holds the list header
         end
     end
     if not row then
-        show_message(valid_types[type] .. ': ' .. texts.off)
+        show_message(valid_types[ttype] .. ': ' .. texts.off)
         return
     end
     show_message(row.full, nil, { rows = { row } })
@@ -3052,6 +3079,7 @@ mp.register_script_message("cycle-sub-down", function()
     mp.commandv("no-osd", "cycle", "sub", "down")
     show_selected_track_row("sub")
 end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 function bind_keys(keys, name, func, opts)
     if not keys then
@@ -3341,56 +3369,116 @@ function reset_desc_timer()
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- Calibrated against the default OSD pen so the positioned block lands on the same pixels as the old implicit text (delta 0 px); show_message prepends an empty line.
+-- Pen metrics for the positioned block (row 1 lands where full-size implicit
+-- text does; show_message prepends an empty line). BLOCK_PITCH trades density
+-- for breathing room between rows.
 local BLOCK_PEN_X = 25.06
 local BLOCK_PEN_Y = 21.928
 local BLOCK_EMPTY_ADV = 0.49155
-local BLOCK_PITCH = 1.0024
+local BLOCK_PITCH = 1.2
+
+-- Width of one positioned row, mirroring render_message_row below, so columns
+-- can be measured before anything is drawn.
+local function message_row_width(row, fontsize, gap)
+    local head = row.head and row.head:gsub("%s+$", "")
+    local tail = row.tail and row.tail:gsub("^%s+", "")
+    if not head then
+        return text_width(row.full or row.text or "", fontsize)
+    end
+    if row.flag_lang then
+        local asset, flag_w = get_flag_geometry(row.flag_lang)
+        if asset then
+            local w = text_width(head, fontsize) + gap + flag_w
+            if tail and tail ~= "" then
+                w = w + gap + text_width(tail, fontsize)
+            end
+            return w
+        end
+    end
+    return text_width(row.full or row.text or "", fontsize)
+end
+
+local function render_message_row(ass, row, x, y, fontsize, style, gap)
+    local head = row.head and row.head:gsub("%s+$", "")
+    local tail = row.tail and row.tail:gsub("^%s+", "")
+    local asset, flag_w, flag_h
+    if row.flag_lang then
+        asset, flag_w, flag_h = get_flag_geometry(row.flag_lang)
+    end
+
+    if not head or not asset then
+        ass:new_event()
+        ass:pos(x, y)
+        ass:an(7)
+        ass:append(style)
+        ass:append(row.full or row.text or "")
+    else
+        ass:new_event()
+        ass:pos(x, y)
+        ass:an(7)
+        ass:append(style)
+        ass:append(head)
+
+        local flag_x = x + text_width(head, fontsize) + gap
+        local flag_ass = render_flag_geometry(asset, flag_x,
+            y + (fontsize - flag_h) / 2)
+        if flag_ass then
+            ass:new_event()
+            ass:merge(flag_ass)
+        end
+
+        if tail and tail ~= "" then
+            ass:new_event()
+            ass:pos(flag_x + flag_w + gap, y)
+            ass:an(7)
+            ass:append(style)
+            ass:append(tail)
+        end
+    end
+end
 
 local function render_message_block(ass, meta, fontsize, outline)
+    if fontsize <= 0 or type(meta.rows) ~= "table" then
+        return
+    end
     local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
     local gap = user_opts.track_flag_gap or 2
+    local pitch = BLOCK_PITCH * fontsize
     local y0 = BLOCK_PEN_Y + BLOCK_EMPTY_ADV * fontsize
-    for i = 1, #meta.rows do
-        local row = meta.rows[i]
-        local y = y0 + (i - 1) * BLOCK_PITCH * fontsize
 
-        local head = row.head and row.head:gsub("%s+$", "")
-        local tail = row.tail and row.tail:gsub("^%s+", "")
-        local asset, p, flag_w, flag_h
-        if row.flag_lang then
-            asset, p, flag_w, flag_h = get_flag_geometry(row.flag_lang)
+    -- header row (list title) spans the full width; data rows flow below it
+    local first = 1
+    if meta.rows[1] and meta.rows[1].text and not meta.rows[1].full then
+        render_message_row(ass, meta.rows[1], BLOCK_PEN_X, y0,
+            fontsize, style, gap)
+        first = 2
+        y0 = y0 + pitch
+    end
+    local count = #meta.rows - first + 1
+    if count <= 0 then
+        return
+    end
+
+    -- cap the list at 75% of the OSD height (mirrors the fraction the
+    -- plain-text path uses) and spill over into columns instead of running off-screen
+    local bottom = osc_param.playresy * 0.75
+    local max_rows = math.max(1, math.floor((bottom - y0) / pitch) + 1)
+    local cols = math.ceil(count / max_rows)
+    local x = BLOCK_PEN_X
+    local idx = first
+    for c = 1, cols do
+        local last = math.min(idx + max_rows - 1, #meta.rows)
+        -- measure this column before drawing it
+        local width = 0
+        for k = idx, last do
+            width = math.max(width, message_row_width(meta.rows[k], fontsize, gap))
         end
-
-        if not head or not asset then
-            ass:new_event()
-            ass:pos(BLOCK_PEN_X, y)
-            ass:an(7)
-            ass:append(style)
-            ass:append(row.full or row.text or "")
-        else
-            ass:new_event()
-            ass:pos(BLOCK_PEN_X, y)
-            ass:an(7)
-            ass:append(style)
-            ass:append(head)
-
-            local flag_x = BLOCK_PEN_X + text_width(head, fontsize) + gap
-            local flag_ass = render_flag_geometry(asset, p, flag_x,
-                y + (fontsize - flag_h) / 2)
-            if flag_ass then
-                ass:new_event()
-                ass:merge(flag_ass)
-            end
-
-            if tail and tail ~= "" then
-                ass:new_event()
-                ass:pos(flag_x + flag_w + gap, y)
-                ass:an(7)
-                ass:append(style)
-                ass:append(tail)
-            end
+        for k = idx, last do
+            render_message_row(ass, meta.rows[k], x, y0 + (k - idx) * pitch,
+                fontsize, style, gap)
         end
+        x = x + width + gap * 2
+        idx = last + 1
     end
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
@@ -3408,8 +3496,8 @@ function render_message(ass)
             fontsize = fontsize * 0.85
             outline = outline * 0.85
         else
-            fontsize = fontsize * counterscale / math.max(0.5 + math.min(lines / maxlines, 1), 1)
-            outline = outline * counterscale / math.max(0.5 + math.min(lines / maxlines, 1) / 2, 1)
+            fontsize = fontsize * counterscale
+            outline = outline * counterscale
         end
 
         if state.showingDescription then
@@ -3420,16 +3508,23 @@ function render_message(ass)
             ass:new_event()
         end
 
-        local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
-
         -- >>> CUSTOM AlwaysBorderRadius <<<
-        -- Use the positioned block renderer while the rows still match the text.
+        -- Positioned block first, at full size: columns absorb long lists,
+        -- so track rows are never shrunk to fit.
         local meta = state.message_meta
         if meta and meta.render_text == state.message_text and not state.showingDescription then
             render_message_block(ass, meta, fontsize, outline)
             return
         end
         -- <<< CUSTOM AlwaysBorderRadius >>>
+
+        -- plain-text path keeps the legacy shrink for long messages
+        -- (descriptions keep their unshrunk *0.85 size as before)
+        if not state.showingDescription then
+            fontsize = fontsize / math.max(0.5 + math.min(lines / maxlines, 1), 1)
+            outline = outline / math.max(0.5 + math.min(lines / maxlines, 1) / 2, 1)
+        end
+        local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
 
         ass:new_event()
         ass:append(style .. state.message_text)
@@ -3451,9 +3546,9 @@ end
 -- Initialisation and Layout
 --
 
-local function new_element(name, type)
+local function new_element(name, el_type)
     local element = {}
-    element.type = type
+    element.type = el_type
     element.name = name
 
     -- add default stuff
@@ -3461,10 +3556,10 @@ local function new_element(name, type)
     element.visible = true
     element.enabled = true
     element.softrepeat = false
-    element.styledown = (type == "button")
+    element.styledown = (el_type == "button")
     element.state = {}
 
-    if type == "slider" then
+    if el_type == "slider" then
         element.slider = { min = { value = 0 }, max = { value = 100 } }
         element.thumbnailable = false
     end
@@ -4233,6 +4328,15 @@ function validate_user_opts()
         mp.msg.warn("track_language_mode cannot be '" .. tostring(user_opts.track_language_mode) .. "'. Using 'code'.")
         user_opts.track_language_mode = "code"
     end
+
+    if type(user_opts.track_flag_gap) ~= "number" or user_opts.track_flag_gap < 0 then
+        mp.msg.warn("track_flag_gap must be a non-negative number. Using 2.")
+        user_opts.track_flag_gap = 2
+    end
+    if type(user_opts.track_flag_size) ~= "number" or user_opts.track_flag_size <= 0 then
+        mp.msg.warn("track_flag_size must be a positive number. Using 16.")
+        user_opts.track_flag_size = 16
+    end
 end
 
 function update_options(_)
@@ -4510,10 +4614,10 @@ local function osc_init()
         local track_id = get_track("video")
         if track_id ~= 0 then
             local total = #tracks_osc.video
-            local message = string.format("%s [%d ∕ %d]", texts.video, track_id, total)
+            local message = string.format("%s (%d ∕ %d)", texts.video, track_id, total)
             local prop_lang = mp.get_property("current-tracks/video/lang")
             local prop_title = mp.get_property("current-tracks/video/title")
-            return tooltip_parts(message, prop_lang, prop_title, flag_drawn(prop_lang))
+            return tooltip_parts(message, prop_lang, prop_title)
         end
         return (not ne.enabled) and texts.novideo or texts.off, ""
     end
@@ -4560,12 +4664,12 @@ local function osc_init()
         local track_id = get_track("audio")
         if track_id ~= 0 then
             local total = #tracks_osc.audio
-            local message = string.format("%s [%d ∕ %d]", texts.audio, track_id, total)
+            local message = string.format("%s (%d ∕ %d)", texts.audio, track_id, total)
             local prop_lang = mp.get_property("current-tracks/audio/lang")
             local prop_title = mp.get_property("current-tracks/audio/title")
-            return tooltip_parts(message, prop_lang, prop_title, flag_drawn(prop_lang))
+            return tooltip_parts(message, prop_lang, prop_title)
         end
-        return (not ne.enabled) and "No audio tracks" or texts.off, ""
+        return (not ne.enabled) and texts.noaudio or texts.off, ""
     end
     ne.nothingavailable = texts.noaudio
     ne.eventresponder['mbtn_left_up'] =
@@ -4621,12 +4725,12 @@ local function osc_init()
         if sub_id == 0 then
             return texts.off, ""
         end
-        local message = string.format("%s [%d ∕ %d]", texts.subtitle, sub_id, #tracks_osc.sub)
+        local message = string.format("%s (%d ∕ %d)", texts.subtitle, sub_id, #tracks_osc.sub)
         local lang = mp.get_property("current-tracks/sub/lang")
         local title = mp.get_property("current-tracks/sub/title")
         -- subtitles carry the title even when the slot is a text label, so the
         -- flag lands between the label and the title instead of replacing it
-        return tooltip_parts(message, lang, title, true)
+        return tooltip_parts(message, lang, title)
     end
     ne.nothingavailable = texts.nosub
     ne.eventresponder['mbtn_left_up'] =
@@ -4754,36 +4858,32 @@ local function osc_init()
             (texts.download .. " (" .. state.file_size_normalized .. ")")
     end
     ne.eventresponder["mbtn_left_up"] = function()
-        if not state.videoCantBeDownloaded then
-            local localpath = mp.command_native({ "expand-path", user_opts.download_path })
+        local localpath = mp.command_native({ "expand-path", user_opts.download_path })
 
-            if state.downloaded_once then
-                show_message("{\\an9}" .. texts.downloaded .. "...")
-            elseif state.downloading then
-                show_message("{\\an9}" .. texts.download_in_progress .. "...")
-            else
-                show_message("{\\an9}" .. texts.downloading .. "...")
-                state.downloading = true
-
-                -- use current or default ytdl-format
-                local mpv_ytdl = (user_opts.ytdl_format and user_opts.ytdl_format ~= "") and user_opts.ytdl_format or
-                    mp.get_property("file-local-options/ytdl-format") or mp.get_property("ytdl-format") or ""
-
-                local command = {
-                    "yt-dlp",
-                    mpv_ytdl,
-                    "--remux", "mp4",
-                    "--add-metadata",
-                    "--embed-subs",
-                    "-o", "%(title)s.%(ext)s",
-                    "-P", localpath,
-                    state.url_path
-                }
-
-                exec_async(command, download_done)
-            end
+        if state.downloaded_once then
+            show_message("{\\an9}" .. texts.downloaded .. "...")
+        elseif state.downloading then
+            show_message("{\\an9}" .. texts.download_in_progress .. "...")
         else
-            show_message("{\\an9}Can't be downloaded")
+            show_message("{\\an9}" .. texts.downloading .. "...")
+            state.downloading = true
+
+            -- use current or default ytdl-format
+            local mpv_ytdl = (user_opts.ytdl_format and user_opts.ytdl_format ~= "") and user_opts.ytdl_format or
+                mp.get_property("file-local-options/ytdl-format") or mp.get_property("ytdl-format") or ""
+
+            local command = {
+                "yt-dlp",
+                mpv_ytdl,
+                "--remux", "mp4",
+                "--add-metadata",
+                "--embed-subs",
+                "-o", "%(title)s.%(ext)s",
+                "-P", localpath,
+                state.url_path
+            }
+
+            exec_async(command, download_done)
         end
     end
 
