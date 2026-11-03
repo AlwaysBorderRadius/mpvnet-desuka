@@ -3297,6 +3297,7 @@ local function render_toast(ass)
     if cy - pill_h / 2 < 0 then cy = pill_h / 2 end
     local x0, y0 = cx - pill_w / 2, cy - pill_h / 2
     local x1, y1 = cx + pill_w / 2, cy + pill_h / 2
+    if not asset then x1 = x1 - 10 end -- balance the text shift (plain only)
     local r = math.min(12, pill_h / 2)
     -- background pill, opaque
     ass:new_event()
