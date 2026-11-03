@@ -3372,50 +3372,108 @@ local BLOCK_PEN_Y = 21.928
 local BLOCK_EMPTY_ADV = 0.49155
 local BLOCK_PITCH = 1.0024
 
+-- Width of one positioned row, mirroring render_message_row below, so columns
+-- can be measured before anything is drawn.
+local function message_row_width(row, fontsize, gap)
+    local head = row.head and row.head:gsub("%s+$", "")
+    local tail = row.tail and row.tail:gsub("^%s+", "")
+    if not head then
+        return text_width(row.full or row.text or "", fontsize)
+    end
+    if row.flag_lang then
+        local asset, flag_w = get_flag_geometry(row.flag_lang)
+        if asset then
+            local w = text_width(head, fontsize) + gap + flag_w
+            if tail and tail ~= "" then
+                w = w + gap + text_width(tail, fontsize)
+            end
+            return w
+        end
+    end
+    return text_width(row.full or row.text or "", fontsize)
+end
+
+local function render_message_row(ass, row, x, y, fontsize, style, gap)
+    local head = row.head and row.head:gsub("%s+$", "")
+    local tail = row.tail and row.tail:gsub("^%s+", "")
+    local asset, flag_w, flag_h
+    if row.flag_lang then
+        asset, flag_w, flag_h = get_flag_geometry(row.flag_lang)
+    end
+
+    if not head or not asset then
+        ass:new_event()
+        ass:pos(x, y)
+        ass:an(7)
+        ass:append(style)
+        ass:append(row.full or row.text or "")
+    else
+        ass:new_event()
+        ass:pos(x, y)
+        ass:an(7)
+        ass:append(style)
+        ass:append(head)
+
+        local flag_x = x + text_width(head, fontsize) + gap
+        local flag_ass = render_flag_geometry(asset, flag_x,
+            y + (fontsize - flag_h) / 2)
+        if flag_ass then
+            ass:new_event()
+            ass:merge(flag_ass)
+        end
+
+        if tail and tail ~= "" then
+            ass:new_event()
+            ass:pos(flag_x + flag_w + gap, y)
+            ass:an(7)
+            ass:append(style)
+            ass:append(tail)
+        end
+    end
+end
+
 local function render_message_block(ass, meta, fontsize, outline)
+    if fontsize <= 0 or type(meta.rows) ~= "table" then
+        return
+    end
     local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
     local gap = user_opts.track_flag_gap or 2
+    local pitch = BLOCK_PITCH * fontsize
     local y0 = BLOCK_PEN_Y + BLOCK_EMPTY_ADV * fontsize
-    for i = 1, #meta.rows do
-        local row = meta.rows[i]
-        local y = y0 + (i - 1) * BLOCK_PITCH * fontsize
 
-        local head = row.head and row.head:gsub("%s+$", "")
-        local tail = row.tail and row.tail:gsub("^%s+", "")
-        local asset, flag_w, flag_h
-        if row.flag_lang then
-            asset, flag_w, flag_h = get_flag_geometry(row.flag_lang)
+    -- header row (list title) spans the full width; data rows flow below it
+    local first = 1
+    if meta.rows[1] and meta.rows[1].text and not meta.rows[1].full then
+        render_message_row(ass, meta.rows[1], BLOCK_PEN_X, y0,
+            fontsize, style, gap)
+        first = 2
+        y0 = y0 + pitch
+    end
+    local count = #meta.rows - first + 1
+    if count <= 0 then
+        return
+    end
+
+    -- cap the list at 75% of the OSD height (mirrors the fraction the
+    -- plain-text path uses) and spill over into columns instead of running off-screen
+    local bottom = osc_param.playresy * 0.75
+    local max_rows = math.max(1, math.floor((bottom - y0) / pitch) + 1)
+    local cols = math.ceil(count / max_rows)
+    local x = BLOCK_PEN_X
+    local idx = first
+    for c = 1, cols do
+        local last = math.min(idx + max_rows - 1, #meta.rows)
+        -- measure this column before drawing it
+        local width = 0
+        for k = idx, last do
+            width = math.max(width, message_row_width(meta.rows[k], fontsize, gap))
         end
-
-        if not head or not asset then
-            ass:new_event()
-            ass:pos(BLOCK_PEN_X, y)
-            ass:an(7)
-            ass:append(style)
-            ass:append(row.full or row.text or "")
-        else
-            ass:new_event()
-            ass:pos(BLOCK_PEN_X, y)
-            ass:an(7)
-            ass:append(style)
-            ass:append(head)
-
-            local flag_x = BLOCK_PEN_X + text_width(head, fontsize) + gap
-            local flag_ass = render_flag_geometry(asset, flag_x,
-                y + (fontsize - flag_h) / 2)
-            if flag_ass then
-                ass:new_event()
-                ass:merge(flag_ass)
-            end
-
-            if tail and tail ~= "" then
-                ass:new_event()
-                ass:pos(flag_x + flag_w + gap, y)
-                ass:an(7)
-                ass:append(style)
-                ass:append(tail)
-            end
+        for k = idx, last do
+            render_message_row(ass, meta.rows[k], x, y0 + (k - idx) * pitch,
+                fontsize, style, gap)
         end
+        x = x + width + gap * 2
+        idx = last + 1
     end
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
