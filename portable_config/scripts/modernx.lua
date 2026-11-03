@@ -438,11 +438,11 @@ track_names["en"] = {
     ["zh"] = "Chinese",
     ["tr"] = "Turkish", ["ar"] = "Arabic",
     ["pl"] = "Polish", ["nl"] = "Dutch",
-    ["sv"] = "Swedish", ["da"] = "Danish", ["no"] = "Norwegian", ["fi"] = "Finnish",
-    ["vi"] = "Vietnamese", ["th"] = "Thai", ["id"] = "Indonesian", ["hi"] = "Hindi",
+    ["sv"] = "Swedish", ["da"] = "Danish", ["no"] = "Norwegian", ["nb"] = "Norwegian (Bokmål)", ["fi"] = "Finnish",
+    ["vi"] = "Vietnamese", ["th"] = "Thai", ["id"] = "Indonesian", ["hi"] = "Hindi", ["fil"] = "Filipino",
     ["ca"] = "Catalan", ["eu"] = "Basque", ["gl"] = "Galician",
     ["cs"] = "Czech", ["sk"] = "Slovak", ["hu"] = "Hungarian", ["ro"] = "Romanian", ["bg"] = "Bulgarian", ["uk"] = "Ukrainian", ["sr"] = "Serbian", ["hr"] = "Croatian", ["sl"] = "Slovenian", ["mk"] = "Macedonian",
-    ["he"] = "Hebrew", ["fa"] = "Persian", ["ms"] = "Malay", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengali",
+    ["he"] = "Hebrew", ["fa"] = "Persian", ["ms"] = "Malay", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengali", ["el"] = "Greek",
     ["und"] = "Unknown", [""] = "Unknown", ["unknown"] = "Unknown",
 }
 
@@ -457,11 +457,11 @@ track_names["es"] = {
     ["zh"] = "Chino",
     ["tr"] = "Turco", ["ar"] = "Árabe",
     ["pl"] = "Polaco", ["nl"] = "Neerlandés",
-    ["sv"] = "Sueco", ["da"] = "Danés", ["no"] = "Noruego", ["fi"] = "Finés",
-    ["vi"] = "Vietnamita", ["th"] = "Tailandés", ["id"] = "Indonesio", ["hi"] = "Hindi",
+    ["sv"] = "Sueco", ["da"] = "Danés", ["no"] = "Noruego", ["nb"] = "Noruego (Bokmål)", ["fi"] = "Finés",
+    ["vi"] = "Vietnamita", ["th"] = "Tailandés", ["id"] = "Indonesio", ["hi"] = "Hindi", ["fil"] = "Filipino",
     ["ca"] = "Catalán", ["eu"] = "Euskera", ["gl"] = "Gallego",
     ["cs"] = "Checo", ["sk"] = "Eslovaco", ["hu"] = "Húngaro", ["ro"] = "Rumano", ["bg"] = "Búlgaro", ["uk"] = "Ucraniano", ["sr"] = "Serbio", ["hr"] = "Croata", ["sl"] = "Esloveno", ["mk"] = "Macedonio",
-    ["he"] = "Hebreo", ["fa"] = "Persa", ["ms"] = "Malayo", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengalí",
+    ["he"] = "Hebreo", ["fa"] = "Persa", ["ms"] = "Malayo", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengalí", ["el"] = "Griego",
     ["und"] = "Desconocido", [""] = "Desconocido", ["unknown"] = "Desconocido",
 }
 
@@ -543,6 +543,9 @@ local lang_to_cc = {
     ["ta"] = "IN", -- 🇮🇳
     ["te"] = "IN", -- 🇮🇳
     ["bn"] = "BD", -- 🇧🇩
+    ["el"] = "GR", -- 🇬🇷
+    ["fil"] = "PH", -- 🇵🇭
+    ["nb"] = "NO", -- 🇳🇴
 }
 
 -- The tables above must stay in sync: every display language needs a country
