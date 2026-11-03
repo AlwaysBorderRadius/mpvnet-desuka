@@ -115,7 +115,7 @@ local user_opts = {
     dynamic_title = true,          -- change title if {media-title} and {filename} differ (eg: when playing URLs or audio)
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    title_hide_extension = false,  -- Oculta la extensión en el título del OSC / Hides the file extension in the OSC title
+    title_hide_extension = false,  -- hide the file extension in the OSC title
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     show_chapter_title = true,     -- show chapter title alongside timestamp (below seekbar)
@@ -163,10 +163,12 @@ local user_opts = {
     chapter_softrepeat = false,     -- enable continuous skipping when holding down chapter skip buttons
     track_nextprev_buttons = true,  -- show next/previous playlist track buttons
 
+    -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track tooltip/menu display for cy_audio/cy_video/cy_sub
-    track_tooltip_mode = "code",  -- "code" | "name" | "flag"
+    track_language_mode = "code",  -- "code" | "name" | "flag"
     track_flag_size = 16,         -- height of the flag vector, snapped to the nearest power of two
     track_flag_gap = 2,           -- space on each side of the flag in the tooltip
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     volume_control = true,          -- show mute button and volume slider
     volume_control_type = "linear", -- volume scale type: "linear" or "logarithmic"
@@ -275,7 +277,7 @@ local user_opts = {
     FORCE_fix_not_ontop = true,                -- EXPERIMENTAL - try and mitigate https://github.com/zydezu/ModernX/issues/30, https://github.com/akiirui/mpv-handler/issues/48
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    -- Barras temporales de volumen y seek (posición/orientación) / Temporary volume & seek bars (position/orientation)
+    -- Temporary volume & seek bars (position/orientation)
     volume_bar_orientation = "vertical", -- "horizontal", "vertical"
     volume_bar_position = "left",        -- "center", "top", "bottom", "left", "right"
     seek_bar_orientation = "horizontal", -- "horizontal", "vertical"
@@ -306,7 +308,7 @@ local icons = {
 
     audio = "\238\175\139",
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    video = "\243\176\128\186", -- icono de pistas de video (mpv-osd-symbols) / video tracks icon
+    video = "\243\176\128\186", -- video tracks icon (mpv-osd-symbols)
     -- <<< CUSTOM AlwaysBorderRadius >>>
     subtitle = "\238\175\141",
 
@@ -389,7 +391,7 @@ local language = {
     },
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    -- Traducción al español / Spanish translation
+    -- Spanish translation
     ['es'] = {
         welcome = 'Arrastra archivos o URLs aquí para reproducir',
         off = 'OFF',
@@ -422,43 +424,44 @@ local language = {
 }
 local texts = language[user_opts.language] or language["en"]
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
 -- Track name mappings for tooltips/menus
 local track_names = {}
 track_names["en"] = {
-    ["es"] = "Spanish", ["es-ES"] = "Spanish (Spain)", ["es-419"] = "Latin American Spanish", ["es-MX"] = "Spanish (Mexico)", ["es-AR"] = "Spanish (Argentina)", ["es-CO"] = "Spanish (Colombia)", ["es-CL"] = "Spanish (Chile)", ["es-PE"] = "Spanish (Peru)", ["es-VE"] = "Spanish (Venezuela)",
+    ["es"] = "Spanish", ["es-ES"] = "Spanish (Spain)", ["es-419"] = "Latin American Spanish", ["es-MX"] = "Spanish (Mexico)", ["es-AR"] = "Spanish (Argentina)", ["es-CO"] = "Spanish (Colombia)", ["es-CL"] = "Spanish (Chile)", ["es-PE"] = "Spanish (Peru)", ["es-VE"] = "Spanish (Venezuela)", ["es-EC"] = "Spanish (Ecuador)", ["es-BO"] = "Spanish (Bolivia)", ["es-UY"] = "Spanish (Uruguay)", ["es-PY"] = "Spanish (Paraguay)", ["es-CR"] = "Spanish (Costa Rica)", ["es-GT"] = "Spanish (Guatemala)", ["es-HN"] = "Spanish (Honduras)", ["es-NI"] = "Spanish (Nicaragua)", ["es-PA"] = "Spanish (Panama)", ["es-DO"] = "Spanish (Dominican Republic)", ["es-CU"] = "Spanish (Cuba)", ["es-PR"] = "Spanish (Puerto Rico)",
     ["en"] = "English", ["en-US"] = "English (US)", ["en-GB"] = "English (UK)", ["en-CA"] = "English (Canada)", ["en-AU"] = "English (Australia)", ["en-NZ"] = "English (New Zealand)", ["en-IE"] = "English (Ireland)",
-    ["ja"] = "Japanese", ["ja-JP"] = "Japanese",
-    ["fr"] = "French", ["fr-FR"] = "French (France)", ["fr-CA"] = "French (Canada)", ["fr-BE"] = "French (Belgium)", ["fr-CH"] = "French (Switzerland)",
+    ["ja"] = "Japanese",
+    ["fr"] = "French",
     ["pt"] = "Portuguese", ["pt-PT"] = "Portuguese (Portugal)", ["pt-BR"] = "Portuguese (Brazil)",
-    ["de"] = "German", ["de-DE"] = "German (Germany)", ["de-AT"] = "German (Austria)", ["de-CH"] = "German (Switzerland)",
-    ["it"] = "Italian", ["it-IT"] = "Italian (Italy)",
-    ["ru"] = "Russian", ["ru-RU"] = "Russian (Russia)",
-    ["ko"] = "Korean", ["ko-KR"] = "Korean (South Korea)",
-    ["zh"] = "Chinese", ["zh-CN"] = "Chinese (Simplified)", ["zh-TW"] = "Chinese (Traditional)", ["zh-HK"] = "Chinese (Hong Kong)", ["zh-Hans"] = "Chinese (Simplified)", ["zh-Hant"] = "Chinese (Traditional)",
-    ["tr"] = "Turkish", ["tr-TR"] = "Turkish",
-    ["ar"] = "Arabic", ["ar-SA"] = "Arabic (Saudi Arabia)",
-    ["pl"] = "Polish", ["pl-PL"] = "Polish",
-    ["nl"] = "Dutch", ["nl-NL"] = "Dutch",
-    ["sv"] = "Swedish", ["sv-SE"] = "Swedish",
-    ["da"] = "Danish", ["da-DK"] = "Danish",
-    ["no"] = "Norwegian", ["nb-NO"] = "Norwegian (Bokmål)",
-    ["fi"] = "Finnish", ["fi-FI"] = "Finnish",
-    ["vi"] = "Vietnamese", ["vi-VN"] = "Vietnamese",
-    ["th"] = "Thai", ["th-TH"] = "Thai",
-    ["id"] = "Indonesian", ["id-ID"] = "Indonesian",
-    ["hi"] = "Hindi", ["hi-IN"] = "Hindi",
+    ["de"] = "German",
+    ["it"] = "Italian", ["ru"] = "Russian", ["ko"] = "Korean",
+    ["zh"] = "Chinese",
+    ["tr"] = "Turkish", ["ar"] = "Arabic",
+    ["pl"] = "Polish", ["nl"] = "Dutch",
+    ["sv"] = "Swedish", ["da"] = "Danish", ["no"] = "Norwegian", ["fi"] = "Finnish",
+    ["vi"] = "Vietnamese", ["th"] = "Thai", ["id"] = "Indonesian", ["hi"] = "Hindi",
+    ["ca"] = "Catalan", ["eu"] = "Basque", ["gl"] = "Galician",
+    ["cs"] = "Czech", ["sk"] = "Slovak", ["hu"] = "Hungarian", ["ro"] = "Romanian", ["bg"] = "Bulgarian", ["uk"] = "Ukrainian", ["sr"] = "Serbian", ["hr"] = "Croatian", ["sl"] = "Slovenian", ["mk"] = "Macedonian",
+    ["he"] = "Hebrew", ["fa"] = "Persian", ["ms"] = "Malay", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengali",
     ["und"] = "Unknown", [""] = "Unknown", ["unknown"] = "Unknown",
 }
 
 track_names["es"] = {
-    ["es"] = "Español", ["es-ES"] = "Español (España)", ["es-419"] = "Español latinoamericano", ["es-MX"] = "Español (México)", ["es-AR"] = "Español (Argentina)", ["es-CO"] = "Español (Colombia)", ["es-CL"] = "Español (Chile)", ["es-PE"] = "Español (Perú)", ["es-VE"] = "Español (Venezuela)",
-    ["en"] = "Inglés", ["en-US"] = "Inglés (EE. UU.)", ["en-GB"] = "Inglés (Reino Unido)", ["en-CA"] = "Inglés (Canadá)", ["en-AU"] = "Inglés (Australia)",
-    ["ja"] = "Japonés", ["fr"] = "Francés", ["pt"] = "Portugués", ["pt-BR"] = "Portugués (Brasil)",
-    ["de"] = "Alemán", ["it"] = "Italiano", ["ru"] = "Ruso", ["ko"] = "Coreano",
-    ["zh"] = "Chino", ["zh-CN"] = "Chino (simplificado)", ["zh-TW"] = "Chino (tradicional)",
-    ["tr"] = "Turco", ["ar"] = "Árabe", ["pl"] = "Polaco", ["nl"] = "Neerlandés", ["sv"] = "Sueco",
-    ["da"] = "Danés", ["no"] = "Noruego", ["fi"] = "Finés", ["vi"] = "Vietnamita", ["th"] = "Tailandés",
-    ["id"] = "Indonesio", ["hi"] = "Hindi",
+    ["es"] = "Español", ["es-ES"] = "Español (España)", ["es-419"] = "Español latinoamericano", ["es-MX"] = "Español (México)", ["es-AR"] = "Español (Argentina)", ["es-CO"] = "Español (Colombia)", ["es-CL"] = "Español (Chile)", ["es-PE"] = "Español (Perú)", ["es-VE"] = "Español (Venezuela)", ["es-EC"] = "Español (Ecuador)", ["es-BO"] = "Español (Bolivia)", ["es-UY"] = "Español (Uruguay)", ["es-PY"] = "Español (Paraguay)", ["es-CR"] = "Español (Costa Rica)", ["es-GT"] = "Español (Guatemala)", ["es-HN"] = "Español (Honduras)", ["es-NI"] = "Español (Nicaragua)", ["es-PA"] = "Español (Panamá)", ["es-DO"] = "Español (República Dominicana)", ["es-CU"] = "Español (Cuba)", ["es-PR"] = "Español (Puerto Rico)",
+    ["en"] = "Inglés", ["en-US"] = "Inglés (EE. UU.)", ["en-GB"] = "Inglés (Reino Unido)", ["en-CA"] = "Inglés (Canadá)", ["en-AU"] = "Inglés (Australia)", ["en-NZ"] = "Inglés (Nueva Zelanda)", ["en-IE"] = "Inglés (Irlanda)",
+    ["ja"] = "Japonés",
+    ["fr"] = "Francés",
+    ["pt"] = "Portugués", ["pt-PT"] = "Portugués (Portugal)", ["pt-BR"] = "Portugués (Brasil)",
+    ["de"] = "Alemán",
+    ["it"] = "Italiano", ["ru"] = "Ruso", ["ko"] = "Coreano",
+    ["zh"] = "Chino",
+    ["tr"] = "Turco", ["ar"] = "Árabe",
+    ["pl"] = "Polaco", ["nl"] = "Neerlandés",
+    ["sv"] = "Sueco", ["da"] = "Danés", ["no"] = "Noruego", ["fi"] = "Finés",
+    ["vi"] = "Vietnamita", ["th"] = "Tailandés", ["id"] = "Indonesio", ["hi"] = "Hindi",
+    ["ca"] = "Catalán", ["eu"] = "Euskera", ["gl"] = "Gallego",
+    ["cs"] = "Checo", ["sk"] = "Eslovaco", ["hu"] = "Húngaro", ["ro"] = "Rumano", ["bg"] = "Búlgaro", ["uk"] = "Ucraniano", ["sr"] = "Serbio", ["hr"] = "Croata", ["sl"] = "Esloveno", ["mk"] = "Macedonio",
+    ["he"] = "Hebreo", ["fa"] = "Persa", ["ms"] = "Malayo", ["ta"] = "Tamil", ["te"] = "Telugu", ["bn"] = "Bengalí",
     ["und"] = "Desconocido", [""] = "Desconocido", ["unknown"] = "Desconocido",
 }
 
@@ -466,79 +469,117 @@ local function get_track_name_map()
     local ui = user_opts.language or "en"
     return track_names[ui] or track_names["en"] or {}
 end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
-local lang_to_flag = {
-    ["es"] = "🇪🇸", ["es-ES"] = "🇪🇸", ["es-419"] = "🇲🇽",
-    ["es-MX"] = "🇲🇽", ["es-AR"] = "🇦🇷", ["es-CO"] = "🇨🇴", ["es-CL"] = "🇨🇱", ["es-PE"] = "🇵🇪", ["es-VE"] = "🇻🇪", ["es-EC"] = "🇪🇨", ["es-BO"] = "🇧🇴", ["es-UY"] = "🇺🇾", ["es-PY"] = "🇵🇾", ["es-CR"] = "🇨🇷", ["es-GT"] = "🇬🇹", ["es-HN"] = "🇭🇳", ["es-NI"] = "🇳🇮", ["es-PA"] = "🇵🇦", ["es-DO"] = "🇩🇴", ["es-CU"] = "🇨🇺", ["es-PR"] = "🇵🇷",
-    ["en"] = "🇬🇧", ["en-GB"] = "🇬🇧", ["en-US"] = "🇺🇸", ["en-CA"] = "🇨🇦", ["en-AU"] = "🇦🇺", ["en-NZ"] = "🇳🇿", ["en-IE"] = "🇮🇪",
-    ["ja"] = "🇯🇵", ["ja-JP"] = "🇯🇵",
-    ["fr"] = "🇫🇷", ["fr-FR"] = "🇫🇷", ["fr-CA"] = "🇨🇦", ["fr-BE"] = "🇧🇪", ["fr-CH"] = "🇨🇭",
-    ["pt"] = "🇵🇹", ["pt-PT"] = "🇵🇹", ["pt-BR"] = "🇧🇷",
-    ["de"] = "🇩🇪", ["de-DE"] = "🇩🇪", ["de-AT"] = "🇦🇹", ["de-CH"] = "🇨🇭",
-    ["it"] = "🇮🇹", ["it-IT"] = "🇮🇹",
-    ["ru"] = "🇷🇺", ["ru-RU"] = "🇷🇺",
-    ["ko"] = "🇰🇷", ["ko-KR"] = "🇰🇷",
-    ["zh"] = "🇨🇳", ["zh-CN"] = "🇨🇳", ["zh-TW"] = "🇹🇼", ["zh-HK"] = "🇭🇰", ["zh-Hans"] = "🇨🇳", ["zh-Hant"] = "🇹🇼",
-    ["tr"] = "🇹🇷", ["tr-TR"] = "🇹🇷",
-    ["ar"] = "🇸🇦", ["ar-SA"] = "🇸🇦", ["ar-EG"] = "🇪🇬", ["ar-AE"] = "🇦🇪",
-    ["pl"] = "🇵🇱", ["pl-PL"] = "🇵🇱",
-    ["nl"] = "🇳🇱", ["nl-NL"] = "🇳🇱", ["nl-BE"] = "🇧🇪",
-    ["sv"] = "🇸🇪", ["sv-SE"] = "🇸🇪",
-    ["da"] = "🇩🇰", ["da-DK"] = "🇩🇰",
-    ["no"] = "🇳🇴", ["nb-NO"] = "🇳🇴", ["nn-NO"] = "🇳🇴",
-    ["fi"] = "🇫🇮", ["fi-FI"] = "🇫🇮",
-    ["vi"] = "🇻🇳", ["vi-VN"] = "🇻🇳",
-    ["th"] = "🇹🇭", ["th-TH"] = "🇹🇭",
-    ["id"] = "🇮🇩", ["id-ID"] = "🇮🇩",
-    ["hi"] = "🇮🇳", ["hi-IN"] = "🇮🇳",
-    ["ca"] = "🇪🇸", ["eu"] = "🇪🇸", ["gl"] = "🇪🇸",
-    ["cs"] = "🇨🇿", ["sk"] = "🇸🇰", ["hu"] = "🇭🇺", ["ro"] = "🇷🇴", ["bg"] = "🇧🇬", ["uk"] = "🇺🇦", ["sr"] = "🇷🇸", ["hr"] = "🇭🇷", ["sl"] = "🇸🇮", ["mk"] = "🇲🇰",
-    ["he"] = "🇮🇱", ["fa"] = "🇮🇷", ["ms"] = "🇲🇾", ["ta"] = "🇮🇳", ["te"] = "🇮🇳", ["bn"] = "🇧🇩",
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Flag engine: explicit lang -> country code table (emoji kept as a visual reference), flag-assets.lua loader, geometry, labels and flag_drawn().
+local lang_to_cc = {
+    ["es"] = "ES", -- 🇪🇸
+    ["es-ES"] = "ES", -- 🇪🇸
+    ["es-419"] = "MX", -- 🇲🇽
+    ["es-MX"] = "MX", -- 🇲🇽
+    ["es-AR"] = "AR", -- 🇦🇷
+    ["es-CO"] = "CO", -- 🇨🇴
+    ["es-CL"] = "CL", -- 🇨🇱
+    ["es-PE"] = "PE", -- 🇵🇪
+    ["es-VE"] = "VE", -- 🇻🇪
+    ["es-EC"] = "EC", -- 🇪🇨
+    ["es-BO"] = "BO", -- 🇧🇴
+    ["es-UY"] = "UY", -- 🇺🇾
+    ["es-PY"] = "PY", -- 🇵🇾
+    ["es-CR"] = "CR", -- 🇨🇷
+    ["es-GT"] = "GT", -- 🇬🇹
+    ["es-HN"] = "HN", -- 🇭🇳
+    ["es-NI"] = "NI", -- 🇳🇮
+    ["es-PA"] = "PA", -- 🇵🇦
+    ["es-DO"] = "DO", -- 🇩🇴
+    ["es-CU"] = "CU", -- 🇨🇺
+    ["es-PR"] = "PR", -- 🇵🇷
+    ["en"] = "GB", -- 🇬🇧
+    ["en-GB"] = "GB", -- 🇬🇧
+    ["en-US"] = "US", -- 🇺🇸
+    ["en-CA"] = "CA", -- 🇨🇦
+    ["en-AU"] = "AU", -- 🇦🇺
+    ["en-NZ"] = "NZ", -- 🇳🇿
+    ["en-IE"] = "IE", -- 🇮🇪
+    ["ja"] = "JP", -- 🇯🇵
+    ["fr"] = "FR", -- 🇫🇷
+    ["pt"] = "PT", -- 🇵🇹
+    ["pt-PT"] = "PT", -- 🇵🇹
+    ["pt-BR"] = "BR", -- 🇧🇷
+    ["de"] = "DE", -- 🇩🇪
+    ["it"] = "IT", -- 🇮🇹
+    ["ru"] = "RU", -- 🇷🇺
+    ["ko"] = "KR", -- 🇰🇷
+    ["zh"] = "CN", -- 🇨🇳
+    ["tr"] = "TR", -- 🇹🇷
+    ["ar"] = "SA", -- 🇸🇦
+    ["pl"] = "PL", -- 🇵🇱
+    ["nl"] = "NL", -- 🇳🇱
+    ["sv"] = "SE", -- 🇸🇪
+    ["da"] = "DK", -- 🇩🇰
+    ["no"] = "NO", -- 🇳🇴
+    ["fi"] = "FI", -- 🇫🇮
+    ["vi"] = "VN", -- 🇻🇳
+    ["th"] = "TH", -- 🇹🇭
+    ["id"] = "ID", -- 🇮🇩
+    ["hi"] = "IN", -- 🇮🇳
+    ["ca"] = "CT", -- custom Senyera art below
+    ["eu"] = "PV", -- custom Ikurrina art below
+    ["gl"] = "GA", -- custom Galician-flag art below
+    ["cs"] = "CZ", -- 🇨🇿
+    ["sk"] = "SK", -- 🇸🇰
+    ["hu"] = "HU", -- 🇭🇺
+    ["ro"] = "RO", -- 🇷🇴
+    ["bg"] = "BG", -- 🇧🇬
+    ["uk"] = "UA", -- 🇺🇦
+    ["sr"] = "RS", -- 🇷🇸
+    ["hr"] = "HR", -- 🇭🇷
+    ["sl"] = "SI", -- 🇸🇮
+    ["mk"] = "MK", -- 🇲🇰
+    ["he"] = "IL", -- 🇮🇱
+    ["fa"] = "IR", -- 🇮🇷
+    ["ms"] = "MY", -- 🇲🇾
+    ["ta"] = "IN", -- 🇮🇳
+    ["te"] = "IN", -- 🇮🇳
+    ["bn"] = "BD", -- 🇧🇩
 }
 
--- lang -> ISO country code, decoded from the regional indicator pair in
--- lang_to_flag so that both tables always stay in sync. LuaJIT has no utf8
--- library, so the decoding is done by hand.
-local lang_to_cc = {}
-do
-    for lang, emoji in pairs(lang_to_flag) do
-        local letters, n = {}, 0
-        local i = 1
-        while i <= #emoji do
-            local b = string.byte(emoji, i)
-            local cp, size
-            if b < 0x80 then
-                cp, size = b, 1
-            elseif b < 0xE0 then
-                cp, size = b - 0xC0, 2
-            elseif b < 0xF0 then
-                cp, size = b - 0xE0, 3
-            else -- 4 byte sequence, which is what a flag emoji uses
-                local b1, b2, b3 = string.byte(emoji, i + 1, i + 3)
-                cp = (b - 0xF0) * 0x40000 + (b1 - 0x80) * 0x1000
-                    + (b2 - 0x80) * 0x40 + (b3 - 0x80)
-                size = 4
-            end
-            if cp >= 0x1F1E6 and cp <= 0x1F1FF then
-                n = n + 1
-                letters[n] = string.char(cp - 0x1F1E6 + 65)
-            end
-            i = i + size
+-- The tables above must stay in sync: every display language needs a country
+-- code and vice versa. Warn once at startup instead of failing silently.
+local function validate_language_tables()
+    for key in pairs(track_names["en"]) do
+        if track_names["es"][key] == nil then
+            mp.msg.warn("modernx: track_names[es] is missing language '" .. tostring(key) .. "'")
         end
-        if n == 2 then
-            lang_to_cc[lang] = letters[1] .. letters[2]
+        if key ~= "und" and key ~= "" and key ~= "unknown" and lang_to_cc[key] == nil then
+            mp.msg.warn("modernx: lang_to_cc is missing language '" .. tostring(key) .. "'")
+        end
+    end
+    for key in pairs(track_names["es"]) do
+        if track_names["en"][key] == nil then
+            mp.msg.warn("modernx: track_names[en] is missing language '" .. tostring(key) .. "'")
+        end
+    end
+    for key in pairs(lang_to_cc) do
+        if track_names["en"][key] == nil then
+            mp.msg.warn("modernx: track_names[en] is missing language '" .. tostring(key) .. "' (orphan flag mapping)")
         end
     end
 end
+validate_language_tables()
 
--- fixed location of the generated vector flags, next to this script inside the
--- portable config folder (~~ is portable_config)
+-- vector flag artwork (tools/twemoji2ass_flags.py); absent means the tooltip falls back to the plain code
 local FLAG_ASSETS_PATH = "~~/scripts/flag-assets.lua"
-
--- vector flag artwork generated by tools/twemoji2ass_flags.py; absent means the
--- tooltip falls back to the plain language code
 local flag_assets = nil
-do
+local flag_assets_loaded = false
+-- Loads the vector artwork on first use so the code/name modes never pay
+-- for parsing the bundle. Warns once, including country codes with no art.
+local function ensure_flag_assets()
+    if flag_assets_loaded then
+        return flag_assets
+    end
+    flag_assets_loaded = true
     local path = FLAG_ASSETS_PATH
     if path:sub(1, 2) == "~~" then
         local ok, expanded = pcall(mp.command_native, { "expand-path", path })
@@ -549,14 +590,28 @@ do
     local okload, mod = pcall(dofile, path)
     if okload and type(mod) == "table" then
         flag_assets = mod
+        local missing = {}
+        for _, cc in pairs(lang_to_cc) do
+            if flag_assets[string.lower(cc)] == nil then
+                missing[#missing + 1] = cc
+            end
+        end
+        if #missing > 0 then
+            table.sort(missing)
+            mp.msg.warn("modernx: missing flag artwork for " .. table.concat(missing, ", "))
+        end
     else
         mp.msg.warn("modernx: could not load " .. FLAG_ASSETS_PATH
             .. ", track tooltips will use language codes")
     end
+    return flag_assets
 end
 
 local function get_flag_asset(lang)
-    if not lang or lang == "" or not flag_assets then
+    if not lang or lang == "" then
+        return nil
+    end
+    if not ensure_flag_assets() then
         return nil
     end
     local cc = lang_to_cc[lang]
@@ -596,21 +651,20 @@ local function get_flag_geometry(lang)
     return asset, p, height * asset.w, height
 end
 
-local function format_track_label(lang, mode_override)
+local function format_track_label(lang, mode_override, name_map)
     if not lang or lang == "" then
         return nil
     end
     local l = lang
-    local mode = mode_override or user_opts.track_tooltip_mode or "code"
+    local mode = mode_override or user_opts.track_language_mode or "code"
     if mode == "flag" then
-        -- the flag is drawn as an ASS vector next to the tooltip, so the text
-        -- only needs the code when there is no artwork for this language
+        -- with artwork the flag replaces the code, so no text is returned
         if get_flag_asset(l) or get_flag_asset(l:match("^([^-_]+)")) then
             return nil
         end
         return "[" .. l .. "]"
     elseif mode == "name" then
-        local map = get_track_name_map()
+        local map = name_map or get_track_name_map()
         local n = map[l]
         if not n then
             local base = l:match("^([^-_]+)")
@@ -625,19 +679,18 @@ end
 
 -- whether the language slot is filled by a vector flag instead of a text label
 local function flag_drawn(lang)
-    if (user_opts.track_tooltip_mode or "code") ~= "flag" then
+    if (user_opts.track_language_mode or "code") ~= "flag" then
         return false
     end
     return get_flag_asset(lang) ~= nil
 end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
 -- Font size the advance table below was measured at. Anything else is scaled.
 local ADVANCE_FS = 20
 
--- Per character advances of Segoe UI at \fs20, in playres units. Measured by
--- rendering with libass and reading the pen position, so the tooltip slots sit
--- exactly where the text they follow actually ends. If you change `font` in
--- modernx.conf these numbers stop matching and the spacing drifts.
+-- Per-character advances of Segoe UI at \fs20 in playres units (measured with libass); retune if `font` changes in modernx.conf
 local CHAR_ADVANCE = {
     [32] = 4.2, [33] = 4.3, [34] = 5.81, [35] = 8.91, [36] = 8.21, [37] = 12.21,
     [38] = 12.11, [39] = 3.5, [40] = 4.6, [41] = 4.6, [42] = 6.21, [43] = 10.31,
@@ -670,8 +723,7 @@ local CHAR_ADVANCE = {
 -- average latin advance, for codepoints the table does not cover
 local ADVANCE_FALLBACK = 8
 
--- advances the table above does not carry: the track list bullets, measured
--- the same way at \fs20 (● = U+25CF, ○ = U+25CB)
+-- extra advances for the track-list bullets (● U+25CF, ○ U+25CB) at \fs20
 local MSG_ADVANCE = { [9679] = 9.831, [9675] = 13.879 }
 
 -- mpv runs Lua 5.1, which has no utf8 library, so decode by hand
@@ -708,12 +760,11 @@ local function text_width(str, fontsize)
     end
     return total * (fs / ADVANCE_FS)
 end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
--- Splits a track tooltip around the language slot, so the vector flag can be
--- drawn exactly where [es] used to be. Returns the text before the slot and the
--- text after it.
---   keep_title  whether the title follows the slot; video and audio only carry
---               it when the slot became a flag, subtitles always do
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Splits a track tooltip around the language slot so the flag lands where [es] was.
+--   keep_title  whether the title follows the slot (video/audio only when the slot is a flag; subtitles always)
 local function tooltip_parts(prefix, lang, title, keep_title)
     local lang_ok = lang ~= nil and lang ~= "" and lang ~= texts.na
     local title_ok = title ~= nil and title ~= "" and title ~= texts.na
@@ -736,6 +787,7 @@ local function tooltip_parts(prefix, lang, title, keep_title)
     end
     return prefix, ""
 end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 local function contains(list, item)
     local t = {}
@@ -794,10 +846,6 @@ local function osc_color_convert(color)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- [ES]
--- Oculta la extensión del archivo del título: se lee desde el final y se elimina
--- todo hasta el primer punto encontrado (el punto de la extensión).
--- [EN]
 -- Hides the file extension in the title: reads from the end and removes
 -- everything up to the first dot found (the extension dot).
 local function strip_file_extension(title)
@@ -859,7 +907,7 @@ local osc_styles = {
     volumebar_bg = "{\\blur0\\bord0\\1c&H999999&}",
     volumebar_fg = "{\\blur1\\bord1\\1c&H" .. osc_color_convert(user_opts.side_buttons_color) .. "&}",
     window_control = "{\\blur1\\bord0.5\\1c&H" ..
-        osc_color_convert(user_opts.window_controls_color) .. "&\\3c&H0&\\fs22\\fnmpv-osd-symbols}", -- >>> EDIT AlwaysBorderRadius <<< -- Aumenta el tamaño de fuente de los controles / larger window-controls font size
+        osc_color_convert(user_opts.window_controls_color) .. "&\\3c&H0&\\fs22\\fnmpv-osd-symbols}", -- >>> EDIT AlwaysBorderRadius <<< -- larger window-controls font size
     window_title = "{\\blur1\\bord0.5\\1c&H" ..
         osc_color_convert(user_opts.window_title_color) .. "&\\3c&H0&\\fs19\\q2\\fn" .. user_opts.font .. "}",
     description = '{\\blur1\\bord0.5\\1c&HFFFFFF&\\3c&H000000&\\fs' ..
@@ -953,19 +1001,19 @@ local state = {
     message_meta = nil, -- structured track list rows for render_message_block
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    -- Estado de las barras temporales de volumen y seek / State for the temporary volume & seek bars
-    show_volume_time = nil,  -- Tiempo hasta el cual mostrar la barra de volumen / Time until the volume bar shows
+    -- State for the temporary volume and seek bars
+    show_volume_time = nil,  -- time until the volume bar stops showing
     current_volume = mp.get_property_number("volume", 0),
     volume_max = mp.get_property_number("volume-max", 100) or 100,
-    previous_volume = nil,  -- Valor previo de volumen (inicial nil para detectar el primer load) / Previous volume value (nil to detect the first load)
-    previous_mute = nil,    -- Valor previo de mute (inicial nil para detectar el primer load) / Previous mute value (nil to detect the first load)
-    volume_hide_timer = nil,  -- Temporizador que fuerza a ocultar la barra de volumen / Timer that forces the volume bar to hide
+    previous_volume = nil,  -- previous volume value (nil to detect the first load)
+    previous_mute = nil,    -- previous mute value (nil to detect the first load)
+    volume_hide_timer = nil,  -- timer that forces the volume bar to hide
 
-    seek_delta = 0,  -- Delta de seek en segundos (+ avance, - retroceso) / Seek delta in seconds (+ forward, - backward)
-    previous_time = nil,  -- Tiempo previo para calcular delta / Previous time to compute the delta
-    show_seek_time = nil,  -- Tiempo hasta el cual mostrar la barra de seek / Time until the seek bar shows
-    seek_display_time = nil,  -- Tiempo hasta el cual mostrar icono/texto (independiente de barra) / Time until icon/text shows (independent of the bar)
-    seek_hide_timer = nil,  -- Temporizador que fuerza a ocultar la barra de seek / Timer that forces the seek bar to hide
+    seek_delta = 0,  -- seek delta in seconds (+ forward, - backward)
+    previous_time = nil,  -- previous time to compute the delta
+    show_seek_time = nil,  -- time until the seek bar stops showing
+    seek_display_time = nil,  -- time until icon/text shows (independent of the bar)
+    seek_hide_timer = nil,  -- timer that forces the seek bar to hide
     -- <<< CUSTOM AlwaysBorderRadius >>>
 }
 
@@ -1174,11 +1222,6 @@ local function ass_draw_rr_h_cw(ass, x0, y0, x1, y1, r1, hexagon, r2)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- [ES]
--- Genera un tag ASS de clip vectorial con la forma de una píldora redondeada.
--- La máscara se usa como recorte para que el progreso nunca sobresalga de los
--- bordes redondeados del fondo (coordenadas absolutas 1:1 en playres).
--- [EN]
 -- Generates a rounded-pill ASS vector clip tag. The mask is used as a clip so
 -- that the progress never overflows the rounded background edges (absolute 1:1 playres coords).
 local function pill_clip_tag(x0, y0, x1, y1, r)
@@ -1270,9 +1313,10 @@ function update_tracklist()
     end
 end
 
--- return a nice list of tracks of the given type (video, audio, sub)
--- The optional second return value carries the structured rows so
--- render_message_block can position every line and drop vector flags in place.
+-- return a nice list of tracks of the given type (video, audio, sub);
+-- the second return value carries rows for render_message_block (positioned lines + flags)
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Build the track menu text and the positioned rows (flag head/tail split).
 function get_tracklist(type)
     update_tracklist()
     local message = valid_types[type] .. texts.track
@@ -1281,6 +1325,8 @@ function get_tracklist(type)
         message = texts.none
     else
         meta = { rows = { { text = message } } }
+        local name_map = get_track_name_map()
+        local mode = user_opts.track_language_mode or "code"
         for n = 1, #tracks_osc[type] do
             local track = tracks_osc[type][n]
             local lang, title, selected = 'unknown', '', '○'
@@ -1293,13 +1339,26 @@ function get_tracklist(type)
             if (track.id == tonumber(mp.get_property(type))) then
                 selected = '●'
             end
-            local label
+            local label, lang_label
             if lang ~= nil and lang ~= 'unknown' and lang ~= '' then
-                -- the menu always spells the language out; track_tooltip_mode
-                -- only drives the hover tooltips
-                local lang_label = format_track_label(lang, "name")
+                -- the language slot follows track_language_mode like the hover
+                -- tooltips do; in flag mode the positioned rows still split on
+                -- the spelled-out name so the flag lands where it belongs
+                if mode == "flag" then
+                    if flag_drawn(lang) then
+                        lang_label = format_track_label(lang, "name", name_map)
+                    else
+                        lang_label = format_track_label(lang, "code")
+                    end
+                else
+                    lang_label = format_track_label(lang, mode, name_map)
+                end
                 if lang_label ~= nil then
-                    label = lang_label .. " — " .. title
+                    if title ~= "" then
+                        label = lang_label .. " — " .. title
+                    else
+                        label = lang_label
+                    end
                 else
                     label = title
                 end
@@ -1310,10 +1369,10 @@ function get_tracklist(type)
             message = message .. '\n' .. full
             local row = { full = full }
             if flag_drawn(lang) then
-                local lang_label = format_track_label(lang, "name")
                 row.head = selected .. ' ' .. n .. ':'
-                if lang_label and label:sub(1, #lang_label) == lang_label then
+                if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
                     row.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
+                    if row.tail == "" then row.tail = nil end
                 end
                 row.flag_lang = lang
             end
@@ -1322,6 +1381,7 @@ function get_tracklist(type)
     end
     return message, meta
 end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 -- relatively change the track of given <type> by <next> tracks
 --(+1 -> next, -1 -> previous)
@@ -1757,17 +1817,9 @@ local function draw_sponsorblock_ranges(element, elem_ass, xp, rh)
     end
 end
 
--- Builds the ASS events for a vector flag. Returns the assembled ass object and
--- the drawn width in playres units, or nil when there is no artwork for lang.
--- Every colour has to be its own event at the same position, in order. libass
--- only accepts one drawing per \p block, so a multi colour flag cannot live in
--- a single event: an override between two paths cancels the whole drawing, and
--- repeating \p makes the pen advance once per colour instead of once per flag.
-local function render_flag(lang, x, y)
-    local asset, p, width = get_flag_geometry(lang)
-    if not asset then
-        return nil, 0
-    end
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Builds the ASS events for a vector flag; one event per colour (libass cancels a multi-path override and repeating \p advances the pen). Returns the ass and drawn width.
+local function render_flag_geometry(asset, p, x, y)
     local flag_ass = mp.assdraw.ass_new()
     for _, part in ipairs(asset.d) do
         flag_ass:new_event()
@@ -1776,8 +1828,17 @@ local function render_flag(lang, x, y)
         flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H00&}")
         flag_ass:append((part:gsub("\\p1", "\\p" .. p)))
     end
-    return flag_ass, width
+    return flag_ass
 end
+
+local function render_flag(lang, x, y)
+    local asset, p, width = get_flag_geometry(lang)
+    if not asset then
+        return nil, 0
+    end
+    return render_flag_geometry(asset, p, x, y), width
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 function render_elements(master_ass)
     -- when the slider is dragged or hovered and we have a target chapter name
@@ -1810,9 +1871,10 @@ function render_elements(master_ass)
 
     for n = 1, #elements do
         local element = elements[n]
-        -- built apart from elem_ass, so the flag never shares an event stream
-        -- with the button glyphs or the hover glow
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- flag built apart from elem_ass so it shares no event stream with the glyphs
         local flag_ass = nil
+        -- <<< CUSTOM AlwaysBorderRadius >>>
         local style_ass = mp.assdraw.ass_new()
         style_ass:merge(element.style_ass)
         ass_append_alpha(style_ass, element.layout.alpha, 0)
@@ -2041,8 +2103,8 @@ function render_elements(master_ass)
                         an = 7
                     end
 
-                    -- tooltip label, split around the language slot so the flag
-                    -- can be drawn exactly where [es] used to be
+                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- tooltip label, split around the language slot so the flag lands where [es] was
                     local head, tail = "", ""
                     if element.enabled then
                         if type(element.tooltipF) == 'function' then
@@ -2056,27 +2118,21 @@ function render_elements(master_ass)
                     head = head or ""
                     tail = tail or ""
 
-                    -- One knob for both sides of the flag. Advances give pen positions, and the
--- ink of ']' ends only 3 units before its pen does while a letter starts 1
--- unit after, so the two gaps end up within ~2 units of each other without
--- any per glyph fudging.
-local gap = user_opts.track_flag_gap or 2
-                    local flag_lang, flag_w, flag_h = nil, 0, 0
+                    -- one gap on each side of the flag (advances give the pen positions)
+                    local gap = user_opts.track_flag_gap or 2
+                    local flag_lang, flag_asset, flag_p, flag_w, flag_h = nil, nil, 0, 0, 0
                     if element.enabled and type(element.flagF) == 'function'
-                        and (user_opts.track_tooltip_mode or "code") == "flag" then
+                        and (user_opts.track_language_mode or "code") == "flag" then
                         local lang = element.flagF()
                         if lang ~= nil and lang ~= "" then
-                            local asset, _, w, h = get_flag_geometry(lang)
+                            local asset, p, w, h = get_flag_geometry(lang)
                             if asset ~= nil then
-                                flag_lang, flag_w, flag_h = lang, w, h
+                                flag_lang, flag_asset, flag_p, flag_w, flag_h = lang, asset, p, w, h
                             end
                         end
                     end
 
-                    -- tooltip_parts pads head with a trailing space and tail
-                    -- with a leading one. With a flag in the middle those
-                    -- spaces would fight the configured gaps, so drop them and
-                    -- let the gaps be the only separators.
+                    -- with a flag in the middle, drop the padded spaces so the configured gaps are the only separators
                     local head_text, tail_text
                     if flag_lang ~= nil then
                         head_text = head:gsub("%s+$", "")
@@ -2099,11 +2155,10 @@ local gap = user_opts.track_flag_gap or 2
 
                     local flag_x
                     if flag_lang ~= nil then
-                        -- centre the flag on the text block, which sits above
-                        -- ty when an == 1 and below it when an == 7
+                        -- centre the flag on the text block (above ty when an == 1, below when an == 7)
                         local top = (an == 1) and (ty - fontsize) or ty
                         flag_x = tx + head_w + gap
-                        flag_ass = render_flag(flag_lang, flag_x,
+                        flag_ass = render_flag_geometry(flag_asset, flag_p, flag_x,
                             top + (fontsize - flag_h) / 2)
                     end
 
@@ -2121,15 +2176,19 @@ local gap = user_opts.track_flag_gap or 2
                         elem_ass:append(element.tooltip_style)
                         elem_ass:append(tail_text)
                     end
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
                 end
             end
         end
 
         master_ass:merge(elem_ass)
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Merge the flag's own event stream.
         if flag_ass ~= nil then
             master_ass:new_event()
             master_ass:merge(flag_ass)
         end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 end
 
@@ -2923,7 +2982,7 @@ local function make_sponsorblock_segments()
     print("Added SponsorBlock segments")
 end
 
-function show_message(text, duration, meta)
+function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
     if state.showingDescription then
         destroy_scrolling_keys()
     end
@@ -2940,12 +2999,15 @@ function show_message(text, duration, meta)
     -- replace actual linebreaks with ASS linebreaks
     text = string.gsub(text, '\n', '\\N')
     text = "\\N" .. text
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Carry structured rows to the block renderer.
     state.message_text = text
     state.message_meta = meta
     if meta then
         -- render_message only takes the block path while both still match
         meta.render_text = text
     end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     if not state.message_hide_timer then
         state.message_hide_timer = mp.add_timeout(0, request_tick)
@@ -2956,15 +3018,15 @@ function show_message(text, duration, meta)
     request_tick()
 end
 
--- show the track list of <type>; uses the explicitly positioned block layout
--- with vector flags whenever get_tracklist could build the row metadata
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- show the track list of <type> in the positioned block layout (with flags when rows are available)
 function show_tracklist(type)
     local message, meta = get_tracklist(type)
     show_message(message, nil, meta)
 end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
--- show only the row of the currently selected track in the same block layout
--- as the full list; used by the cycle-sub keybinds (input.conf script-messages)
+-- show only the row of the current track in the same block layout (used by the cycle-sub keybinds)
 function show_selected_track_row(type)
     local _, meta = get_tracklist(type)
     local row
@@ -3260,7 +3322,10 @@ function show_description(text)
     state.descriptionBaseText = text
     text = "\\N" .. apply_link_highlight(text)
     state.message_text = text
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Plain descriptions carry no block rows.
     state.message_meta = nil
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     if not state.message_hide_timer then
         state.message_hide_timer = mp.add_timeout(0, request_tick)
@@ -3275,12 +3340,8 @@ function reset_desc_timer()
     state.message_hide_timer:resume()
 end
 
--- Calibrated with compute_bounds against the default OSD pen: with these
--- constants the explicitly positioned block lands on the same pixels as the
--- old implicitly positioned text (delta 0 px), so the list keeps its place
--- while every row gets its own \pos for the flag to hang off. show_message
--- prepends an empty line, so the header sits one line below the pen, and
--- both offsets scale with the runtime font size (fs20 -> 31.759 / 20.048).
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Calibrated against the default OSD pen so the positioned block lands on the same pixels as the old implicit text (delta 0 px); show_message prepends an empty line.
 local BLOCK_PEN_X = 25.06
 local BLOCK_PEN_Y = 21.928
 local BLOCK_EMPTY_ADV = 0.49155
@@ -3296,9 +3357,9 @@ local function render_message_block(ass, meta, fontsize, outline)
 
         local head = row.head and row.head:gsub("%s+$", "")
         local tail = row.tail and row.tail:gsub("^%s+", "")
-        local asset, _, flag_w, flag_h
+        local asset, p, flag_w, flag_h
         if row.flag_lang then
-            asset, _, flag_w, flag_h = get_flag_geometry(row.flag_lang)
+            asset, p, flag_w, flag_h = get_flag_geometry(row.flag_lang)
         end
 
         if not head or not asset then
@@ -3315,7 +3376,7 @@ local function render_message_block(ass, meta, fontsize, outline)
             ass:append(head)
 
             local flag_x = BLOCK_PEN_X + text_width(head, fontsize) + gap
-            local flag_ass = render_flag(row.flag_lang, flag_x,
+            local flag_ass = render_flag_geometry(asset, p, flag_x,
                 y + (fontsize - flag_h) / 2)
             if flag_ass then
                 ass:new_event()
@@ -3332,6 +3393,7 @@ local function render_message_block(ass, meta, fontsize, outline)
         end
     end
 end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 function render_message(ass)
     if state.message_hide_timer and state.message_hide_timer:is_enabled() and state.message_text then
@@ -3360,11 +3422,14 @@ function render_message(ass)
 
         local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
 
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Use the positioned block renderer while the rows still match the text.
         local meta = state.message_meta
         if meta and meta.render_text == state.message_text and not state.showingDescription then
             render_message_block(ass, meta, fontsize, outline)
             return
         end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
 
         ass:new_event()
         ass:append(style .. state.message_text)
@@ -3373,9 +3438,12 @@ function render_message(ass)
             ass:pos(20, state.scrolledlines)
         end
     else
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Clear the text/rows when the message timer ends.
         state.message_text = nil
         state.message_meta = nil
         if state.showingDescription then destroy_scrolling_keys() end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 end
 
@@ -4158,6 +4226,13 @@ function validate_user_opts()
         mp.msg.warn("volume_control_type cannot be '" .. user_opts.volume_control_type .. "'. Ignoring.")
         user_opts.volume_control_type = "linear"
     end
+
+    if user_opts.track_language_mode ~= "code" and
+        user_opts.track_language_mode ~= "name" and
+        user_opts.track_language_mode ~= "flag" then
+        mp.msg.warn("track_language_mode cannot be '" .. tostring(user_opts.track_language_mode) .. "'. Using 'code'.")
+        user_opts.track_language_mode = "code"
+    end
 end
 
 function update_options(_)
@@ -4223,7 +4298,7 @@ local function osc_init()
         local title = state.forced_title or
             mp.command_native({ "expand-text", user_opts.title })
         -- >>> CUSTOM AlwaysBorderRadius <<<
-        title = strip_file_extension(title) -- Oculta la extensión del título / Hides the title extension
+        title = strip_file_extension(title) -- hide the title extension
         -- <<< CUSTOM AlwaysBorderRadius >>>
         -- escape ASS, and strip newlines and trailing slashes
         title = title:gsub("\\n", " "):gsub("\\$", ""):gsub("{", "\\{")
@@ -4469,6 +4544,8 @@ local function osc_init()
         end
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Audio track button (tooltip flag + shift/wheel bindings).
     -- audio
     ne = new_element('cy_audio', 'button')
     ne.enabled = (#tracks_osc.audio > 0)
@@ -4525,7 +4602,10 @@ local function osc_init()
         function() mp.commandv("script-binding", "select/select-aid") end
     ne.eventresponder['shift+mbtn_right_down'] =
         function() mp.commandv("script-binding", "loadaudiotracks/ask_for_audio_track") end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Subtitle track button (tooltip flag + shift/wheel bindings).
     -- subtitles
     ne = new_element('cy_sub', 'button')
     ne.enabled = #tracks_osc.sub > 0
@@ -4588,6 +4668,7 @@ local function osc_init()
             mp.set_property_number("secondary-sid", 0)
             set_track('sub', 1)
         end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- volume slider
     ne = new_element("vol_ctrl", "button")
@@ -5355,23 +5436,23 @@ local function render()
     end
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    -- Render de barras temporales (volumen y seek) / Renders the temporary bars (volume & seek)
-    -- Barra de volumen temporal (al cambiar volumen o silenciar) / Temporary volume bar (when changing volume or muting)
+    -- Temporary volume and seek bars
+    -- Temporary volume bar (shown when the volume changes or on mute)
     if state.show_volume_time and mp.get_time() < state.show_volume_time then
         local is_vertical = user_opts.volume_bar_orientation == "vertical"
-        local bar_length = 300  -- Longitud principal (ancho si horizontal, altura si vertical) / Main length (width if horizontal, height if vertical)
-        local bar_thickness = 10  -- Grosor (altura si horizontal, ancho si vertical) / Thickness (height if horizontal, width if vertical)
-        local bar_radius = 5     -- Radio máximo de los bordes redondeados / Maximum rounded-corner radius
-        local margin = 20        -- Margen desde los bordes de la pantalla / Margin from the screen edges
+        local bar_length = 300  -- main length (width if horizontal, height if vertical)
+        local bar_thickness = 10  -- thickness (height if horizontal, width if vertical)
+        local bar_radius = 5     -- maximum rounded-corner radius
+        local margin = 20        -- margin from the screen edges
 
-        local progress = state.current_volume / state.volume_max  -- Progreso base (0-1) / Base progress (0-1)
+        local progress = state.current_volume / state.volume_max  -- base progress (0-1)
         local progress_length = progress * bar_length
 
-        -- Invertir dimensiones si es vertical / Swap dimensions if vertical
+        -- swap dimensions if vertical
         local draw_width = is_vertical and bar_thickness or bar_length
         local draw_height = is_vertical and bar_length or bar_thickness
 
-        -- Calcular posición basada en user_opts.volume_bar_position (solo center, top, bottom, left, right) / Compute position from user_opts.volume_bar_position (only center, top, bottom, left, right)
+        -- position from user_opts.volume_bar_position (center, top, bottom, left, right)
         local screen_w = osc_param.playresx
         local screen_h = osc_param.playresy
         local bar_x, bar_y
@@ -5392,40 +5473,40 @@ local function render()
             bar_x = screen_w - draw_width - margin
             bar_y = screen_h / 2 - draw_height / 2
         else
-            -- Fallback a center si opción inválida / Fallback to center if invalid option
+            -- fallback to center if the option is invalid
             bar_x = screen_w / 2 - draw_width / 2
             bar_y = screen_h / 2 - draw_height / 2
         end
 
-        -- Evento 1: Fondo de la barra (gris semi-transparente, redondeado completo) / Event 1: Bar background (semi-transparent gray, fully rounded)
+        -- event 1: bar background (semi-transparent gray, fully rounded)
         ass:new_event()
-        ass:pos(0, 0)  -- Posición absoluta (origen top-left) / Absolute position (top-left origin)
-        ass:an(7)      -- Alineación top-left para coordenadas absolutas / Top-left alignment for absolute coordinates
-        ass:append("{\\blur0\\bord0\\1c&HCCCCCC&\\3c&H000000&\\alpha&H80&}")  -- Color gris claro, semi-transparente / Light gray, semi-transparent color
+        ass:pos(0, 0)  -- absolute position (top-left origin)
+        ass:an(7)      -- top-left alignment for absolute coordinates
+        ass:append("{\\blur0\\bord0\\1c&HCCCCCC&\\3c&H000000&\\alpha&H80&}")  -- light gray, semi-transparent
         ass:draw_start()
         ass_draw_rr_h_cw(ass, bar_x, bar_y, bar_x + draw_width, bar_y + draw_height, bar_radius)
         ass:draw_stop()
 
-        -- Evento 2: Progreso (azul) - Solo si progress_length > 0 / Event 2: Progress (blue) - Only if progress_length > 0
+        -- event 2: progress (blue), only if progress_length > 0
         if progress_length > 0 then
             ass:new_event()
-            ass:pos(0, 0)  -- Posición absoluta (origen top-left) / Absolute position (top-left origin)
-            ass:an(7)      -- Alineación top-left para coordenadas absolutas / Top-left alignment for absolute coordinates
-            ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")  -- Color azul (amarillo) opaco / Opaque blue (yellow) color
-            -- Mascara de recorte: recorta el azul a la forma redondeada del fondo gris / Clip mask: clips the blue to the rounded shape of the gray background
+            ass:pos(0, 0)  -- absolute position (top-left origin)
+            ass:an(7)      -- top-left alignment for absolute coordinates
+            ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")  -- opaque blue (yellow) color
+            -- clip mask: clips the blue to the rounded shape of the gray background
             ass:append(pill_clip_tag(bar_x, bar_y, bar_x + draw_width, bar_y + draw_height, bar_radius))
             ass:draw_start()
             if is_vertical then
-                -- Vertical: progreso de abajo hacia arriba / Vertical: bottom-to-top progress
+                -- vertical: bottom-to-top progress
                 ass:rect_cw(bar_x, bar_y + draw_height - progress_length, bar_x + draw_width, bar_y + draw_height)
             else
--- Horizontal: progreso de izquierda a derecha (posiciones icono/texto) / Horizontal: left-to-right progress (icon/text positions)
+                -- horizontal: left-to-right progress (icon/text positions)
                 ass:rect_cw(bar_x, bar_y, bar_x + progress_length, bar_y + draw_height)
             end
             ass:draw_stop()
         end
 
-        -- Icono de volumen (izquierda horizontal / abajo vertical), cambiando según nivel / Volume icon (left if horizontal / below if vertical), changing by level
+        -- volume icon (left if horizontal, below if vertical), changing with the level
         local volume_icon
         if state.mute then
             volume_icon = icons.volume.mute
@@ -5438,31 +5519,31 @@ local function render()
         end
         ass:new_event()
         ass:pos(is_vertical and (bar_x + draw_width / 2) or (bar_x - 20), is_vertical and (bar_y + draw_height + 20) or (bar_y + draw_height / 2))
-        ass:an(5)  -- Alineación central / Center alignment
-        ass:append("{\\fs24\\1c&HFFFFFF&\\fn" .. iconfont .. "}" .. volume_icon)  -- Añadir \\fn para la fuente de iconos / Add \\fn for the icon font
+        ass:an(5)  -- center alignment
+        ass:append("{\\fs24\\1c&HFFFFFF&\\fn" .. iconfont .. "}" .. volume_icon)  -- add \\fn for the icon font
 
-        -- Texto con el porcentaje de volumen (derecha horizontal / arriba vertical) / Volume percentage text (right if horizontal / above if vertical)
+        -- volume percentage text (right if horizontal, above if vertical)
         local volume_text = state.mute and "Muted" or math.floor(state.current_volume) .. "%"
         ass:new_event()
         ass:pos(is_vertical and (bar_x + draw_width / 2) or (bar_x + draw_width + 30), is_vertical and (bar_y - 20) or (bar_y + draw_height / 2))
-        ass:an(5)  -- Alineación central / Center alignment
+        ass:an(5)  -- center alignment
         ass:append("{\\fs20\\1c&HFFFFFF&\\bord1\\3c&H000000&}" .. volume_text)
     end
 
-    -- Barra de seek temporal (similar a volumen) / Temporary seek bar (similar to volume)
-    if state.show_seek_time and mp.get_time() < state.show_seek_time and not state.osc_visible then  -- No mostrar si OSC visible (ej. clic en seekbar) / Don't show if OSC is visible (e.g. click on seekbar)
+    -- Temporary seek bar (similar to the volume bar)
+    if state.show_seek_time and mp.get_time() < state.show_seek_time and not state.osc_visible then  -- don't show if the OSC is visible (e.g. click on the seekbar)
         local bar_length = 300
         local bar_thickness = 10
-        local bar_radius = 5  -- Radio fijo deseado / Desired fixed radius
+        local bar_radius = 5  -- desired fixed radius
         local margin = 20
-        local progress = mp.get_property_number("percent-pos", 0) / 100  -- Progreso video (0-1) / Video progress (0-1)
+        local progress = mp.get_property_number("percent-pos", 0) / 100  -- video progress (0-1)
         local progress_length = progress * bar_length
 
-        -- Dimensiones (solo horizontal) / Dimensions (horizontal only)
+        -- dimensions (horizontal only)
         local draw_width = bar_length
         local draw_height = bar_thickness
 
-        -- Calcular posición basada en user_opts.seek_bar_position (solo center, top, bottom) / Compute position from user_opts.seek_bar_position (only center, top, bottom)
+        -- position from user_opts.seek_bar_position (center, top, bottom)
         local screen_w = osc_param.playresx
         local screen_h = osc_param.playresy
         local bar_x, bar_y
@@ -5476,56 +5557,56 @@ local function render()
             bar_x = screen_w / 2 - draw_width / 2
             bar_y = screen_h - draw_height - margin
         else
-            -- Fallback a center si opción inválida / Fallback to center if invalid option
+            -- fallback to center if the option is invalid
             bar_x = screen_w / 2 - draw_width / 2
             bar_y = screen_h / 2 - draw_height / 2
         end
 
-        -- Evento 1: Fondo de la barra (gris semi-transparente, redondeado completo) / Event 1: Bar background (semi-transparent gray, fully rounded)
+        -- event 1: bar background (semi-transparent gray, fully rounded)
         ass:new_event()
-        ass:pos(0, 0)  -- Posición absoluta (origen top-left) / Absolute position (top-left origin)
-        ass:an(7)      -- Alineación top-left para coordenadas absolutas / Top-left alignment for absolute coordinates
-        ass:append("{\\blur0\\bord0\\1c&HCCCCCC&\\3c&H000000&\\alpha&H80&}")  -- Color gris claro, semi-transparente / Light gray, semi-transparent color
+        ass:pos(0, 0)  -- absolute position (top-left origin)
+        ass:an(7)      -- top-left alignment for absolute coordinates
+        ass:append("{\\blur0\\bord0\\1c&HCCCCCC&\\3c&H000000&\\alpha&H80&}")  -- light gray, semi-transparent
         ass:draw_start()
         ass_draw_rr_h_cw(ass, bar_x, bar_y, bar_x + draw_width, bar_y + draw_height, bar_radius)
         ass:draw_stop()
 
-        -- Evento 2: Progreso (azul) - Solo si progress_length > 0 / Event 2: Progress (blue) - Only if progress_length > 0
+        -- event 2: progress (blue), only if progress_length > 0
         if progress_length > 0 then
             ass:new_event()
-            ass:pos(0, 0)  -- Posición absoluta (origen top-left) / Absolute position (top-left origin)
-            ass:an(7)      -- Alineación top-left para coordenadas absolutas / Top-left alignment for absolute coordinates
-            ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")  -- Color azul opaco / Opaque blue color
-            -- Mascara de recorte: recorta el azul a la forma redondeada del fondo gris / Clip mask: clips the blue to the rounded shape of the gray background
+            ass:pos(0, 0)  -- absolute position (top-left origin)
+            ass:an(7)      -- top-left alignment for absolute coordinates
+            ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")  -- opaque blue color
+            -- clip mask: clips the blue to the rounded shape of the gray background
             ass:append(pill_clip_tag(bar_x, bar_y, bar_x + draw_width, bar_y + draw_height, bar_radius))
             ass:draw_start()
-            -- Horizontal: progreso de izquierda a derecha (el clip redondea el borde al llenarse) / Horizontal: left-to-right progress (the clip rounds the edge when filling)
+            -- horizontal: left-to-right progress (the clip rounds the edge when filling)
             ass:rect_cw(bar_x, bar_y, bar_x + progress_length, bar_y + draw_height)
             ass:draw_stop()
         end
 
-        -- Icono y segundos de seek (solo si seek_display_time active y delta != 0) / Seek icon and seconds (only if seek_display_time is active and delta != 0)
+        -- seek icon and seconds (only if seek_display_time is active and delta != 0)
         if state.seek_display_time and mp.get_time() < state.seek_display_time and math.abs(state.seek_delta) > 0 then
             local is_forward = state.seek_delta > 0
             local seek_icon = is_forward and icons.forward or icons.rewind
-            local seek_text = (is_forward and "+" or "-") .. math.abs(state.seek_delta) .. "s"  -- Fijo, sin sumar / Fixed, no summing
+            local seek_text = (is_forward and "+" or "-") .. math.abs(state.seek_delta) .. "s"  -- fixed, no summing
             local icon_x, icon_y, text_x, text_y
 
-            -- Horizontal: progreso de izquierda a derecha / Horizontal: left-to-right progress
+            -- horizontal: left-to-right progress
             icon_x = is_forward and (bar_x + draw_width + 30) or (bar_x - 30)
             icon_y = bar_y + draw_height / 2
             text_x = is_forward and (bar_x + draw_width + 60) or (bar_x - 60)
             text_y = bar_y + draw_height / 2
 
-            -- Icono / Icon
+            -- icon
             ass:new_event()
             ass:pos(icon_x, icon_y)
-            ass:an(5)  -- Alineación central / Center alignment
+            ass:an(5)  -- center alignment
             ass:append("{\\fs24\\1c&HFFFFFF&\\fn" .. iconfont .. "}" .. seek_icon)
-            -- Texto segundos / Seconds text
+            -- seconds text
             ass:new_event()
             ass:pos(text_x, text_y)
-            ass:an(5)  -- Alineación central / Center alignment
+            ass:an(5)  -- center alignment
             ass:append("{\\fs20\\1c&HFFFFFF&\\bord1\\3c&H000000&}" .. seek_text)
         end
     end
@@ -5742,21 +5823,27 @@ if user_opts.key_bindings then
     end);
 
     -- extra key bindings
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Cycle audio tracks key binding.
     mp.add_key_binding("z", "cycleaudiotracks", function()
         mp.set_property_number("secondary-sid", 0)
         set_track("audio", 1)
         show_tracklist("audio")
     end);
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     mp.add_key_binding("Z", "selectaudiotrack", function()
         mp.commandv("script-binding", "select/select-aid")
     end);
 
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Cycle captions key binding.
     mp.add_key_binding("c", "cyclecaptions", function()
         mp.set_property_number("secondary-sid", 0)
         set_track("sub", 1)
         show_tracklist("sub")
     end);
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     mp.add_key_binding("C", "selectsubtitletrack", function()
         mp.commandv("script-binding", "select/select-sid")
@@ -5949,10 +6036,6 @@ set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
 mp.set_property("title", "mpv")
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- [ES]
--- Fuerzan la desaparición de las barras temporales aunque playback-time no emita
--- cambios (pausa, buffering, eof), programando un render que limpia el OSD.
--- [EN]
 -- Force the bars to disappear even if playback-time stops emitting changes
 -- (pause, buffering, eof), scheduling a render that clears the OSD.
 local function volume_bar_expire()
@@ -5967,17 +6050,17 @@ local function seek_bar_expire()
     request_tick()
 end
 
--- Observar volumen para mostrar la barra temporal solo en cambios / Observe volume to show the temporary bar only on changes
+-- observe volume to show the temporary bar only on changes
 mp.observe_property("volume", "number", function(name, val)
     if state.previous_volume == nil then
-        state.previous_volume = val  -- Inicializar en el primer llamado (al load de mpv) / Initialize on the first call (at mpv load)
+        state.previous_volume = val  -- initialize on the first call (at mpv load)
         state.current_volume = val
-        return  -- No mostrar barra al inicio / Don't show the bar at startup
+        return  -- don't show the bar at startup
     end
 
     state.current_volume = val
     if val ~= state.previous_volume then
-        state.show_volume_time = mp.get_time() + 1.5  -- Mostrar solo si cambió / Show only if it changed
+        state.show_volume_time = mp.get_time() + 1.5  -- show only if it changed
         if not state.volume_hide_timer then
             state.volume_hide_timer = mp.add_timeout(0, volume_bar_expire)
         end
@@ -5989,20 +6072,20 @@ mp.observe_property("volume", "number", function(name, val)
     state.previous_volume = val
 end)
 
--- Observar mute para actualizar la barra solo en cambios / Observe mute to update the bar only on changes
+-- observe mute to update the bar only on changes
 mp.observe_property("mute", "bool", function(name, val)
     if state.previous_mute == nil then
-        state.previous_mute = val  -- Inicializar en el primer llamado (al load de mpv) / Initialize on the first call (at mpv load)
+        state.previous_mute = val  -- initialize on the first call (at mpv load)
         if val then
             state.current_volume = 0
         else
             state.current_volume = mp.get_property_number("volume", 0)
         end
-        return  -- No mostrar barra al inicio / Don't show the bar at startup
+        return  -- don't show the bar at startup
     end
 
     if val then
-        state.current_volume = 0  -- Mostrar barra en 0 si muteado / Show the bar at 0 if muted
+        state.current_volume = 0  -- show the bar at 0 if muted
     else
         state.current_volume = mp.get_property_number("volume", 0)
     end
@@ -6019,19 +6102,19 @@ mp.observe_property("mute", "bool", function(name, val)
     state.previous_mute = val
 end)
 
--- Observar playback-time para calcular delta de seek (dirección y segundos) y mostrar barra / Observe playback-time to compute seek delta (direction & seconds) and show the bar
+-- observe playback-time to compute the seek delta (direction & seconds) and show the bar
 mp.observe_property("playback-time", "number", function(name, val)
-    if val == nil then return end  -- Ignorar si val es nil (ej. al cambiar video o idle) / Ignore if val is nil (e.g. when switching video or idle)
+    if val == nil then return end  -- ignore nil (e.g. when switching video or idle)
     if state.previous_time == nil then
         state.previous_time = val
         return
     end
     local raw_delta = val - state.previous_time
     local abs_delta = math.abs(raw_delta)
-    -- Detecta seek fijo: ~5s o ~85s (con tolerancia a inconsistencias) / Detect fixed seek: ~5s or ~85s (with tolerance for inconsistency)
+    -- detect a fixed seek: ~5s or ~85s (with tolerance for inconsistency)
     if abs_delta > 2 and abs_delta < 8 then  -- ~5s
         state.seek_delta = (raw_delta > 0 and 5 or -5)
-        state.show_seek_time = mp.get_time() + 2  -- Extender/refrescar visibilidad en seeks múltiples / Extend/refresh visibility for multiple seeks
+        state.show_seek_time = mp.get_time() + 2  -- extend/refresh visibility for multiple seeks
         state.seek_display_time = mp.get_time() + 2
         if not state.seek_hide_timer then
             state.seek_hide_timer = mp.add_timeout(0, seek_bar_expire)
@@ -6042,7 +6125,7 @@ mp.observe_property("playback-time", "number", function(name, val)
         request_tick()
     elseif abs_delta > 80 and abs_delta < 90 then  -- ~85s
         state.seek_delta = (raw_delta > 0 and 85 or -85)
-        state.show_seek_time = mp.get_time() + 2  -- Extender/refrescar visibilidad en seeks múltiples / Extend/refresh visibility for multiple seeks
+        state.show_seek_time = mp.get_time() + 2  -- extend/refresh visibility for multiple seeks
         state.seek_display_time = mp.get_time() + 2
         if not state.seek_hide_timer then
             state.seek_hide_timer = mp.add_timeout(0, seek_bar_expire)
@@ -6051,7 +6134,7 @@ mp.observe_property("playback-time", "number", function(name, val)
         state.seek_hide_timer:kill()
         state.seek_hide_timer:resume()
         request_tick()
-    end  -- Sin else; mantener delta previo durante el tiempo de visualización / No else; keep previous delta during display time
+    end  -- no else: keep the previous delta during the display time
     state.previous_time = val
 end)
 -- <<< CUSTOM AlwaysBorderRadius >>>
