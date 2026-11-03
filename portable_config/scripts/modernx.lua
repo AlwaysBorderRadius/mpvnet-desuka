@@ -3013,8 +3013,6 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
     end
     if duration == nil then
         duration = tonumber(mp.get_property('options/osd-duration')) / 1000
-    elseif not type(duration) == 'number' then
-        print('duration: ' .. duration)
     end
 
     -- cut the text short, otherwise the following functions
