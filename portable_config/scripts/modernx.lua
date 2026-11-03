@@ -289,8 +289,7 @@ local user_opts = {
     toast_enabled = true,          -- route all script OSD through the modernx toast
     toast_font_size = 20,          -- toast text size
     toast_max_width = 900,         -- max toast pill width (playres units)
-    toast_y_offset = 200,          -- height above bottom edge when OSC is visible
-    toast_y_offset_hidden = 80,    -- height above bottom edge when OSC is hidden
+    toast_top_margin = 80,         -- fixed distance from top edge (top-center, ignores OSC)
     toast_info_color = "#1D96F5",      -- info accent (seekbar blue)
     toast_success_color = "#00D400",   -- success accent
     toast_warn_color = "#FFC107",      -- warning accent
@@ -1048,6 +1047,9 @@ local state = {
     toast_kind = "info",    -- info|success|warn|error|persistent
     toast_source = "",      -- sender id for source-aware clear
     toast_hide_timer = nil, ---@type mp.Timer?
+    toast_head = nil,       -- flag row head (selected + index), escaped
+    toast_tail = nil,       -- flag row tail, escaped
+    toast_flag_lang = nil,  -- flag row language for vector flag
     -- <<< CUSTOM desuka >>>
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -3068,16 +3070,32 @@ end
 -- >>> CUSTOM desuka: unified toast channel <<<
 -- Central OSD replacement: one visible toast, new toast kills the previous
 -- one (no queue). Toast is a separate slot from the modal message
--- (tracklist/description): toast renders bottom-center, modal renders
+-- (tracklist/description): toast renders top-center fixed, modal renders
 -- top-left, so they never overlap on screen.
 local TOAST_KINDS = { info = true, success = true, warn = true, error = true, persistent = true }
 
+-- Strip quotes/spaces from script-opt colors (mp.options may keep them
+-- literally) and validate #RRGGBB; fall back to the Lua default.
+local function sanitize_hex_color(v, fallback)
+    local s = tostring(v or "")
+    s = s:gsub("^%s+", ""):gsub("%s+$", "")
+    while #s >= 2 and ((s:sub(1, 1) == '"' and s:sub(-1) == '"')
+        or (s:sub(1, 1) == "'" and s:sub(-1) == "'")) do
+        s = s:sub(2, -2):gsub("^%s+", ""):gsub("%s+$", "")
+    end
+    if s:match("^#?%x%x%x%x%x%x$") then
+        if s:sub(1, 1) ~= "#" then s = "#" .. s end
+        return s:upper()
+    end
+    return fallback
+end
+
 local function toast_accent(kind)
-    if kind == "success" then return user_opts.toast_success_color
-    elseif kind == "warn" then return user_opts.toast_warn_color
-    elseif kind == "error" then return user_opts.toast_error_color
-    elseif kind == "persistent" then return user_opts.toast_persistent_color
-    else return user_opts.toast_info_color end
+    if kind == "success" then return sanitize_hex_color(user_opts.toast_success_color, "#00D400")
+    elseif kind == "warn" then return sanitize_hex_color(user_opts.toast_warn_color, "#FFC107")
+    elseif kind == "error" then return sanitize_hex_color(user_opts.toast_error_color, "#E81123")
+    elseif kind == "persistent" then return sanitize_hex_color(user_opts.toast_persistent_color, "#9D96F5")
+    else return sanitize_hex_color(user_opts.toast_info_color, "#1D96F5") end
 end
 
 local function toast_default_duration(kind)
@@ -3118,6 +3136,49 @@ function show_toast(text, kind, source, duration)
     state.toast_text = escape_toast_text(text)
     state.toast_kind = kind
     state.toast_source = source
+    state.toast_head = nil
+    state.toast_tail = nil
+    state.toast_flag_lang = nil
+    if not state.toast_hide_timer then
+        state.toast_hide_timer = mp.add_timeout(0, request_tick)
+    end
+    state.toast_hide_timer:kill()
+    state.toast_hide_timer.timeout = duration
+    state.toast_hide_timer:resume()
+    request_tick()
+end
+
+-- Single track row as toast, preserving the vector flag (cycle feedback).
+-- Plain rows fall back to show_toast with the full text.
+function show_toast_row(row, kind, source, duration)
+    if type(row) ~= "table" then
+        show_toast(tostring(row or ""), kind, source, duration)
+        return
+    end
+    if not row.flag_lang or not get_flag_asset(row.flag_lang) then
+        show_toast(row.full or row.text or "", kind, source, duration)
+        return
+    end
+    if not user_opts.toast_enabled then
+        show_message(row.full or row.text or "", duration)
+        return
+    end
+    kind = tostring(kind or "info")
+    if not TOAST_KINDS[kind] then kind = "info" end
+    source = tostring(source or "")
+    if duration == nil then
+        duration = toast_default_duration(kind)
+    else
+        duration = tonumber(duration) or toast_default_duration(kind)
+        if duration > 1000 then duration = duration / 1000 end
+    end
+    state.toast_text = escape_toast_text(row.full or row.text or "")
+    state.toast_kind = kind
+    state.toast_source = source
+    state.toast_head = escape_toast_text((row.head or ""):gsub("%s+$", ""))
+    local tail = tostring(row.tail or ""):gsub("^%s+", "")
+    state.toast_tail = (tail ~= "") and escape_toast_text(tail) or nil
+    state.toast_flag_lang = row.flag_lang
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
@@ -3134,6 +3195,9 @@ function clear_toast(source, force)
     end
     state.toast_text = nil
     state.toast_source = ""
+    state.toast_head = nil
+    state.toast_tail = nil
+    state.toast_flag_lang = nil
     if state.toast_hide_timer then state.toast_hide_timer:kill() end
     request_tick()
 end
@@ -3141,25 +3205,48 @@ end
 local function render_toast(ass)
     if not user_opts.toast_enabled then return end
     if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled() and state.toast_text) then
-        if state.toast_text ~= nil then state.toast_text = nil end
+        if state.toast_text ~= nil then
+            state.toast_text = nil
+            state.toast_head = nil
+            state.toast_tail = nil
+            state.toast_flag_lang = nil
+        end
         return
     end
     local fontsize = tonumber(user_opts.toast_font_size) or 20
-    local lines = {}
-    for line in (state.toast_text .. "\\N"):gmatch("(.-)\\N") do lines[#lines + 1] = line end
-    if #lines == 0 then return end
-    local maxw = 0
-    for _, line in ipairs(lines) do
-        local w = text_width(line, fontsize)
-        if w > maxw then maxw = w end
+    local gap = tonumber(user_opts.track_flag_gap) or 2
+    -- flag row (track cycle): head + vector flag + tail, centered
+    local asset, flag_w, flag_h = nil, 0, 0
+    if state.toast_flag_lang and state.toast_head then
+        asset, flag_w, flag_h = get_flag_geometry(state.toast_flag_lang)
+        if not asset then
+            asset, flag_w, flag_h = nil, 0, 0
+        end
     end
     local pad_x, pad_y = 22, 12
-    local pill_w = math.min(maxw + pad_x * 2 + 10, tonumber(user_opts.toast_max_width) or 900)
-    local pill_h = #lines * fontsize * 1.35 + pad_y * 2
     local cx = osc_param.playresx / 2
-    local lift = state.osc_visible and (tonumber(user_opts.toast_y_offset) or 200)
-        or (tonumber(user_opts.toast_y_offset_hidden) or 80)
-    local cy = osc_param.playresy - lift
+    -- fixed top-center: never moves with the OSC
+    local cy = (tonumber(user_opts.toast_top_margin) or 80)
+    local pill_w, pill_h, head_w, tail_w
+    if asset then
+        head_w = text_width(state.toast_head, fontsize)
+        tail_w = state.toast_tail and text_width(state.toast_tail, fontsize) or 0
+        local total = head_w + gap + flag_w
+        if state.toast_tail then total = total + gap + tail_w end
+        pill_w = math.min(total + pad_x * 2 + 10, tonumber(user_opts.toast_max_width) or 900)
+        pill_h = math.max(fontsize * 1.35, flag_h) + pad_y * 2
+    else
+        local lines = {}
+        for line in (state.toast_text .. "\\N"):gmatch("(.-)\\N") do lines[#lines + 1] = line end
+        if #lines == 0 then return end
+        local maxw = 0
+        for _, line in ipairs(lines) do
+            local w = text_width(line, fontsize)
+            if w > maxw then maxw = w end
+        end
+        pill_w = math.min(maxw + pad_x * 2 + 10, tonumber(user_opts.toast_max_width) or 900)
+        pill_h = #lines * fontsize * 1.35 + pad_y * 2
+    end
     local x0, y0 = cx - pill_w / 2, cy - pill_h / 2
     local x1, y1 = cx + pill_w / 2, cy + pill_h / 2
     local r = math.min(12, pill_h / 2)
@@ -3171,6 +3258,31 @@ local function render_toast(ass)
     ass:draw_start()
     ass:round_rect_cw(x0, y0, x1, y1, r)
     ass:draw_stop()
+    local text_style = "{\\blur0\\bord1\\1c&HFFFFFF&\\3c&H000000&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}"
+    if asset then
+        local total = head_w + gap + flag_w
+        if state.toast_tail then total = total + gap + tail_w end
+        local sx = cx - total / 2
+        -- head
+        ass:new_event()
+        ass:pos(sx + head_w / 2, cy)
+        ass:an(5)
+        ass:append(text_style .. (state.toast_head or ""))
+        -- flag (an=7 top-left, vertically centered)
+        local flag_ass = render_flag_geometry(asset, sx + head_w + gap, cy - flag_h / 2)
+        if flag_ass then
+            ass:new_event()
+            ass:merge(flag_ass)
+        end
+        -- tail
+        if state.toast_tail then
+            ass:new_event()
+            ass:pos(sx + head_w + gap + flag_w + gap + tail_w / 2, cy)
+            ass:an(5)
+            ass:append(text_style .. state.toast_tail)
+        end
+        return
+    end
     -- accent dot
     local accent = toast_accent(state.toast_kind)
     ass:new_event()
@@ -3181,7 +3293,7 @@ local function render_toast(ass)
     ass:new_event()
     ass:pos(cx + 8, cy)
     ass:an(5)
-    ass:append("{\\blur0\\bord1\\1c&HFFFFFF&\\3c&H000000&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}" .. state.toast_text)
+    ass:append(text_style .. state.toast_text)
 end
 -- <<< CUSTOM desuka >>>
 
@@ -3195,7 +3307,8 @@ end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- show only the row of the current track in the same block layout (used by the cycle-sub keybinds)
+-- Cycle feedback as toast (single row, flag preserved); the full list
+-- button keeps the modal block layout.
 function show_selected_track_row(ttype)
     local _, meta = get_tracklist(ttype)
     local row
@@ -3206,10 +3319,10 @@ function show_selected_track_row(ttype)
         end
     end
     if not row then
-        show_message(valid_types[ttype] .. ': ' .. texts.off)
+        show_toast(valid_types[ttype] .. ': ' .. texts.off, "info", "modernx-track")
         return
     end
-    show_message(row.full, nil, { rows = { row } })
+    show_toast_row(row, "info", "modernx-track")
 end
 
 mp.register_script_message("cycle-sub", function()
@@ -4479,6 +4592,42 @@ function validate_user_opts()
         mp.msg.warn("track_flag_size must be a positive number. Using 16.")
         user_opts.track_flag_size = 16
     end
+
+    -- >>> CUSTOM desuka: toast opts <<<
+    if type(user_opts.toast_enabled) ~= "boolean" then
+        mp.msg.warn("toast_enabled must be boolean. Using true.")
+        user_opts.toast_enabled = true
+    end
+    if type(user_opts.toast_font_size) ~= "number" or user_opts.toast_font_size <= 0 then
+        mp.msg.warn("toast_font_size must be a positive number. Using 20.")
+        user_opts.toast_font_size = 20
+    end
+    if type(user_opts.toast_max_width) ~= "number" or user_opts.toast_max_width <= 0 then
+        mp.msg.warn("toast_max_width must be a positive number. Using 900.")
+        user_opts.toast_max_width = 900
+    end
+    if type(user_opts.toast_top_margin) ~= "number" or user_opts.toast_top_margin < 0 then
+        mp.msg.warn("toast_top_margin must be a non-negative number. Using 80.")
+        user_opts.toast_top_margin = 80
+    end
+    local _fallback = { info = "#1D96F5", success = "#00D400", warn = "#FFC107", error = "#E81123", persistent = "#9D96F5" }
+    for _, k in ipairs({ "info", "success", "warn", "error", "persistent" }) do
+        local opt = "toast_" .. k .. "_color"
+        local s = tostring(user_opts[opt] or "")
+        s = s:gsub("^%s+", ""):gsub("%s+$", "")
+        while #s >= 2 and ((s:sub(1, 1) == '"' and s:sub(-1) == '"')
+            or (s:sub(1, 1) == "'" and s:sub(-1) == "'")) do
+            s = s:sub(2, -2):gsub("^%s+", ""):gsub("%s+$", "")
+        end
+        if not s:match("^#?%x%x%x%x%x%x$") then
+            mp.msg.warn(opt .. " must be #RRGGBB. Using " .. _fallback[k] .. ".")
+            user_opts[opt] = _fallback[k]
+        else
+            if s:sub(1, 1) ~= "#" then s = "#" .. s end
+            user_opts[opt] = s:upper()
+        end
+    end
+    -- <<< CUSTOM desuka >>>
 end
 
 function update_options(_)
