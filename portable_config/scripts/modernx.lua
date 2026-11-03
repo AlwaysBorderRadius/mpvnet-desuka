@@ -166,7 +166,7 @@ local user_opts = {
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track tooltip/menu display for cy_audio/cy_video/cy_sub
     track_language_mode = "code",  -- "code" | "name" | "flag"
-    track_flag_size = 14,         -- height of the flag vector in playres units (exact, aspect preserved)
+    track_flag_size = 16,         -- height of the flag vector in playres units (exact, aspect preserved)
     track_flag_gap = 2,           -- space on each side of the flag in the tooltip
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -592,9 +592,10 @@ local function ensure_flag_assets()
         flag_assets = mod
         local seen, missing = {}, {}
         for _, cc in pairs(lang_to_cc) do
-            if not seen[cc] then
-                seen[cc] = true
-                if flag_assets[string.lower(cc)] == nil then
+            local k = string.lower(cc)
+            if not seen[k] then
+                seen[k] = true
+                if flag_assets[k] == nil then
                     missing[#missing + 1] = cc
                 end
             end
@@ -629,7 +630,7 @@ local function get_flag_asset(lang)
 end
 
 -- Scaled artwork cache: coordinates are stored for a 256-unit height and \pN
--- only allows powers of two, so scale them once per (lang, size) to hit the
+-- only allows powers of two, so scale them once per asset and size to hit the
 -- requested height exactly. Aspect is preserved (X and Y share one factor).
 local scaled_flag_cache = {}
 
@@ -643,11 +644,11 @@ local function get_flag_geometry(lang)
     if not asset or not asset.d or #asset.d == 0 then
         return nil
     end
-    local size = user_opts.track_flag_size or 14
+    local size = user_opts.track_flag_size or 16
     if type(size) ~= "number" or size <= 0 then
-        size = 14
+        size = 16
     end
-    local key = lang .. ":" .. tostring(size)
+    local key = tostring(asset) .. ":" .. tostring(size)
     local scaled = scaled_flag_cache[key]
     if not scaled then
         local f = size / 256
@@ -676,7 +677,8 @@ local function format_track_label(lang, mode_override, name_map)
     local mode = mode_override or user_opts.track_language_mode or "code"
     if mode == "flag" then
         -- with artwork the flag replaces the code, so no text is returned
-        if get_flag_asset(l) or get_flag_asset(l:match("^([^-_]+)")) then
+        -- (get_flag_asset already falls back to the base language itself)
+        if get_flag_asset(l) then
             return nil
         end
         return "[" .. l .. "]"
@@ -781,18 +783,18 @@ end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
 -- Splits a track tooltip around the language slot so the flag lands where [es] was.
---   keep_title  whether the title follows the slot (video/audio only when the slot is a flag; subtitles always)
-local function tooltip_parts(prefix, lang, title, keep_title)
+-- The title always follows the slot, in every mode.
+local function tooltip_parts(prefix, lang, title)
     local lang_ok = lang ~= nil and lang ~= "" and lang ~= texts.na
     local title_ok = title ~= nil and title ~= "" and title ~= texts.na
 
     if lang_ok then
         if flag_drawn(lang) then
-            return prefix .. " ", (keep_title and title_ok) and (" " .. title) or ""
+            return prefix .. " ", title_ok and (" " .. title) or ""
         end
         local label = format_track_label(lang)
         if label then
-            if keep_title and title_ok then
+            if title_ok then
                 return prefix .. " " .. label .. " ", title
             end
             return prefix .. " " .. label, ""
@@ -1354,21 +1356,24 @@ function get_tracklist(type)
                 title = track.metadata["name"]
             end
             -- one track, one row: stray line breaks would desync the block layout
+            if type(title) ~= "string" then
+                title = ""
+            end
             title = title:gsub("[\r\n]+", " ")
             if (track.id == tonumber(mp.get_property(type))) then
                 selected = '●'
             end
             local label, lang_label
+            local drew_flag = false
             if lang ~= nil and lang ~= 'unknown' and lang ~= '' then
                 -- the language slot follows track_language_mode like the hover
                 -- tooltips do; in flag mode the positioned rows still split on
                 -- the spelled-out name so the flag lands where it belongs
-                if mode == "flag" then
-                    if flag_drawn(lang) then
-                        lang_label = format_track_label(lang, "name", name_map)
-                    else
-                        lang_label = format_track_label(lang, "code")
-                    end
+                drew_flag = (mode == "flag") and flag_drawn(lang)
+                if drew_flag then
+                    lang_label = format_track_label(lang, "name", name_map)
+                elseif mode == "flag" then
+                    lang_label = format_track_label(lang, "code")
                 else
                     lang_label = format_track_label(lang, mode, name_map)
                 end
@@ -1387,7 +1392,7 @@ function get_tracklist(type)
             local full = selected .. ' ' .. n .. ': ' .. label
             message = message .. '\n' .. full
             local row = { full = full }
-            if flag_drawn(lang) then
+            if drew_flag then
                 row.head = selected .. ' ' .. n .. ':'
                 if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
                     row.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
@@ -4254,8 +4259,8 @@ function validate_user_opts()
         user_opts.track_flag_gap = 2
     end
     if type(user_opts.track_flag_size) ~= "number" or user_opts.track_flag_size <= 0 then
-        mp.msg.warn("track_flag_size must be a positive number. Using 14.")
-        user_opts.track_flag_size = 14
+        mp.msg.warn("track_flag_size must be a positive number. Using 16.")
+        user_opts.track_flag_size = 16
     end
 end
 
@@ -4537,7 +4542,7 @@ local function osc_init()
             local message = string.format("%s [%d ∕ %d]", texts.video, track_id, total)
             local prop_lang = mp.get_property("current-tracks/video/lang")
             local prop_title = mp.get_property("current-tracks/video/title")
-            return tooltip_parts(message, prop_lang, prop_title, true)
+            return tooltip_parts(message, prop_lang, prop_title)
         end
         return (not ne.enabled) and texts.novideo or texts.off, ""
     end
@@ -4587,7 +4592,7 @@ local function osc_init()
             local message = string.format("%s [%d ∕ %d]", texts.audio, track_id, total)
             local prop_lang = mp.get_property("current-tracks/audio/lang")
             local prop_title = mp.get_property("current-tracks/audio/title")
-            return tooltip_parts(message, prop_lang, prop_title, true)
+            return tooltip_parts(message, prop_lang, prop_title)
         end
         return (not ne.enabled) and texts.noaudio or texts.off, ""
     end
@@ -4650,7 +4655,7 @@ local function osc_init()
         local title = mp.get_property("current-tracks/sub/title")
         -- subtitles carry the title even when the slot is a text label, so the
         -- flag lands between the label and the title instead of replacing it
-        return tooltip_parts(message, lang, title, true)
+        return tooltip_parts(message, lang, title)
     end
     ne.nothingavailable = texts.nosub
     ne.eventresponder['mbtn_left_up'] =

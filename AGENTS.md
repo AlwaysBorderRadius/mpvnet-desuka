@@ -22,7 +22,7 @@ opciones, keybinds) + tooling en `tools/`.
 - `portable_config/scripts/modernx.lua` — OSC + tooltips/listas de pistas.
 - `portable_config/scripts/flag-assets.lua` — bundle generado + custom.
 - `portable_config/script-opts/modernx.conf` — opciones (`track_language_mode`,
-  `track_flag_gap`, `font`, tamaños).
+  `track_flag_gap`, `track_flag_size`, `font`, tamaños).
 - `portable_config/input.conf` — keybinds (p. ej. ciclo de subtítulos por
   `script-message-to modernx cycle-sub[-down]`).
 - `tools/twemoji2ass_flags.py` — generador (requiere red para Twemoji).
