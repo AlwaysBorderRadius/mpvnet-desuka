@@ -6197,12 +6197,6 @@ function tick()
             ass:an(8)
             ass:append("{\\fs24\\1c&H0&\\1c&HFFFFFF&}" .. texts.welcome)
         end
-        -- >>> CUSTOM desuka: toasts also visible on idle screen (e.g. update check) <<<
-        if osc_param.playresx <= 0 or osc_param.playresy <= 0 then
-            osc_param.playresx, osc_param.playresy = display_w, display_h
-        end
-        render_toast(ass)
-        -- <<< CUSTOM desuka >>>
         set_osd(display_w, display_h, ass.text)
 
         if state.showhide_enabled then
