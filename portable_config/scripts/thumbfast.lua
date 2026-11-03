@@ -535,10 +535,7 @@ local function spawn(time)
                             end
                         else
                             toast_err("thumbfast: ERROR! cannot create mpv subprocess")
-                            if os_name == "windows" and frontend_path == nil then
-                                mp.commandv("script-message-to", "mpvnet", "show-text", "thumbfast: ERROR! install standalone mpv, see README", 5000, 20)
-                                mp.commandv("script-message", "mpv.net", "show-text", "thumbfast: ERROR! install standalone mpv, see README", 5000, 20)
-                            end
+                            -- NOTE desuka: no mpvnet show-text here, the toast is the only channel
                         end
                     else
                         toast_err("thumbfast: ERROR! cannot create mpv subprocess")

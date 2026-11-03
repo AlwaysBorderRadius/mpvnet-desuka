@@ -3331,16 +3331,17 @@ local function render_toast(ass)
         end
         return
     end
-    -- accent bar (vertical)
+    -- accent bar (vertical, short, near the pill edge)
     local accent = toast_accent(state.toast_kind)
     local bar_w = 4
-    local bar_h = pill_h - pad_y
+    local bar_h = pill_h - pad_y * 2
+    local bar_x = x0 + 10
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
     ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(accent) .. "&}")
     ass:draw_start()
-    ass:round_rect_cw(x0 + pad_x, cy - bar_h / 2, x0 + pad_x + bar_w, cy + bar_h / 2, 2)
+    ass:round_rect_cw(bar_x, cy - bar_h / 2, bar_x + bar_w, cy + bar_h / 2, 2)
     ass:draw_stop()
     -- text (centered, multiline via \N)
     local body = table.concat(lines, "\\N")
