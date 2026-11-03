@@ -3369,11 +3369,13 @@ function reset_desc_timer()
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- Calibrated against the default OSD pen so the positioned block lands on the same pixels as the old implicit text (delta 0 px); show_message prepends an empty line.
+-- Pen metrics for the positioned block (row 1 lands where full-size implicit
+-- text does; show_message prepends an empty line). BLOCK_PITCH trades density
+-- for breathing room between rows.
 local BLOCK_PEN_X = 25.06
 local BLOCK_PEN_Y = 21.928
 local BLOCK_EMPTY_ADV = 0.49155
-local BLOCK_PITCH = 1.0024
+local BLOCK_PITCH = 1.2
 
 -- Width of one positioned row, mirroring render_message_row below, so columns
 -- can be measured before anything is drawn.
@@ -3494,8 +3496,8 @@ function render_message(ass)
             fontsize = fontsize * 0.85
             outline = outline * 0.85
         else
-            fontsize = fontsize * counterscale / math.max(0.5 + math.min(lines / maxlines, 1), 1)
-            outline = outline * counterscale / math.max(0.5 + math.min(lines / maxlines, 1) / 2, 1)
+            fontsize = fontsize * counterscale
+            outline = outline * counterscale
         end
 
         if state.showingDescription then
@@ -3506,16 +3508,23 @@ function render_message(ass)
             ass:new_event()
         end
 
-        local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
-
         -- >>> CUSTOM AlwaysBorderRadius <<<
-        -- Use the positioned block renderer while the rows still match the text.
+        -- Positioned block first, at full size: columns absorb long lists,
+        -- so track rows are never shrunk to fit.
         local meta = state.message_meta
         if meta and meta.render_text == state.message_text and not state.showingDescription then
             render_message_block(ass, meta, fontsize, outline)
             return
         end
         -- <<< CUSTOM AlwaysBorderRadius >>>
+
+        -- plain-text path keeps the legacy shrink for long messages
+        -- (descriptions keep their unshrunk *0.85 size as before)
+        if not state.showingDescription then
+            fontsize = fontsize / math.max(0.5 + math.min(lines / maxlines, 1), 1)
+            outline = outline / math.max(0.5 + math.min(lines / maxlines, 1) / 2, 1)
+        end
+        local style = '{\\bord' .. outline .. '\\fs' .. fontsize .. '}'
 
         ass:new_event()
         ass:append(style .. state.message_text)
