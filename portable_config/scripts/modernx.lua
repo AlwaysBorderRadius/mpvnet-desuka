@@ -1328,16 +1328,16 @@ function update_tracklist()
     tracks_mpv.video, tracks_mpv.audio, tracks_mpv.sub = {}, {}, {}
     for n = 1, #tracktable do
         if not (tracktable[n].type == 'unknown') then
-            local type = tracktable[n].type
+            local ttype = tracktable[n].type
             local mpv_id = tonumber(tracktable[n].id)
             ---@cast mpv_id number
 
             -- by osc_id
-            table.insert(tracks_osc[type], tracktable[n])
+            table.insert(tracks_osc[ttype], tracktable[n])
 
             -- by mpv_id
-            tracks_mpv[type][mpv_id] = tracktable[n]
-            tracks_mpv[type][mpv_id].osc_id = #tracks_osc[type]
+            tracks_mpv[ttype][mpv_id] = tracktable[n]
+            tracks_mpv[ttype][mpv_id].osc_id = #tracks_osc[ttype]
         end
     end
 end
@@ -1346,18 +1346,18 @@ end
 -- the second return value carries rows for render_message_block (positioned lines + flags)
 -- >>> CUSTOM AlwaysBorderRadius <<<
 -- Build the track menu text and the positioned rows (flag head/tail split).
-function get_tracklist(type)
+function get_tracklist(ttype)
     update_tracklist()
-    local message = valid_types[type] .. texts.track
+    local message = valid_types[ttype] .. texts.track
     local meta = nil
-    if not tracks_osc or #tracks_osc[type] == 0 then
+    if not tracks_osc or #tracks_osc[ttype] == 0 then
         message = texts.none
     else
         meta = { rows = { { text = message } } }
         local name_map = get_track_name_map()
         local mode = user_opts.track_language_mode or "code"
-        for n = 1, #tracks_osc[type] do
-            local track = tracks_osc[type][n]
+        for n = 1, #tracks_osc[ttype] do
+            local track = tracks_osc[ttype][n]
             local lang, title, selected = 'unknown', '', '○'
             if not (track.lang == nil) then lang = track.lang end
             if not (track.title == nil) then
@@ -1370,7 +1370,7 @@ function get_tracklist(type)
                 title = ""
             end
             title = title:gsub("[\r\n]+", " ")
-            if (track.id == tonumber(mp.get_property(type))) then
+            if (track.id == tonumber(mp.get_property(ttype))) then
                 selected = '●'
             end
             local label, lang_label
@@ -1417,35 +1417,35 @@ function get_tracklist(type)
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
--- relatively change the track of given <type> by <next> tracks
+-- relatively change the track of given <ttype> by <step> tracks
 --(+1 -> next, -1 -> previous)
-function set_track(type, next)
+function set_track(ttype, step)
     local current_track_mpv, current_track_osc
     current_track_osc = 0
-    if (mp.get_property(type) == 'no') then
+    if (mp.get_property(ttype) == 'no') then
         current_track_osc = 0
     else
-        current_track_mpv = tonumber(mp.get_property(type))
-        if (tracks_mpv[type][current_track_mpv]) then
-            current_track_osc = tracks_mpv[type][current_track_mpv].osc_id
+        current_track_mpv = tonumber(mp.get_property(ttype))
+        if (tracks_mpv[ttype][current_track_mpv]) then
+            current_track_osc = tracks_mpv[ttype][current_track_mpv].osc_id
         end
     end
-    local new_track_osc = (current_track_osc + next) % (#tracks_osc[type] + 1)
+    local new_track_osc = (current_track_osc + step) % (#tracks_osc[ttype] + 1)
     local new_track_mpv
     if new_track_osc == 0 then
         new_track_mpv = 'no'
     else
-        new_track_mpv = tracks_osc[type][new_track_osc].id
+        new_track_mpv = tracks_osc[ttype][new_track_osc].id
     end
 
-    mp.commandv('set', type, new_track_mpv)
+    mp.commandv('set', ttype, new_track_mpv)
 end
 
--- get the currently selected track of <type>, OSC-style counted
-function get_track(type)
-    local track = mp.get_property(type)
+-- get the currently selected track of <ttype>, OSC-style counted
+function get_track(ttype)
+    local track = mp.get_property(ttype)
     if track ~= 'no' and track ~= nil then
-        local tr = tracks_mpv[type][tonumber(track)]
+        local tr = tracks_mpv[ttype][tonumber(track)]
         if tr then
             return tr.osc_id
         end
@@ -3045,26 +3045,26 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- show the track list of <type> in the positioned block layout (with flags when rows are available)
-function show_tracklist(type)
-    local message, meta = get_tracklist(type)
+-- show the track list of <ttype> in the positioned block layout (with flags when rows are available)
+function show_tracklist(ttype)
+    local message, meta = get_tracklist(ttype)
     show_message(message, nil, meta)
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
 -- show only the row of the current track in the same block layout (used by the cycle-sub keybinds)
-function show_selected_track_row(type)
-    local _, meta = get_tracklist(type)
+function show_selected_track_row(ttype)
+    local _, meta = get_tracklist(ttype)
     local row
     if meta then
-        local n = get_track(type)
+        local n = get_track(ttype)
         if n > 0 then
             row = meta.rows[n + 1] -- rows[1] holds the list header
         end
     end
     if not row then
-        show_message(valid_types[type] .. ': ' .. texts.off)
+        show_message(valid_types[ttype] .. ': ' .. texts.off)
         return
     end
     show_message(row.full, nil, { rows = { row } })
@@ -3537,9 +3537,9 @@ end
 -- Initialisation and Layout
 --
 
-local function new_element(name, type)
+local function new_element(name, el_type)
     local element = {}
-    element.type = type
+    element.type = el_type
     element.name = name
 
     -- add default stuff
@@ -3547,10 +3547,10 @@ local function new_element(name, type)
     element.visible = true
     element.enabled = true
     element.softrepeat = false
-    element.styledown = (type == "button")
+    element.styledown = (el_type == "button")
     element.state = {}
 
-    if type == "slider" then
+    if el_type == "slider" then
         element.slider = { min = { value = 0 }, max = { value = 100 } }
         element.thumbnailable = false
     end

@@ -37,6 +37,9 @@ opciones, keybinds) + tooling en `tools/`.
 - Validar opciones nuevas en `validate_user_opts()` (aviso + default seguro).
 - Medición de tooltips: avances calibrados para la `font` del conf; si cambia
   la fuente hay que recalibrar `CHAR_ADVANCE`.
+- No usar `type`/`next` como parámetro o local en Lua: eclipsan a los builtins
+  `type()`/`next()` (upstream lo hace en varias funciones; ya nos rompió
+  `get_tracklist` una vez).
 - Los `.conf` de `portable_config/` se commitean en cada rama como parte del
   estado portable (incluidos `mpv.conf`, `discord.conf` y `update-checker.conf`
   con sus ajustes locales).
