@@ -675,7 +675,8 @@ local function ui_msg(text, dur, kind)
 end
 
 -- Loading indicator through the modernx toast (persistent slot, same source):
--- staged braille frames, since blocking ffmpeg/ffprobe calls freeze timers.
+-- a single message, replaced only before real waits (ffmpeg blocks the loop,
+-- so no animation is possible during them; extra bumps would just flicker).
 local loading_frames = {"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 local loading_i = 0
 local loading_active = false
@@ -1128,7 +1129,6 @@ end
 -- Enumerar los streams "attachment" (fuentes) en su orden real: la opción
 -- -dump_attachment:t:N usa N dentro de los adjuntos del contenedor.
 local function list_attachments(video_path)
-    loading_bump("Leyendo fuentes…")
     local probe = utils.subprocess({
         args = { "ffprobe", "-v", "error", "-of", "default=noprint_wrappers=1",
                  "-show_entries", "stream=codec_type:stream_tags=filename",
@@ -2606,7 +2606,6 @@ local function edit_subtitle(mode)
     -- (cubierto de todas formas por el retry de fs_command()).
     mp.add_timeout(0.05, function()
         get_session_edit_dir()
-        loading_bump("Buscando subtítulos")
         -- Re-read time: user may have seeked during the delay.
         local now_t = mp.get_property_number("time-pos")
         if not now_t then
@@ -2617,15 +2616,16 @@ local function edit_subtitle(mode)
             return
         end
         local ok, cands, errs = pcall(collect_candidates, subs, now_t)
-        stop_loading()
         loading = false
         if not ok then
+            stop_loading()
             cleanup_disposable()
             ui_msg("Error al buscar subtítulos", 3, "error")
             return
         end
 
         if #cands == 0 then
+            stop_loading()
             cleanup_disposable()
             local extra = ""
             if #errs > 0 then
@@ -2644,6 +2644,7 @@ local function edit_subtitle(mode)
             end
         end
         if #filtered == 0 then
+            stop_loading()
             cleanup_disposable()
             ui_msg("Subtítulo demasiado complejo para edición (tags entre las palabras)", 3, "warn")
             return
@@ -2659,7 +2660,8 @@ local function edit_subtitle(mode)
 
         -- Fuentes embebidas para el primer evento en edición (antes de crear
         -- el renderer en setup_screen). Por línea, se re-evalúan en switch_edit.
-        -- NOTE: already paused on launch.
+        -- NOTE: already paused on launch. Loading toast stays up through
+        -- font extraction; start_edit/enter_selector hide it.
         loading_bump("Cargando fuentes…")
         ensure_edit_fonts(cands[1])
         -- En modo pantalla se entra directo al primer candidato y se salta
