@@ -1,7 +1,7 @@
 -- update-checker.lua
 -- Startup update check against GitHub releases/latest.
 -- Async fetch + short curl timeouts so a slow network can't freeze the OSD.
--- Manual: script-message-to update-checker check-for-update
+-- Manual: script-message-to update_checker check-for-update
 
 local mp = require 'mp'
 local utils = require 'mp.utils'
@@ -138,7 +138,6 @@ local function fetch_latest_async(cb)
         capture_stdout = true,
         capture_stderr = true,
         playback_only = false, -- Allow run at startup, no playback needed.
-        cancellable = false,
         stdin_data = "", -- Fix invalid handle on Windows GUI builds.
     }
     local ok, async_err = pcall(mp.command_native_async, cmd, function(success, res, native_err)
