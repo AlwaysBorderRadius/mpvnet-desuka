@@ -1,16 +1,13 @@
 -- update-checker.lua
--- >>> CUSTOM AlwaysBorderRadius >>>
 -- Startup update check against GitHub releases/latest.
 -- Async fetch + short curl timeouts so a slow network can't freeze the OSD.
 -- Manual: script-message-to update-checker check-for-update
--- <<< CUSTOM AlwaysBorderRadius >>>
 
 local mp = require 'mp'
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
 local options = require 'mp.options'
 
--- >>> CUSTOM AlwaysBorderRadius >>>
 local o = {
     check_on_startup = true,
     repo = "AlwaysBorderRadius/mpvnet-desuka",
@@ -22,25 +19,25 @@ local o = {
 }
 options.read_options(o, "update-checker")
 
--- Clamp user opts to safe defaults. -- EDIT AlwaysBorderRadius
+-- Clamp user opts to safe defaults.
 local function validate_user_opts()
-    if type(o.check_on_startup) ~= "boolean" then -- EDIT AlwaysBorderRadius
+    if type(o.check_on_startup) ~= "boolean" then
         msg.warn("update-checker: bad check_on_startup, using true")
         o.check_on_startup = true
     end
-    if type(o.notify_up_to_date) ~= "boolean" then -- EDIT AlwaysBorderRadius
+    if type(o.notify_up_to_date) ~= "boolean" then
         msg.warn("update-checker: bad notify_up_to_date, using false")
         o.notify_up_to_date = false
     end
-    if type(o.repo) ~= "string" or o.repo == "" then -- EDIT AlwaysBorderRadius
+    if type(o.repo) ~= "string" or o.repo == "" then
         msg.warn("update-checker: bad repo, using default")
         o.repo = "AlwaysBorderRadius/mpvnet-desuka"
     end
-    if type(o.current_version) ~= "string" or o.current_version == "" then -- EDIT AlwaysBorderRadius
+    if type(o.current_version) ~= "string" or o.current_version == "" then
         msg.warn("update-checker: bad current_version, using 1.2")
         o.current_version = "1.2"
     end
-    local delay = tonumber(o.startup_delay) -- EDIT AlwaysBorderRadius
+    local delay = tonumber(o.startup_delay)
     if delay == nil then
         msg.warn("update-checker: bad startup_delay, using 5")
         delay = 5
@@ -50,7 +47,7 @@ local function validate_user_opts()
         msg.warn("update-checker: bad startup_delay, using 5")
         o.startup_delay = 5
     end
-    local max_time = tonumber(o.curl_max_time) -- EDIT AlwaysBorderRadius
+    local max_time = tonumber(o.curl_max_time)
     if max_time == nil then
         msg.warn("update-checker: bad curl_max_time, using 10")
         max_time = 10
@@ -60,7 +57,7 @@ local function validate_user_opts()
         msg.warn("update-checker: bad curl_max_time, using 10")
         o.curl_max_time = 10
     end
-    local conn_time = tonumber(o.curl_connect_timeout) -- EDIT AlwaysBorderRadius
+    local conn_time = tonumber(o.curl_connect_timeout)
     if conn_time == nil then
         msg.warn("update-checker: bad curl_connect_timeout, using 5")
         conn_time = 5
@@ -70,7 +67,7 @@ local function validate_user_opts()
         msg.warn("update-checker: bad curl_connect_timeout, using 5")
         o.curl_connect_timeout = 5
     end
-    if o.curl_connect_timeout > o.curl_max_time then -- EDIT AlwaysBorderRadius
+    if o.curl_connect_timeout > o.curl_max_time then
         msg.warn("update-checker: connect timeout above max time, clamping")
         o.curl_connect_timeout = o.curl_max_time
     end
@@ -140,7 +137,7 @@ local function fetch_latest_async(cb)
         args = args,
         capture_stdout = true,
         capture_stderr = true,
-        playback_only = false, -- Allow run at startup, no playback needed. -- EDIT AlwaysBorderRadius
+        playback_only = false, -- Allow run at startup, no playback needed.
         cancellable = false,
         stdin_data = "", -- Fix invalid handle on Windows GUI builds.
     }
@@ -208,7 +205,7 @@ local function check_for_update(manual)
         msg.verbose("update-checker: latest=" .. latest .. " current=" .. o.current_version)
         local cmp = compare_versions(latest, o.current_version)
         if cmp > 0 then
-            -- Important toast, preempts any toast (no queue). -- EDIT AlwaysBorderRadius
+            -- Important toast, preempts any toast (no queue).
             mp.commandv("script-message-to", "modernx", "modernx-toast",
                 "warn", "update-checker",
                 "Nueva actualización disponible: " .. latest .. " (actual: " .. o.current_version .. ")",
@@ -233,8 +230,6 @@ local function check_for_update(manual)
         end
     end)
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
-
 mp.register_script_message("check-for-update", function() check_for_update(true) end)
 
 if o.check_on_startup then
