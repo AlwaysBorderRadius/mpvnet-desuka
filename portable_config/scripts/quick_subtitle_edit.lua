@@ -456,8 +456,6 @@ end
 
 -- Forward: defined below, used by resolve_track_file (dedup).
 local find_track_ids_by_file
--- Forward: loading bumps run during blocking ffmpeg/ffprobe calls above.
-local loading_bump
 -- Forward: newline flavor, used by refresh_screen_mask below.
 local ass_newline
 
@@ -521,7 +519,6 @@ local function resolve_track_file(sub)
             return nil, "No se pudo mapear la pista embebida"
         end
         msg.info("[extracción] ffmpeg extrae pista 0:s:" .. tostring(sidx) .. " → " .. out)
-        loading_bump("Extrayendo pista…")
         local res = utils.subprocess({
             args = {"ffmpeg", "-nostdin", "-y", "-i", video_path,
                     "-map", "0:s:" .. sidx, out},
@@ -674,11 +671,8 @@ local function ui_msg(text, dur, kind)
         kind or "info", "subedit", tostring(text or ""), ms and tostring(ms) or "")
 end
 
--- Loading indicator through the modernx toast (persistent slot, same source):
--- a single message, replaced only before real waits (ffmpeg blocks the loop,
--- so no animation is possible during them; extra bumps would just flicker).
-local loading_frames = {"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
-local loading_i = 0
+-- Loading indicator: a single static message on the modernx toast
+-- (persistent slot, same source) until the menu/editor shows up.
 local loading_active = false
 
 local function loading_toast(text)
@@ -690,16 +684,9 @@ local function loading_toast(text)
     end
 end
 
-loading_bump = function(label)
-    if not loading_active then return end
-    loading_i = loading_i % #loading_frames + 1
-    loading_toast(loading_frames[loading_i] .. " " .. (label or "Buscando subtítulos"))
-end
-
 local function show_loading()
-    loading_i = 0
     loading_active = true
-    loading_bump("Buscando subtítulos")
+    loading_toast("Iniciando edición de subtítulos…")
 end
 
 local function stop_loading()
@@ -1318,7 +1305,6 @@ local function ensure_edit_fonts(cand)
     args[#args + 1] = "-i"
     args[#args + 1] = video_path
     msg.info("[fuentes] ffmpeg extrae " .. tostring(n) .. " fuentes a " .. dir)
-    loading_bump("Copiando fuentes…")
     utils.subprocess({
         args = args,
         playback_only = false,
@@ -2599,7 +2585,7 @@ local function edit_subtitle(mode)
     loading = true
     show_loading()
 
-    -- Se aplaza la búsqueda para que el spinner llegue a pintarse
+    -- Se aplaza la búsqueda para que el mensaje llegue a pintarse
     -- (collect_candidates puede bloquear extrayendo pistas con ffmpeg).
     -- La carpeta de sesión se crea AQUÍ, antes de esa extracción: al ser el
     -- primer subprocess del tick se evita el fallo transitorio de parseo de mpv
@@ -2662,8 +2648,14 @@ local function edit_subtitle(mode)
         -- el renderer en setup_screen). Por línea, se re-evalúan en switch_edit.
         -- NOTE: already paused on launch. Loading toast stays up through
         -- font extraction; start_edit/enter_selector hide it.
-        loading_bump("Cargando fuentes…")
-        ensure_edit_fonts(cands[1])
+        local fonts_ok, fonts_err = pcall(ensure_edit_fonts, cands[1])
+        if not fonts_ok then
+            msg.warn("[fuentes] ERROR: " .. tostring(fonts_err))
+            stop_loading()
+            cleanup_disposable()
+            ui_msg("Error al preparar las fuentes", 3, "error")
+            return
+        end
         -- En modo pantalla se entra directo al primer candidato y se salta
         -- entre eventos con Ctrl+↑/↓; el menú selector queda para el modo OSD.
         candidates = cands
