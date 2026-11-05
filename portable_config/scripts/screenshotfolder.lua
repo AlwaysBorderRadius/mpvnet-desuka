@@ -28,7 +28,7 @@ local options = {
     png_compression = 7,  -- 0 (fast, big) to 9 (slow, small)
     jpeg_quality = 95,  -- 0 (worst) to 100 (best)
     sequential_numbering = true,  -- true: keep counting up; false: mpv %n (fills gaps)
-    naming_mode = "series",  -- "series" or "season"
+    naming_mode = "series",  -- "series" or "season" (separates screenshots by serie or by serie>season)
 }
 (require "mp.options").read_options(options)
 

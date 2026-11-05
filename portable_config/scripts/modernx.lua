@@ -297,6 +297,19 @@ local user_opts = {
     toast_warn_color = "#FFC107",      -- warning accent
     toast_error_color = "#E81123",     -- error accent
     toast_persistent_color = "#9D96F5",-- persistent accent (chapter current)
+    toast_bg_color = "#000000",      -- toast background
+    toast_bg_opacity = 1.0,          -- background opacity 0-1 (1 = opaque)
+    toast_bg_border_size = 0,        -- background border thickness (0 = none)
+    toast_bg_border_color = "#000000",
+    toast_text_color = "#FFFFFF",
+    toast_text_border_size = 1,      -- text outline (0 = none)
+    toast_text_border_color = "#000000",
+    toast_pad_x = 22,                -- horizontal padding
+    toast_pad_y = 12,                -- vertical padding
+    toast_text_dy = 0,               -- vertical text nudge (optical centering)
+    toast_bar_width = 4,             -- accent bar thickness
+    toast_bar_color = "",            -- override ("" = per-kind accent)
+    toast_bar_position = "auto",     -- "auto"|"left"|"top"|"bottom"
     -- <<< CUSTOM desuka >>>
 }
 -- read options from config and command-line
@@ -3244,7 +3257,11 @@ local function render_toast(ass)
             asset, flag_w, flag_h = nil, 0, 0
         end
     end
-    local pad_x, pad_y = 22, 12
+    local pad_x = tonumber(user_opts.toast_pad_x)
+    if pad_x == nil or pad_x < 0 then pad_x = 22 end
+    local pad_y = tonumber(user_opts.toast_pad_y)
+    if pad_y == nil or pad_y < 0 then pad_y = 12 end
+    local text_dy = tonumber(user_opts.toast_text_dy) or 0
     local content_max = cap - pad_x * 2 - 10
     local pill_w, pill_h, head_w, tail_w
     local lines = nil
@@ -3299,26 +3316,42 @@ local function render_toast(ass)
     local x1, y1 = cx + pill_w / 2, cy + pill_h / 2
     if not asset then x1 = x1 - 10 end -- balance the text shift (plain only)
     local r = math.min(12, pill_h / 2)
-    -- background pill, opaque
+    -- background pill, opacity + border from opts
+    local bg_op = tonumber(user_opts.toast_bg_opacity)
+    if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
+    local bg_aa = string.format("%02X", math.floor((1 - bg_op) * 255 + 0.5))
+    local bg_bb = tonumber(user_opts.toast_bg_border_size) or 0
+    if bg_bb < 0 then bg_bb = 0 end
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord0\\1c&H000000&\\alpha&H00&}")
+    ass:append("{\\blur0\\bord" .. bg_bb .. "\\1c&H"
+        .. osc_color_convert(sanitize_hex_color(user_opts.toast_bg_color, "#000000"))
+        .. "&\\alpha&H" .. bg_aa .. "&\\3c&H"
+        .. osc_color_convert(sanitize_hex_color(user_opts.toast_bg_border_color, "#000000"))
+        .. "&\\3a&H" .. bg_aa .. "&}")
     ass:draw_start()
     ass:round_rect_cw(x0, y0, x1, y1, r)
     ass:draw_stop()
-    local text_style = "{\\blur0\\bord1\\1c&HFFFFFF&\\3c&H000000&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}"
+    local t_bb = tonumber(user_opts.toast_text_border_size)
+    if t_bb == nil or t_bb < 0 then t_bb = 1 end
+    local text_style = "{\\blur0\\bord" .. t_bb .. "\\1c&H"
+        .. osc_color_convert(sanitize_hex_color(user_opts.toast_text_color, "#FFFFFF"))
+        .. "&\\3c&H"
+        .. osc_color_convert(sanitize_hex_color(user_opts.toast_text_border_color, "#000000"))
+        .. "&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}"
     if asset then
         local total = head_w + gap + flag_w
         if state.toast_tail then total = total + gap + tail_w end
         local sx = cx - total / 2
+        local ty = cy + text_dy
         -- head
         ass:new_event()
-        ass:pos(sx + head_w / 2, cy)
+        ass:pos(sx + head_w / 2, ty)
         ass:an(5)
         ass:append(text_style .. (state.toast_head or ""))
         -- flag (an=7 top-left, vertically centered)
-        local flag_ass = render_flag_geometry(asset, sx + head_w + gap, cy - flag_h / 2)
+        local flag_ass = render_flag_geometry(asset, sx + head_w + gap, ty - flag_h / 2)
         if flag_ass then
             ass:new_event()
             ass:merge(flag_ass)
@@ -3326,28 +3359,42 @@ local function render_toast(ass)
         -- tail
         if state.toast_tail then
             ass:new_event()
-            ass:pos(sx + head_w + gap + flag_w + gap + tail_w / 2, cy)
+            ass:pos(sx + head_w + gap + flag_w + gap + tail_w / 2, ty)
             ass:an(5)
             ass:append(text_style .. state.toast_tail)
         end
         return
     end
-    -- accent bar (vertical, short, near the pill edge)
-    local accent = toast_accent(state.toast_kind)
-    local bar_w = 4
-    local bar_h = pill_h - pad_y * 2
-    local bar_x = x0 + 10
+    -- accent bar: auto = left on corners, top when centered
+    local bar_pos = user_opts.toast_bar_position
+    if bar_pos ~= "left" and bar_pos ~= "top" and bar_pos ~= "bottom" then
+        bar_pos = (pos == "top-center") and "top" or "left"
+    end
+    local bar_w = tonumber(user_opts.toast_bar_width) or 4
+    if bar_w <= 0 then bar_w = 4 end
+    local bar_col = sanitize_hex_color(user_opts.toast_bar_color or "", "")
+    if bar_col == "" then bar_col = toast_accent(state.toast_kind) end
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(accent) .. "&}")
+    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&}")
     ass:draw_start()
-    ass:round_rect_cw(bar_x, cy - bar_h / 2, bar_x + bar_w, cy + bar_h / 2, 2)
+    -- plain pills are shortened by 10px (x1-10): center on the visual middle
+    local vcx = cx - 5
+    if bar_pos == "top" or bar_pos == "bottom" then
+        local bw = pill_w - pad_x * 2 - 10
+        local by = (bar_pos == "top") and (y0 + pad_y / 2) or (y1 - pad_y / 2)
+        ass:round_rect_cw(vcx - bw / 2, by - bar_w / 2, vcx + bw / 2, by + bar_w / 2, 2)
+    else
+        local bar_h = pill_h - pad_y * 2
+        local bar_x = x0 + pad_x / 2
+        ass:round_rect_cw(bar_x, cy - bar_h / 2, bar_x + bar_w, cy + bar_h / 2, 2)
+    end
     ass:draw_stop()
     -- text (centered, multiline via \N)
     local body = table.concat(lines, "\\N")
     ass:new_event()
-    ass:pos(cx - 2, cy)
+    ass:pos(cx - 2, cy + text_dy)
     ass:an(5)
     ass:append(text_style .. body)
 end
@@ -4691,6 +4738,73 @@ function validate_user_opts()
             if s:sub(1, 1) ~= "#" then s = "#" .. s end
             user_opts[opt] = s:upper()
         end
+    end
+    local _cc = { toast_bg_color = "#000000", toast_bg_border_color = "#000000",
+        toast_text_color = "#FFFFFF", toast_text_border_color = "#000000" }
+    for opt, fb in pairs(_cc) do
+        local s = tostring(user_opts[opt] or "")
+        s = s:gsub("^%s+", ""):gsub("%s+$", "")
+        while #s >= 2 and ((s:sub(1, 1) == '"' and s:sub(-1) == '"')
+            or (s:sub(1, 1) == "'" and s:sub(-1) == "'")) do
+            s = s:sub(2, -2):gsub("^%s+", ""):gsub("%s+$", "")
+        end
+        if not s:match("^#?%x%x%x%x%x%x$") then
+            mp.msg.warn(opt .. " must be #RRGGBB. Using " .. fb .. ".")
+            user_opts[opt] = fb
+        else
+            if s:sub(1, 1) ~= "#" then s = "#" .. s end
+            user_opts[opt] = s:upper()
+        end
+    end
+    do
+        local s = tostring(user_opts.toast_bar_color or "")
+        s = s:gsub("^%s+", ""):gsub("%s+$", "")
+        while #s >= 2 and ((s:sub(1, 1) == '"' and s:sub(-1) == '"')
+            or (s:sub(1, 1) == "'" and s:sub(-1) == "'")) do
+            s = s:sub(2, -2):gsub("^%s+", ""):gsub("%s+$", "")
+        end
+        if s ~= "" and not s:match("^#?%x%x%x%x%x%x$") then
+            mp.msg.warn("toast_bar_color must be empty or #RRGGBB. Using per-kind accent.")
+            s = ""
+        end
+        if s ~= "" and s:sub(1, 1) ~= "#" then s = "#" .. s end
+        user_opts.toast_bar_color = s:upper()
+    end
+    if type(user_opts.toast_bg_opacity) ~= "number"
+        or user_opts.toast_bg_opacity < 0 or user_opts.toast_bg_opacity > 1 then
+        mp.msg.warn("toast_bg_opacity must be 0-1. Using 1.")
+        user_opts.toast_bg_opacity = 1.0
+    end
+    if type(user_opts.toast_bg_border_size) ~= "number"
+        or user_opts.toast_bg_border_size < 0 then
+        mp.msg.warn("toast_bg_border_size must be a non-negative number. Using 0.")
+        user_opts.toast_bg_border_size = 0
+    end
+    if type(user_opts.toast_text_border_size) ~= "number"
+        or user_opts.toast_text_border_size < 0 then
+        mp.msg.warn("toast_text_border_size must be a non-negative number. Using 1.")
+        user_opts.toast_text_border_size = 1
+    end
+    if type(user_opts.toast_pad_x) ~= "number" or user_opts.toast_pad_x < 0 then
+        mp.msg.warn("toast_pad_x must be a non-negative number. Using 22.")
+        user_opts.toast_pad_x = 22
+    end
+    if type(user_opts.toast_pad_y) ~= "number" or user_opts.toast_pad_y < 0 then
+        mp.msg.warn("toast_pad_y must be a non-negative number. Using 12.")
+        user_opts.toast_pad_y = 12
+    end
+    if type(user_opts.toast_text_dy) ~= "number" then
+        mp.msg.warn("toast_text_dy must be a number. Using 0.")
+        user_opts.toast_text_dy = 0
+    end
+    if type(user_opts.toast_bar_width) ~= "number" or user_opts.toast_bar_width <= 0 then
+        mp.msg.warn("toast_bar_width must be a positive number. Using 4.")
+        user_opts.toast_bar_width = 4
+    end
+    if user_opts.toast_bar_position ~= "left" and user_opts.toast_bar_position ~= "top"
+        and user_opts.toast_bar_position ~= "bottom" and user_opts.toast_bar_position ~= "auto" then
+        mp.msg.warn("toast_bar_position must be auto, left, top or bottom. Using auto.")
+        user_opts.toast_bar_position = "auto"
     end
     -- <<< CUSTOM desuka >>>
 end
