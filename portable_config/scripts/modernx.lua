@@ -313,6 +313,7 @@ local user_opts = {
     toast_bar_length = 1.0,          -- bar length ratio 0-1 (1 = full content)
     toast_bar_gap = -1,              -- bar-to-edge gap px (-1 = auto; top/bottom bars only)
     toast_pad_bottom = 0,            -- extra space below the text
+    toast_bg_border_kind_colors = false, -- bar + bg border follow kind accent
     -- <<< CUSTOM desuka >>>
 }
 -- read options from config and command-line
@@ -3352,20 +3353,37 @@ local function render_toast(ass)
     local y1 = cy_box + pill_h / 2
     if not asset then x1 = x1 - 10 end -- balance the text shift (plain only)
     local r = math.min(12, pill_h / 2)
-    -- background pill, opacity + border from opts
+    -- background pill, opacity + border from opts.
+    -- NOTE: the border is a layered flat rect, not \bord on the drawing:
+    -- libass does not reliably paint \3c on \p shapes (size grew, color did
+    -- not), while plain fills always render with exact colors.
     local bg_op = tonumber(user_opts.toast_bg_opacity)
     if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
     local bg_aa = string.format("%02X", math.floor((1 - bg_op) * 255 + 0.5))
     local bg_bb = tonumber(user_opts.toast_bg_border_size) or 0
     if bg_bb < 0 then bg_bb = 0 end
+    local kind_col = toast_accent(state.toast_kind)
+    local bb_col = kind_col
+    if not user_opts.toast_bg_border_kind_colors then
+        bb_col = sanitize_hex_color(user_opts.toast_bg_border_color, "#000000")
+    end
+    if bg_bb > 0 then
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bb_col)
+            .. "&\\alpha&H" .. bg_aa .. "&}")
+        ass:draw_start()
+        ass:round_rect_cw(x0 - bg_bb / 2, y0 - bg_bb / 2,
+            x1 + bg_bb / 2, y1 + bg_bb / 2, r + bg_bb / 2)
+        ass:draw_stop()
+    end
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord" .. bg_bb .. "\\1c&H"
+    ass:append("{\\blur0\\bord0\\1c&H"
         .. osc_color_convert(sanitize_hex_color(user_opts.toast_bg_color, "#000000"))
-        .. "&\\alpha&H" .. bg_aa .. "&\\3c&H"
-        .. osc_color_convert(sanitize_hex_color(user_opts.toast_bg_border_color, "#000000"))
-        .. "&\\3a&H" .. bg_aa .. "&}")
+        .. "&\\alpha&H" .. bg_aa .. "&}")
     ass:draw_start()
     ass:round_rect_cw(x0, y0, x1, y1, r)
     ass:draw_stop()
@@ -3409,8 +3427,13 @@ local function render_toast(ass)
     end
     local bar_w = tonumber(user_opts.toast_bar_width) or 4
     if bar_w <= 0 then bar_w = 4 end
-    local bar_col = sanitize_hex_color(user_opts.toast_bar_color or "", "")
-    if bar_col == "" then bar_col = toast_accent(state.toast_kind) end
+    local bar_col
+    if user_opts.toast_bg_border_kind_colors then
+        bar_col = kind_col
+    else
+        bar_col = sanitize_hex_color(user_opts.toast_bar_color or "", "")
+        if bar_col == "" then bar_col = kind_col end
+    end
     local bar_gap = tonumber(user_opts.toast_bar_gap)
     -- only -1 (or invalid) means auto; other negatives push past the edge
     if bar_gap == nil or bar_gap == -1 then
@@ -4866,6 +4889,10 @@ function validate_user_opts()
     if type(user_opts.toast_pad_bottom) ~= "number" or user_opts.toast_pad_bottom < 0 then
         mp.msg.warn("toast_pad_bottom must be a non-negative number. Using 0.")
         user_opts.toast_pad_bottom = 0
+    end
+    if type(user_opts.toast_bg_border_kind_colors) ~= "boolean" then
+        mp.msg.warn("toast_bg_border_kind_colors must be boolean. Using false.")
+        user_opts.toast_bg_border_kind_colors = false
     end
     -- <<< CUSTOM desuka >>>
 end
