@@ -310,6 +310,9 @@ local user_opts = {
     toast_bar_width = 4,             -- accent bar thickness
     toast_bar_color = "",            -- override ("" = per-kind accent)
     toast_bar_position = "auto",     -- "auto"|"left"|"top"|"bottom"
+    toast_bar_length = 1.0,          -- bar length ratio 0-1 (1 = full content)
+    toast_bar_gap = -1,              -- bar-to-text gap px (-1 = auto)
+    toast_pad_bottom = 0,            -- extra space below the text
     -- <<< CUSTOM desuka >>>
 }
 -- read options from config and command-line
@@ -3262,8 +3265,13 @@ local function render_toast(ass)
     local pad_y = tonumber(user_opts.toast_pad_y)
     if pad_y == nil or pad_y < 0 then pad_y = 12 end
     local text_dy = tonumber(user_opts.toast_text_dy) or 0
+    local pad_b = tonumber(user_opts.toast_pad_bottom)
+    if pad_b == nil or pad_b < 0 then pad_b = 0 end
+    local bar_len = tonumber(user_opts.toast_bar_length)
+    if bar_len == nil or bar_len < 0 or bar_len > 1 then bar_len = 1 end
     local content_max = cap - pad_x * 2 - 10
     local pill_w, pill_h, head_w, tail_w
+    local content_w, content_h = 0, 0
     local lines = nil
     if asset then
         head_w = toast_measure(state.toast_head, fontsize)
@@ -3283,7 +3291,7 @@ local function render_toast(ass)
         local total = head_w + gap + flag_w
         if state.toast_tail then total = total + gap + tail_w end
         pill_w = math.min(total + pad_x * 2 + 10, cap)
-        pill_h = math.max(fontsize * 1.35, flag_h) + pad_y * 2
+        pill_h = math.max(fontsize * 1.35, flag_h) + pad_y * 2 + pad_b
     else
         lines = {}
         for line in (state.toast_text .. "\\N"):gmatch("(.-)\\N") do lines[#lines + 1] = line end
@@ -3297,7 +3305,8 @@ local function render_toast(ass)
             if w > maxw then maxw = w end
         end
         pill_w = maxw + pad_x * 2 + 10
-        pill_h = #lines * fontsize * 1.35 + pad_y * 2
+        pill_h = #lines * fontsize * 1.35 + pad_y * 2 + pad_b
+        content_w, content_h = maxw, #lines * fontsize * 1.35
     end
     -- fixed position: top-left | top-center | top-right, never moves with the OSC
     local pos = user_opts.toast_position or "top-center"
@@ -3311,9 +3320,19 @@ local function render_toast(ass)
     end
     -- keep the pill on screen (narrow/portrait video, wide pill)
     cx = math.min(math.max(cx, pill_w / 2), math.max(pill_w / 2, osc_param.playresx - pill_w / 2))
-    if cy - pill_h / 2 < 0 then cy = pill_h / 2 end
-    local x0, y0 = cx - pill_w / 2, cy - pill_h / 2
-    local x1, y1 = cx + pill_w / 2, cy + pill_h / 2
+    -- extra bottom padding grows downward: top edge stays anchored
+    local cy_box = cy + pad_b / 2
+    -- text (and bar) vertical center, optical nudge included
+    local tcy = cy + text_dy
+    local x0 = cx - pill_w / 2
+    local x1 = cx + pill_w / 2
+    local y0 = cy_box - pill_h / 2
+    if y0 < 0 then
+        cy_box = cy_box - y0
+        tcy = tcy - y0
+        y0 = 0
+    end
+    local y1 = cy_box + pill_h / 2
     if not asset then x1 = x1 - 10 end -- balance the text shift (plain only)
     local r = math.min(12, pill_h / 2)
     -- background pill, opacity + border from opts
@@ -3344,14 +3363,13 @@ local function render_toast(ass)
         local total = head_w + gap + flag_w
         if state.toast_tail then total = total + gap + tail_w end
         local sx = cx - total / 2
-        local ty = cy + text_dy
         -- head
         ass:new_event()
-        ass:pos(sx + head_w / 2, ty)
+        ass:pos(sx + head_w / 2, tcy)
         ass:an(5)
         ass:append(text_style .. (state.toast_head or ""))
         -- flag (an=7 top-left, vertically centered)
-        local flag_ass = render_flag_geometry(asset, sx + head_w + gap, ty - flag_h / 2)
+        local flag_ass = render_flag_geometry(asset, sx + head_w + gap, tcy - flag_h / 2)
         if flag_ass then
             ass:new_event()
             ass:merge(flag_ass)
@@ -3359,7 +3377,7 @@ local function render_toast(ass)
         -- tail
         if state.toast_tail then
             ass:new_event()
-            ass:pos(sx + head_w + gap + flag_w + gap + tail_w / 2, ty)
+            ass:pos(sx + head_w + gap + flag_w + gap + tail_w / 2, tcy)
             ass:an(5)
             ass:append(text_style .. state.toast_tail)
         end
@@ -3374,27 +3392,39 @@ local function render_toast(ass)
     if bar_w <= 0 then bar_w = 4 end
     local bar_col = sanitize_hex_color(user_opts.toast_bar_color or "", "")
     if bar_col == "" then bar_col = toast_accent(state.toast_kind) end
+    local bar_gap = tonumber(user_opts.toast_bar_gap)
+    if bar_gap == nil or bar_gap < 0 then
+        bar_gap = math.max(0, pad_y / 2 - bar_w / 2)
+    end
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
     ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&}")
     ass:draw_start()
-    -- plain pills are shortened by 10px (x1-10): center on the visual middle
+    -- plain pills are shortened by 10px (x1-10): center on the visual middle.
+    -- bars anchor to the text block, not the pill, with bar_gap clearance.
     local vcx = cx - 5
+    local ttop, tbot = tcy - content_h / 2, tcy + content_h / 2
     if bar_pos == "top" or bar_pos == "bottom" then
-        local bw = pill_w - pad_x * 2 - 10
-        local by = (bar_pos == "top") and (y0 + pad_y / 2) or (y1 - pad_y / 2)
-        ass:round_rect_cw(vcx - bw / 2, by - bar_w / 2, vcx + bw / 2, by + bar_w / 2, 2)
+        local bw = content_w * bar_len
+        local bx0, bx1 = vcx - bw / 2, vcx + bw / 2
+        local by0, by1
+        if bar_pos == "top" then
+            by1, by0 = ttop - bar_gap, ttop - bar_gap - bar_w
+        else
+            by0, by1 = tbot + bar_gap, tbot + bar_gap + bar_w
+        end
+        ass:round_rect_cw(bx0, by0, bx1, by1, 2)
     else
-        local bar_h = pill_h - pad_y * 2
+        local bar_h = content_h * bar_len
         local bar_x = x0 + pad_x / 2
-        ass:round_rect_cw(bar_x, cy - bar_h / 2, bar_x + bar_w, cy + bar_h / 2, 2)
+        ass:round_rect_cw(bar_x, tcy - bar_h / 2, bar_x + bar_w, tcy + bar_h / 2, 2)
     end
     ass:draw_stop()
     -- text (centered, multiline via \N)
     local body = table.concat(lines, "\\N")
     ass:new_event()
-    ass:pos(cx - 2, cy + text_dy)
+    ass:pos(cx - 2, tcy)
     ass:an(5)
     ass:append(text_style .. body)
 end
@@ -4805,6 +4835,19 @@ function validate_user_opts()
         and user_opts.toast_bar_position ~= "bottom" and user_opts.toast_bar_position ~= "auto" then
         mp.msg.warn("toast_bar_position must be auto, left, top or bottom. Using auto.")
         user_opts.toast_bar_position = "auto"
+    end
+    if type(user_opts.toast_bar_length) ~= "number"
+        or user_opts.toast_bar_length < 0 or user_opts.toast_bar_length > 1 then
+        mp.msg.warn("toast_bar_length must be 0-1. Using 1.")
+        user_opts.toast_bar_length = 1.0
+    end
+    if type(user_opts.toast_bar_gap) ~= "number" then
+        mp.msg.warn("toast_bar_gap must be a number (-1 = auto). Using -1.")
+        user_opts.toast_bar_gap = -1
+    end
+    if type(user_opts.toast_pad_bottom) ~= "number" or user_opts.toast_pad_bottom < 0 then
+        mp.msg.warn("toast_pad_bottom must be a non-negative number. Using 0.")
+        user_opts.toast_pad_bottom = 0
     end
     -- <<< CUSTOM desuka >>>
 end
