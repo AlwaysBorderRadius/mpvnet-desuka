@@ -311,7 +311,7 @@ local user_opts = {
     toast_bar_color = "",            -- override ("" = per-kind accent)
     toast_bar_position = "auto",     -- "auto"|"left"|"top"|"bottom"
     toast_bar_length = 1.0,          -- bar length ratio 0-1 (1 = full content)
-    toast_bar_gap = -1,              -- bar-to-text gap px (-1 = auto; top/bottom bars only)
+    toast_bar_gap = -1,              -- bar-to-edge gap px (-1 = auto; top/bottom bars only)
     toast_pad_bottom = 0,            -- extra space below the text
     -- <<< CUSTOM desuka >>>
 }
@@ -3400,7 +3400,9 @@ local function render_toast(ass)
         end
         return
     end
-    -- accent bar: auto = left on corners, top when centered
+    -- accent bar: auto = left on corners, top when centered.
+    -- The bar belongs to the pill (box-anchored); the text moves freely
+    -- with text_dy. That decouples both: nudge the text, bar stays put.
     local bar_pos = user_opts.toast_bar_position
     if bar_pos ~= "left" and bar_pos ~= "top" and bar_pos ~= "bottom" then
         bar_pos = (pos == "top-center") and "top" or "left"
@@ -3410,7 +3412,7 @@ local function render_toast(ass)
     local bar_col = sanitize_hex_color(user_opts.toast_bar_color or "", "")
     if bar_col == "" then bar_col = toast_accent(state.toast_kind) end
     local bar_gap = tonumber(user_opts.toast_bar_gap)
-    -- only -1 (or invalid) means auto; other negatives overlap the text
+    -- only -1 (or invalid) means auto; other negatives push past the edge
     if bar_gap == nil or bar_gap == -1 then
         bar_gap = math.max(0, pad_y / 2 - bar_w / 2)
     end
@@ -3419,24 +3421,22 @@ local function render_toast(ass)
     ass:an(7)
     ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&}")
     ass:draw_start()
-    -- plain pills are shortened by 10px (x1-10): center on the visual middle.
-    -- bars anchor to the text block, not the pill, with bar_gap clearance.
+    -- plain pills are shortened by 10px (x1-10): center on the visual middle
     local vcx = cx - 5
-    local ttop, tbot = tcy - content_h / 2, tcy + content_h / 2
     if bar_pos == "top" or bar_pos == "bottom" then
         local bw = content_w * bar_len
         local bx0, bx1 = vcx - bw / 2, vcx + bw / 2
         local by0, by1
         if bar_pos == "top" then
-            by1, by0 = ttop - bar_gap, ttop - bar_gap - bar_w
+            by0, by1 = y0 + bar_gap, y0 + bar_gap + bar_w
         else
-            by0, by1 = tbot + bar_gap, tbot + bar_gap + bar_w
+            by0, by1 = y1 - bar_gap - bar_w, y1 - bar_gap
         end
         ass:round_rect_cw(bx0, by0, bx1, by1, 2)
     else
         local bar_h = content_h * bar_len
         local bar_x = x0 + pad_x / 2
-        ass:round_rect_cw(bar_x, tcy - bar_h / 2, bar_x + bar_w, tcy + bar_h / 2, 2)
+        ass:round_rect_cw(bar_x, cy_box - bar_h / 2, bar_x + bar_w, cy_box + bar_h / 2, 2)
     end
     ass:draw_stop()
     -- text (centered, multiline via \N)
