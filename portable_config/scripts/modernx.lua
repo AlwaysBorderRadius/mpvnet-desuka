@@ -168,6 +168,8 @@ local user_opts = {
     track_language_mode = "code",  -- "code" | "name" | "flag"
     track_flag_size = 16,         -- height of the flag vector in playres units (exact, aspect preserved)
     track_flag_gap = 2,           -- space on each side of the flag in the tooltip
+    track_menu_max_rows = 8,      -- max visible rows in the track dropdown (rest scrolls)
+    track_menu_font_size = 18,    -- font size of the track dropdown rows
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     volume_control = true,          -- show mute button and volume slider
@@ -1062,6 +1064,11 @@ local state = {
     message_text = nil,
     message_hide_timer = nil, ---@type mp.Timer?
     message_meta = nil, -- structured track list rows for render_message_block
+
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown menu (click cy_video/cy_audio/cy_sub to pick with the mouse)
+    track_menu = nil, -- { ttype, items, header, width, offset, pressed } or nil
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- >>> CUSTOM desuka: unified toast (single slot, preemptive, no queue) <<<
     toast_text = nil,       -- plain text with \N linebreaks (no ASS)
@@ -2333,6 +2340,9 @@ end
 
 local function newfilereset()
     request_init()
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    close_track_menu() -- new file, stale dropdown
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     state.downloaded_once = false
     state.videoDescription = "Loading description..."
     state.file_size_normalized = "Approximating size..."
@@ -3524,6 +3534,434 @@ mp.register_script_message("cycle-sub-down", function()
     mp.commandv("no-osd", "cycle", "sub", "down")
     show_selected_track_row("sub")
 end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Track dropdown menu: click cy_video/cy_audio/cy_sub to pick with the mouse.
+-- Anchored above the button, scrollable with the wheel, closes on
+-- selection / outside click / right-click / ESC / OSC hide.
+function track_menu_button_name(ttype)
+    if ttype == "video" then return "cy_video" end
+    if ttype == "audio" then return "cy_audio" end
+    return "cy_sub"
+end
+
+local function track_menu_item_width(item, fontsize, gap)
+    if item.head and item.flag_lang then
+        local asset, flag_w = get_flag_geometry(item.flag_lang)
+        if asset then
+            local w = text_width(item.head:gsub("%s+$", ""), fontsize) + gap + flag_w
+            if item.tail and item.tail ~= "" then
+                w = w + gap + text_width(item.tail:gsub("^%s+", ""), fontsize)
+            end
+            return w
+        end
+    end
+    return text_width(item.full or "", fontsize)
+end
+
+-- Button the menu hangs from; nil while hidden (narrow window) or mid-rebuild.
+local function track_menu_anchor(ttype)
+    local want = track_menu_button_name(ttype)
+    for _, el in pairs(elements) do
+        if el.name == want and el.hitbox then return el end
+    end
+    return nil
+end
+
+-- UTF-8 safe ellipsis trunction, mirrors the toast path.
+local function track_menu_fit(s, max_w, fontsize)
+    s = tostring(s or "")
+    if text_width(s, fontsize) <= max_w then return s end
+    local ell = "…"
+    while #s > 0 and text_width(s .. ell, fontsize) > max_w do
+        s = s:gsub("[%z\1-\127\194-\244][\128-\191]*$", "")
+    end
+    return s .. ell
+end
+
+local function track_menu_build(ttype)
+    update_tracklist()
+    local cur = get_track(ttype)
+    local marker_off = (cur == 0) and '● ' or '○ '
+    local items = { { osc_id = 0, selected = (cur == 0), full = marker_off .. texts.off } }
+    local name_map = get_track_name_map()
+    local mode = user_opts.track_language_mode or "code"
+    for n = 1, #tracks_osc[ttype] do
+        local track = tracks_osc[ttype][n]
+        local lang, title = 'unknown', ''
+        if not (track.lang == nil) then lang = track.lang end
+        if not (track.title == nil) then
+            title = track.title
+        elseif track.metadata and track.metadata["name"] then
+            title = track.metadata["name"]
+        end
+        if type(title) ~= "string" then title = "" end
+        title = title:gsub("[\r\n]+", " ")
+        local item = { osc_id = n, mpv_id = track.id, selected = (track.id == tonumber(mp.get_property(ttype))) }
+        local drew_flag = (mode == "flag") and flag_drawn(lang)
+        local lang_label
+        if lang ~= nil and lang ~= 'unknown' and lang ~= '' then
+            if drew_flag then
+                lang_label = format_track_label(lang, "name", name_map)
+            elseif mode == "flag" then
+                lang_label = format_track_label(lang, "code")
+            else
+                lang_label = format_track_label(lang, mode, name_map)
+            end
+        end
+        local label
+        if lang_label ~= nil then
+            label = (title ~= "") and (lang_label .. " — " .. title) or lang_label
+        else
+            label = title
+        end
+        item.full = (item.selected and '● ' or '○ ') .. n .. ': ' .. label
+        if drew_flag then
+            item.head = (item.selected and '● ' or '○ ') .. n .. ':'
+            if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
+                item.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
+                if item.tail == "" then item.tail = nil end
+            end
+            item.flag_lang = lang
+        end
+        items[#items + 1] = item
+    end
+    local header = valid_types[ttype] .. texts.track
+    local fontsize = user_opts.track_menu_font_size or 18
+    local gap = user_opts.track_flag_gap or 2
+    local width = text_width(header, fontsize)
+    for _, item in ipairs(items) do
+        width = math.max(width, track_menu_item_width(item, fontsize, gap))
+    end
+    return header, items, width
+end
+
+function track_menu_refresh()
+    local m = state.track_menu
+    if not m then return end
+    local header, items, width = track_menu_build(m.ttype)
+    m.header, m.items, m.width = header, items, width
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    local max_off = math.max(0, #items - max_rows)
+    if m.offset > max_off then m.offset = max_off end
+    if m.pressed and (m.pressed < 1 or m.pressed > #items) then m.pressed = nil end
+    -- keep the selected row in view after external changes
+    local sel = get_track(m.ttype) + 1
+    if sel < m.offset + 1 or sel > m.offset + max_rows then
+        m.offset = math.min(math.max(0, sel - max_rows), max_off)
+    end
+    request_tick()
+end
+
+function open_track_menu(ttype)
+    if ttype ~= "video" and ttype ~= "audio" and ttype ~= "sub" then return end
+    if not track_menu_anchor(ttype) then
+        show_tracklist(ttype) -- button hidden (narrow window): legacy block list
+        return
+    end
+    local header, items, width = track_menu_build(ttype)
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    local cur = get_track(ttype)
+    local sel_idx = cur + 1
+    local offset = 0
+    if sel_idx > max_rows then offset = math.min(sel_idx - max_rows, math.max(0, #items - max_rows)) end
+    state.track_menu = { ttype = ttype, header = header, items = items, width = width, offset = offset, pressed = nil }
+    reset_timeout()
+    show_osc()
+    mp.add_forced_key_binding("ESC", "modernx-track-menu-close", close_track_menu)
+    request_tick()
+end
+
+function close_track_menu()
+    if state.track_menu == nil then return end
+    state.track_menu = nil
+    mp.remove_key_binding("modernx-track-menu-close")
+    request_tick()
+end
+
+function toggle_track_menu(ttype)
+    if state.track_menu and state.track_menu.ttype == ttype then
+        close_track_menu()
+    else
+        open_track_menu(ttype)
+    end
+end
+
+function track_menu_cycle(ttype, step)
+    close_track_menu()
+    update_tracklist()
+    if ttype == "audio" then mp.set_property("lavfi-complex", "") end
+    if ttype == "sub" then mp.set_property_number("secondary-sid", 0) end
+    set_track(ttype, step)
+    show_selected_track_row(ttype)
+end
+
+function track_menu_select(item)
+    local m = state.track_menu
+    if not m or not item then return end
+    local ttype = m.ttype
+    update_tracklist()
+    if ttype == "audio" then mp.set_property("lavfi-complex", "") end
+    if ttype == "sub" then mp.set_property_number("secondary-sid", 0) end
+    if item.osc_id == 0 then
+        mp.commandv('set', ttype, 'no')
+    elseif item.mpv_id then
+        mp.commandv('set', ttype, item.mpv_id)
+    end
+    close_track_menu()
+    -- confirm like the cycle path does (item text, no stale re-read)
+    if item.flag_lang then
+        show_toast_row({ full = item.full, head = item.head, tail = item.tail, flag_lang = item.flag_lang },
+            "info", "modernx-track")
+    elseif item.osc_id == 0 then
+        show_toast(valid_types[ttype] .. ': ' .. texts.off, "info", "modernx-track")
+    else
+        show_toast(item.full or "", "info", "modernx-track")
+    end
+end
+
+function track_menu_scroll(delta)
+    local m = state.track_menu
+    if not m then return end
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    local max_off = math.max(0, #m.items - max_rows)
+    m.offset = math.max(0, math.min(max_off, m.offset + delta))
+    reset_timeout()
+    request_tick()
+end
+
+function track_menu_geometry()
+    local m = state.track_menu
+    if not m then return nil end
+    local anchor = track_menu_anchor(m.ttype)
+    if not anchor then return nil end
+    local fontsize = user_opts.track_menu_font_size or 18
+    if fontsize <= 0 then fontsize = 18 end
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    if max_rows < 3 then max_rows = 3 end
+    local row_h = fontsize * 1.5
+    local flag_need = (user_opts.track_flag_size or 16) + 8
+    if flag_need > row_h then row_h = flag_need end
+    local pad_x, pad_y = 12, 8
+    local header_h = fontsize * 1.2
+    local total = #m.items
+    local visible = math.min(total, max_rows)
+    local scrollable = total > max_rows
+    local sb_reserve = scrollable and 14 or 0
+    local menu_w = m.width + pad_x * 2 + sb_reserve
+    local max_w = osc_param.playresx - 8
+    if menu_w > max_w then menu_w = max_w end
+    local menu_h = pad_y * 2 + header_h + visible * row_h
+    local cx = (anchor.hitbox.x1 + anchor.hitbox.x2) / 2
+    local x0 = cx - menu_w / 2
+    x0 = math.max(4, math.min(x0, osc_param.playresx - menu_w - 4))
+    local y1 = anchor.hitbox.y1 - 8
+    local y0 = y1 - menu_h
+    if y0 < 4 then y0 = 4 y1 = y0 + menu_h end
+    local rows = {}
+    for i = 1, visible do
+        local idx = m.offset + i
+        if idx > total then break end
+        rows[#rows + 1] = {
+            x0 = x0, y0 = y0 + pad_y + header_h + (i - 1) * row_h,
+            x1 = x0 + menu_w - sb_reserve, y1 = y0 + pad_y + header_h + i * row_h,
+            index = idx,
+        }
+    end
+    return { x0 = x0, y0 = y0, x1 = x0 + menu_w, y1 = y0 + menu_h,
+        row_h = row_h, fontsize = fontsize, header_h = header_h,
+        pad_x = pad_x, pad_y = pad_y, visible = visible,
+        scrollable = scrollable, rows = rows }
+end
+
+function render_track_menu(ass)
+    local m = state.track_menu
+    if not m then return end
+    local g = track_menu_geometry()
+    if not g then return end
+    local mx, my = get_virt_mouse_pos()
+    local gap = user_opts.track_flag_gap or 2
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord1\\1c&H141414&\\3c&H999999&}")
+    ass:draw_start()
+    ass:round_rect_cw(g.x0, g.y0, g.x1, g.y1, 6)
+    ass:draw_stop()
+    ass:new_event()
+    ass:pos(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h / 2)
+    ass:an(4)
+    ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}")
+    ass:append(m.header)
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord0\\1c&H999999&}")
+    ass:draw_start()
+    ass:rect_cw(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h, g.x1 - g.pad_x, g.y0 + g.pad_y + g.header_h + 1)
+    ass:draw_stop()
+    for _, r in ipairs(g.rows) do
+        local item = m.items[r.index]
+        if item then
+            local hovered = mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1
+            local pressed = (m.pressed == r.index) and hovered
+            if item.selected or pressed then
+                ass:new_event()
+                ass:pos(0, 0)
+                ass:an(7)
+                ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")
+                ass:draw_start()
+                ass:rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1)
+                ass:draw_stop()
+            elseif hovered then
+                ass:new_event()
+                ass:pos(0, 0)
+                ass:an(7)
+                ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+                ass:draw_start()
+                ass:rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1)
+                ass:draw_stop()
+            end
+            local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}"
+            local tx = g.x0 + g.pad_x
+            local ty = (r.y0 + r.y1) / 2
+            local avail = r.x1 - tx - 4 -- text must stay inside the rounded box
+            local asset, flag_w, flag_h = nil, 0, 0
+            if item.flag_lang then asset, flag_w, flag_h = get_flag_geometry(item.flag_lang) end
+            if item.head and asset then
+                local head = item.head:gsub("%s+$", "")
+                local head_w = text_width(head, g.fontsize)
+                if head_w + gap + flag_w > avail then
+                    -- no room for the vector flag: fitted plain row instead
+                    ass:new_event()
+                    ass:pos(tx, ty)
+                    ass:an(4)
+                    ass:append(style)
+                    ass:append(track_menu_fit(item.full, avail, g.fontsize))
+                else
+                    ass:new_event()
+                    ass:pos(tx, ty)
+                    ass:an(4)
+                    ass:append(style)
+                    ass:append(head)
+                    local flag_ass = render_flag_geometry(asset, tx + head_w + gap, ty - flag_h / 2)
+                    if flag_ass then
+                        ass:new_event()
+                        ass:merge(flag_ass)
+                    end
+                    if item.tail and item.tail ~= "" then
+                        local tail = track_menu_fit(item.tail:gsub("^%s+", ""),
+                            avail - head_w - gap - flag_w - gap, g.fontsize)
+                        ass:new_event()
+                        ass:pos(tx + head_w + gap + flag_w + gap, ty)
+                        ass:an(4)
+                        ass:append(style)
+                        ass:append(tail)
+                    end
+                end
+            else
+                ass:new_event()
+                ass:pos(tx, ty)
+                ass:an(4)
+                ass:append(style)
+                ass:append(track_menu_fit(item.full, avail, g.fontsize))
+            end
+        end
+    end
+    if g.scrollable then
+        local top = g.y0 + g.pad_y + g.header_h
+        local bottom = g.y1 - g.pad_y
+        local sb_x0 = g.x1 - g.pad_x - 6
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+        ass:draw_start()
+        ass:rect_cw(sb_x0, top, sb_x0 + 6, bottom)
+        ass:draw_stop()
+        local total = #m.items
+        local h = (bottom - top) * (g.visible / total)
+        local y = top + (bottom - top) * (m.offset / total)
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&HFFFFFF&}")
+        ass:draw_start()
+        ass:rect_cw(sb_x0, y, sb_x0 + 6, y + h)
+        ass:draw_stop()
+    end
+end
+
+function track_menu_handle_event(source, what)
+    local m = state.track_menu
+    if not m then return false end
+    if source == "mouse_move" then return false end
+    local mx, my = get_virt_mouse_pos()
+    local g = track_menu_geometry()
+    if not g then close_track_menu() return false end
+    local inside = mx >= g.x0 and mx <= g.x1 and my >= g.y0 and my <= g.y1
+    if source == "wheel_up" or source == "wheel_down" then
+        if inside then
+            track_menu_scroll(source == "wheel_down" and 1 or -1)
+            return true
+        end
+        return false
+    end
+    if source == "mbtn_right" then
+        close_track_menu()
+        return true
+    end
+    if source == "mbtn_left" or source == "shift+mbtn_left" then
+        if what == "down" then
+            for _, r in ipairs(g.rows) do
+                if mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 then
+                    m.pressed = r.index
+                    request_tick()
+                    return true
+                end
+            end
+            return false
+        elseif what == "up" then
+            if m.pressed then
+                local p = m.pressed
+                m.pressed = nil
+                for _, r in ipairs(g.rows) do
+                    if mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 and r.index == p then
+                        track_menu_select(m.items[r.index])
+                        return true
+                    end
+                end
+                request_tick()
+                return true
+            end
+            if inside then
+                -- released over the menu with no press: swallow so the
+                -- click can't leak through to the OSC underneath
+                return true
+            end
+            for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub" }) do
+                for _, el in pairs(elements) do
+                    if el.name == nm and el.hitbox and mouse_hit_coords(el.hitbox.x1, el.hitbox.y1, el.hitbox.x2, el.hitbox.y2) then
+                        return false -- another track button toggles its own menu
+                    end
+                end
+            end
+            -- dismiss click: close and swallow, never pass through
+            close_track_menu()
+            return true
+        end
+    end
+    return false
+end
+
+-- Keyboard / input.conf access to the dropdown (toggles like a left click).
+mp.register_script_message("open-track-menu", function(tt)
+    if tt == "video" or tt == "audio" or tt == "sub" then
+        toggle_track_menu(tt)
+    end
+end)
+mp.register_script_message("close-track-menu", function() close_track_menu() end)
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
 function bind_keys(keys, name, func, opts)
@@ -4782,6 +5220,14 @@ function validate_user_opts()
         mp.msg.warn("track_flag_size must be a positive number. Using 16.")
         user_opts.track_flag_size = 16
     end
+    if type(user_opts.track_menu_max_rows) ~= "number" or user_opts.track_menu_max_rows < 3 then
+        mp.msg.warn("track_menu_max_rows must be >= 3. Using 8.")
+        user_opts.track_menu_max_rows = 8
+    end
+    if type(user_opts.track_menu_font_size) ~= "number" or user_opts.track_menu_font_size <= 0 then
+        mp.msg.warn("track_menu_font_size must be a positive number. Using 18.")
+        user_opts.track_menu_font_size = 18
+    end
 
     -- >>> CUSTOM desuka: toast opts <<<
     if type(user_opts.toast_enabled) ~= "boolean" then
@@ -5207,27 +5653,31 @@ local function osc_init()
     ne.nothingavailable = texts.novideo
     ne.eventresponder['mbtn_left_up'] =
         function()
-            set_track('video', 1)
-            show_tracklist('video')
+            toggle_track_menu('video')
         end
     ne.eventresponder['enter'] =
         function()
-            set_track('video', 1)
-            show_tracklist('video')
+            toggle_track_menu('video')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
-            set_track('video', -1)
-            show_tracklist('video')
+            track_menu_cycle('video', -1)
+        end
+    ne.eventresponder['wheel_up_press'] = -- >>> EDIT AlwaysBorderRadius <<< -- wheel parity with cy_audio/cy_sub
+        function()
+            track_menu_cycle('video', 1)
+        end
+    ne.eventresponder['wheel_down_press'] = -- >>> EDIT AlwaysBorderRadius <<< -- wheel parity with cy_audio/cy_sub
+        function()
+            track_menu_cycle('video', -1)
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function()
-            set_track('video', 1)
-            show_tracklist('video')
+            track_menu_cycle('video', 1)
         end
     ne.eventresponder['shift+mbtn_right_down'] =
         function()
-            show_tracklist('video')
+            toggle_track_menu('video')
         end
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -5257,33 +5707,23 @@ local function osc_init()
     ne.nothingavailable = texts.noaudio
     ne.eventresponder['mbtn_left_up'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', 1)
-            show_tracklist('audio')
+            toggle_track_menu('audio')
         end
     ne.eventresponder['enter'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', 1)
-            show_tracklist('audio')
+            toggle_track_menu('audio')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', -1)
-            show_tracklist('audio')
+            track_menu_cycle('audio', -1)
         end
     ne.eventresponder['wheel_up_press'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', 1)
-            show_tracklist('audio')
+            track_menu_cycle('audio', 1)
         end
     ne.eventresponder['wheel_down_press'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', -1)
-            show_tracklist('audio')
+            track_menu_cycle('audio', -1)
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function() mp.commandv("script-binding", "select/select-aid") end
@@ -5318,33 +5758,23 @@ local function osc_init()
     ne.nothingavailable = texts.nosub
     ne.eventresponder['mbtn_left_up'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
-            show_tracklist("sub")
+            toggle_track_menu('sub')
         end
     ne.eventresponder['enter'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
-            show_tracklist('sub')
+            toggle_track_menu('sub')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', -1)
-            show_tracklist('sub')
+            track_menu_cycle('sub', -1)
         end
     ne.eventresponder['wheel_up_press'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
-            show_tracklist('sub')
+            track_menu_cycle('sub', 1)
         end
     ne.eventresponder['wheel_down_press'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', -1)
-            show_tracklist('sub')
+            track_menu_cycle('sub', -1)
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function()
@@ -5352,8 +5782,7 @@ local function osc_init()
         end
     ne.eventresponder['shift+mbtn_right_down'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
+            track_menu_cycle('sub', 1)
         end
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -5867,6 +6296,10 @@ end
 
 function hide_osc()
     mp.msg.trace('hide_osc')
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown never outlives the OSC.
+    close_track_menu()
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     if not state.enabled then
         -- typically hide happens at render() from tick(), but now tick() is
         -- no-op and won't render again to remove the osc, so do that manually.
@@ -6046,6 +6479,7 @@ local function render()
 
     -- mouse input area
     local mouse_over_osc = false
+    local menu_hovered = false -- track dropdown hover (autohide guard) -- >>> EDIT AlwaysBorderRadius <<<
 
     for _, cords in ipairs(osc_param.areas['input']) do
         if state.osc_visible then -- activate only when OSC is actually visible
@@ -6080,16 +6514,41 @@ local function render()
         end
     end
 
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown: one rect per 'input' slot, so merge the OSC areas
+    -- with the menu box into a single union rect instead of replacing it.
+    if state.track_menu and state.osc_visible then
+        local mg = track_menu_geometry()
+        if mg then
+            local ux0, uy0, ux1, uy1 = mg.x0, mg.y0, mg.x1, mg.y1
+            for _, cords in ipairs(osc_param.areas['input']) do
+                ux0 = math.min(ux0, cords.x1)
+                uy0 = math.min(uy0, cords.y1)
+                ux1 = math.max(ux1, cords.x2)
+                uy1 = math.max(uy1, cords.y2)
+            end
+            set_virt_mouse_area(ux0, uy0, ux1, uy1, 'input')
+            if mouse_hit_coords(mg.x0, mg.y0, mg.x1, mg.y1) then
+                mouse_over_osc = true
+                menu_hovered = true
+            end
+        else
+            close_track_menu()
+        end
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+
     -- autohide
     if not (state.showtime == nil) and (get_hide_timeout() >= 0) then
         local timeout = state.showtime + (get_hide_timeout() / 1000) - now
         if timeout <= 0 then
             if (state.active_element == nil) and (user_opts.bottom_hover) or (not mouse_over_osc) then
-                if (not (state.paused and user_opts.keep_on_pause)) then
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                if (not (state.paused and user_opts.keep_on_pause)) and not menu_hovered then
                     hide_osc()
                 end
-            end
-        else
+                -- <<< CUSTOM AlwaysBorderRadius >>>
+            else
             -- the timer is only used to recheck the state and to possibly run
             -- the code above again
             if not state.hide_timer then
@@ -6099,6 +6558,7 @@ local function render()
             -- re-arm
             state.hide_timer:kill()
             state.hide_timer:resume()
+            end
         end
     end
 
@@ -6113,6 +6573,10 @@ local function render()
     -- actual OSC
     if state.osc_visible then
         render_elements(ass)
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Track dropdown renders on top of the OSC elements.
+        render_track_menu(ass)
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 
     if state.persistent_progresstoggle then
@@ -6310,6 +6774,13 @@ local function element_has_action(element, action)
 end
 
 function process_event(source, what)
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown gets first pick of mouse events while open.
+    if state.track_menu and track_menu_handle_event(source, what) then
+        request_tick()
+        return
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     local action = string.format('%s%s', source,
         what and ('_' .. what) or '')
 
@@ -6460,6 +6931,12 @@ end
 mp.register_event('start-file', newfilereset)
 mp.register_event("file-loaded", startupevents)
 mp.observe_property('track-list', nil, request_init)
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Keep the open dropdown in sync with external track changes.
+mp.observe_property('track-list', nil, function()
+    if state.track_menu then track_menu_refresh() end
+end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
 mp.observe_property('playlist', nil, request_init)
 mp.observe_property("chapter-list", "native", function(_, list) -- chapter list changes
     list = list or {}                                           -- safety, shouldn't return nil
@@ -6510,9 +6987,7 @@ if user_opts.key_bindings then
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Cycle audio tracks key binding.
     mp.add_key_binding("z", "cycleaudiotracks", function()
-        mp.set_property_number("secondary-sid", 0)
-        set_track("audio", 1)
-        show_tracklist("audio")
+        track_menu_cycle("audio", 1)
     end);
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -6523,9 +6998,7 @@ if user_opts.key_bindings then
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Cycle captions key binding.
     mp.add_key_binding("c", "cyclecaptions", function()
-        mp.set_property_number("secondary-sid", 0)
-        set_track("sub", 1)
-        show_tracklist("sub")
+        track_menu_cycle("sub", 1)
     end);
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
