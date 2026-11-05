@@ -3256,6 +3256,41 @@ local function truncate_to_fit(s, max_w, fontsize)
     return s .. ell
 end
 
+-- Rounded-rect path with controllable winding. Ring holes need opposite
+-- winding on the inner loop (works under both nonzero and even-odd fills).
+local function round_rect_path(x0, y0, x1, y1, r, cw)
+    r = r or 0
+    r = math.max(0, math.min(r, (x1 - x0) / 2, (y1 - y0) / 2))
+    local k = 0.5522847498 * r
+    local p = {}
+    local function L(x, y) p[#p + 1] = string.format("l %g %g", x, y) end
+    local function B(x1, y1, x2, y2, x3, y3)
+        p[#p + 1] = string.format("b %g %g %g %g %g %g", x1, y1, x2, y2, x3, y3)
+    end
+    if cw then
+        p[#p + 1] = string.format("m %g %g", x0 + r, y0)
+        L(x1 - r, y0)
+        B(x1 - r + k, y0, x1, y0 + r - k, x1, y0 + r)
+        L(x1, y1 - r)
+        B(x1, y1 - r + k, x1 - r + k, y1, x1 - r, y1)
+        L(x0 + r, y1)
+        B(x0 + r - k, y1, x0, y1 - r + k, x0, y1 - r)
+        L(x0, y0 + r)
+        B(x0, y0 + r - k, x0 + r - k, y0, x0 + r, y0)
+    else
+        p[#p + 1] = string.format("m %g %g", x0 + r, y0)
+        B(x0 + r - k, y0, x0, y0 + r - k, x0, y0 + r)
+        L(x0, y1 - r)
+        B(x0, y1 - r + k, x0 + r - k, y1, x0 + r, y1)
+        L(x1 - r, y1)
+        B(x1 - r + k, y1, x1, y1 - r + k, x1, y1 - r)
+        L(x1, y0 + r)
+        B(x1, y0 + r - k, x1 - r + k, y0, x1 - r, y0)
+        L(x0 + r, y0)
+    end
+    return table.concat(p, " ")
+end
+
 local function render_toast(ass)
     if not user_opts.toast_enabled then return end
     if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled() and state.toast_text) then
@@ -3357,11 +3392,11 @@ local function render_toast(ass)
     local r_opt = tonumber(user_opts.toast_bg_radius)
     if r_opt == nil or r_opt < 0 then r_opt = 12 end
     local r = math.min(r_opt, pill_h / 2)
-    -- background pill, opacity + border from opts.
-    -- NOTE: the border is a ring with a vector \iclip hole, not \bord on the
-    -- drawing (libass does not reliably paint \3c on \p shapes) and not a
-    -- solid underlay (it would show through a translucent bg). The hole path
-    -- is built with the same round_rect_cw (tags stripped), so edges match.
+    -- background pill, opacity + border from opts. The border is a
+    -- single-path ring (outer CW + inner CCW loops): libass does not
+    -- reliably paint \3c on \p shapes, and a solid underlay would show
+    -- through a translucent bg. Opposite windings hole the ring under
+    -- both nonzero and even-odd fill rules.
     local bg_op = tonumber(user_opts.toast_bg_opacity)
     if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
     local bg_aa = string.format("%02X", math.floor((1 - bg_op) * 255 + 0.5))
@@ -3376,25 +3411,16 @@ local function render_toast(ass)
         bb_col = sanitize_hex_color(user_opts.toast_bg_border_color, "#000000")
     end
     if bg_bb > 0 then
-        -- Tuck the ring 1px under the bg on all sides: clip rasterization
-        -- can leave a 1px seam if hole and bg just abut. Overlap stays
-        -- hidden under the bg (drawn after, on top).
-        local inset = 1
-        local hole = mp.assdraw.ass_new()
-        hole.scale = 1
-        hole:draw_start()
-        hole:round_rect_cw(x0 + inset, y0 + inset,
-            x1 - inset, y1 - inset, math.max(0, r - inset))
-        hole:draw_stop()
-        local hole_path = hole.text:gsub("{\\p%d+}", "")
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
         ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bb_col)
-            .. "&\\alpha&H" .. bb_aa .. "&\\iclip(1, " .. hole_path .. ")}")
+            .. "&\\alpha&H" .. bb_aa .. "&}")
         ass:draw_start()
-        ass:round_rect_cw(x0 - bg_bb / 2, y0 - bg_bb / 2,
-            x1 + bg_bb / 2, y1 + bg_bb / 2, r + bg_bb / 2)
+        ass:append(round_rect_path(x0 - bg_bb, y0 - bg_bb,
+            x1 + bg_bb, y1 + bg_bb, r + bg_bb, true) .. " "
+            .. round_rect_path(x0 + 1, y0 + 1, x1 - 1, y1 - 1,
+            math.max(0, r - 1), false))
         ass:draw_stop()
     end
     ass:new_event()
