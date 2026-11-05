@@ -3376,10 +3376,15 @@ local function render_toast(ass)
         bb_col = sanitize_hex_color(user_opts.toast_bg_border_color, "#000000")
     end
     if bg_bb > 0 then
+        -- Tuck the ring 1px under the bg on all sides: clip rasterization
+        -- can leave a 1px seam if hole and bg just abut. Overlap stays
+        -- hidden under the bg (drawn after, on top).
+        local inset = 1
         local hole = mp.assdraw.ass_new()
         hole.scale = 1
         hole:draw_start()
-        hole:round_rect_cw(x0, y0, x1, y1, r)
+        hole:round_rect_cw(x0 + inset, y0 + inset,
+            x1 - inset, y1 - inset, math.max(0, r - inset))
         hole:draw_stop()
         local hole_path = hole.text:gsub("{\\p%d+}", "")
         ass:new_event()
