@@ -1631,6 +1631,7 @@ local function draw_seekbar_handle(element, elem_ass, override_alpha)
     local xp = get_slider_ele_pos_for(element, pos)                                  -- handle position
     local handle_hovered = mouse_hit_coords(element.hitbox.x1 + xp - rh, element.hitbox.y1 + elem_geo.h / 2 - rh,
         element.hitbox.x1 + xp + rh, element.hitbox.y1 + elem_geo.h / 2 + rh) and element.enabled
+        and not track_menu_under_cursor() -- >>> EDIT AlwaysBorderRadius <<< -- no handle hover through the open menu
 
     if display_handle then
         -- Apply size hover_effect only if hovering over the handle
@@ -2007,7 +2008,11 @@ function render_elements(master_ass)
 
                 -- add tooltip
                 if element.slider.tooltipF ~= nil and element.enabled then
-                    if mouse_hit(element) then
+                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- The open track dropdown sits above the seekbar: never
+                    -- hover through it (no time tooltip/thumbfast behind it).
+                    if mouse_hit(element) and not track_menu_under_cursor() then
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
                         local sliderpos = get_slider_value(element)
                         local tooltiplabel = element.slider.tooltipF(sliderpos)
                         local an = slider_lo.tooltip_an
@@ -3775,6 +3780,15 @@ function track_menu_geometry()
         scrollable = scrollable, rows = rows }
 end
 
+-- True while the cursor sits on the open dropdown, so elements painted
+-- underneath (seekbar) ignore the hover (no tooltip/thumbfast through it).
+function track_menu_under_cursor()
+    if not state.track_menu then return false end
+    local g = track_menu_geometry()
+    if not g then return false end
+    return mouse_hit_coords(g.x0, g.y0, g.x1, g.y1)
+end
+
 function render_track_menu(ass)
     local m = state.track_menu
     if not m then return end
@@ -3920,6 +3934,12 @@ function track_menu_handle_event(source, what)
                     request_tick()
                     return true
                 end
+            end
+            -- inside the box but not on a row (header/padding/scrollbar):
+            -- swallow so the click can't leak to the seekbar underneath
+            if inside then
+                request_tick()
+                return true
             end
             return false
         elseif what == "up" then
