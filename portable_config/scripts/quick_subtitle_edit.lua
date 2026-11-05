@@ -37,19 +37,16 @@ local registered = {}       -- nombres de key bindings activos
 local binding_counter = 0
 local editor_mode_request = "screen"  -- modo pedido al lanzar la edición
 local loading = false       -- true mientras se buscan candidatos
--- local loading_timer = nil -- timer del spinner (desactivado, ver show_loading)
-local loading_overlay = nil -- overlay del spinner de carga
 local selector_overlay = nil-- overlay del menú selector
-local help_overlay = nil    -- overlay de la leyenda de controles (esquina sup-izq)
+local help_overlay = nil    -- overlay de la leyenda de controles (centrada arriba)
 local pending = {}          -- buffers no guardados por candidato al cambiar de evento
 local screen = nil          -- estado del modo pantalla (copia-máscara, pista temporal)
-local script_created_files = {} -- archivos extraídos por el script aún sin guardar (borrar al cancelar)
+local script_created_files = {} -- extraídos sin guardar (borrar de disco al cancelar)
+local session_added_files = {}  -- pistas añadidas en la sesión (sub-remove al cancelar)
 local session_rollback = nil    -- sid/secondary-sid previos a la extracción (restaurar al cancelar)
-local font_dir_state = nil     -- { old } de osd-fonts-dir para el overlay del editor ("" si no había)
+local font_dir_state = nil     -- { old } de osd-fonts-dir para el overlay del editor
 local session_edit_dir = nil   -- carpeta temporal de sesión junto al vídeo (subedit.temp)
-local last_session_dir = nil   -- última carpeta de sesión conocida (para limpiarla al apagar aun sin estar activa)
-
-local SECTION_KEYS = {}     -- (reservado para futuros modos)
+local last_session_dir = nil   -- última carpeta de sesión conocida (limpieza al apagar)
 
 --------------------------------------------------------------------------
 -- Utilidades UTF-8
@@ -166,6 +163,21 @@ local function norm_path(p)
     return (p:lower():gsub("/", "\\"))
 end
 
+-- Absolute local video path (mp "path" may be relative to working-directory).
+local function abs_video_path()
+    local p = mp.get_property("path")
+    if not p or type(p) ~= "string" then return nil end
+    if p:find("://", 1, true) then return p end
+    if p:match("^[A-Za-z]:[\\/]") or p:match("^\\\\") or p:match("^/") then
+        return p
+    end
+    local wd = mp.get_property("working-directory")
+    if wd and wd ~= "" then
+        return utils.join_path(wd, p)
+    end
+    return p
+end
+
 local function read_file(path)
     local f = io.open(path, "rb")
     if not f then
@@ -241,9 +253,14 @@ local function doc_common(content)
     return bom, body, eol
 end
 
-local function parse_srt(content)
+-- Shared header split: BOM flag, EOL style, raw lines with terminators.
+local function parse_common(content)
     local bom, body, eol = doc_common(content)
-    local raw = split_raw_lines(body)
+    return bom, eol, split_raw_lines(body)
+end
+
+local function parse_srt(content)
+    local bom, eol, raw = parse_common(content)
     local events = {}
     local i, n = 1, #raw
 
@@ -295,8 +312,7 @@ local function parse_srt(content)
 end
 
 local function parse_ass(content)
-    local bom, body, eol = doc_common(content)
-    local raw = split_raw_lines(body)
+    local bom, eol, raw = parse_common(content)
     local events = {}
 
     for idx, line in ipairs(raw) do
@@ -438,7 +454,37 @@ local function watch_track(path, cb)
     end)
 end
 
+-- Forward: defined below, used by resolve_track_file (dedup).
+local find_track_ids_by_file
+-- Forward: newline flavor, used by refresh_screen_mask below.
+local ass_newline
+
+-- Bitmap subtitle codecs: image-based, not editable as text.
+local BITMAP_SUB_CODECS = {
+    pgs = true, pgssub = true, hdmv_pgs_subtitle = true,
+    dvd_sub = true, dvdsub = true, dvbsub = true,
+    xsub = true, vobsub = true,
+}
+
+-- mpv track ids are NOT ffmpeg stream indexes: derive 0:s:N from the order
+-- of embedded sub tracks in track-list (demuxer order).
+local function embedded_sub_index(tid)
+    local ids = {}
+    for _, tr in ipairs(mp.get_property_native("track-list") or {}) do
+        if tr.type == "sub" and not tr.external then
+            ids[#ids + 1] = tr.id
+        end
+    end
+    table.sort(ids)
+    for i, id in ipairs(ids) do
+        if id == tid then return i - 1 end
+    end
+    return nil
+end
+
 -- Devuelve el archivo editable de la pista (extrae si es embebida).
+-- Extraction persists next to the video (autoload + future mux);
+-- only mask + fonts live in subedit.temp.
 local function resolve_track_file(sub)
     local t = sub.track
     if t.external and t["external-filename"] then
@@ -446,26 +492,36 @@ local function resolve_track_file(sub)
         return t["external-filename"]
     end
 
-    local video_path = mp.get_property("path")
+    local video_path = abs_video_path()
     if not video_path then
         return nil, "No se pudo obtener la ruta del video"
     end
-    if video_path:find("://") then
+    if video_path:find("://", 1, true) then
         return nil, "No se puede extraer de una URL"
+    end
+
+    local codec = (t.codec or ""):lower()
+    if BITMAP_SUB_CODECS[codec] or codec:find("pgs", 1, true)
+        or codec:find("vobsub", 1, true) or codec:find("dvd", 1, true)
+        or codec:find("dvb", 1, true) or codec:find("xsub", 1, true) then
+        return nil, "Subtítulo bitmap (imagen): no editable como texto"
     end
 
     local dir, filename = utils.split_path(video_path)
     local name = filename:match("^(.*)%.%w+$") or filename
-    local codec = t.codec or ""
-    local ext = (codec:find("ass") or codec:find("ssa")) and ".ass" or ".srt"
+    local ext = (codec:find("ass", 1, true) or codec:find("ssa", 1, true)) and ".ass" or ".srt"
     local out = utils.join_path(dir, name .. ".sub" .. t.id .. ext)
     msg.info("[pista] embebida t.id=" .. tostring(t.id) .. " out=" .. out)
 
     if not utils.file_info(out) then
-        msg.info("[extracción] ffmpeg extrae pista " .. tostring(t.id) .. " → " .. out)
+        local sidx = embedded_sub_index(t.id)
+        if sidx == nil then
+            return nil, "No se pudo mapear la pista embebida"
+        end
+        msg.info("[extracción] ffmpeg extrae pista 0:s:" .. tostring(sidx) .. " → " .. out)
         local res = utils.subprocess({
             args = {"ffmpeg", "-nostdin", "-y", "-i", video_path,
-                    "-map", "0:s:" .. (t.id - 1), out},
+                    "-map", "0:s:" .. sidx, out},
             playback_only = false,
             capture_stderr = true,
         })
@@ -483,21 +539,38 @@ local function resolve_track_file(sub)
     end
 
     -- Cambiar la selección de la pista embebida al archivo extraído
-    if t["main-selection"] == 1 then
-        msg.info("[pista] sub-add (auto) " .. out)
-        mp.commandv("sub-add", out, "auto")
-        watch_track(out, function(id)
-            mp.set_property_number("secondary-sid", id)
-        end)
+    -- (skip if already loaded from a previous edit).
+    if #find_track_ids_by_file(out) == 0 then
+        if t["main-selection"] == 1 then
+            msg.info("[pista] sub-add (auto) " .. out)
+            mp.commandv("sub-add", out, "auto")
+            session_added_files[norm_path(out)] = true
+            watch_track(out, function(id)
+                -- Session may have ended before the track showed up.
+                if session_rollback == nil or state == "idle" then return end
+                mp.set_property_number("secondary-sid", id)
+            end)
+        else
+            msg.info("[pista] sub-add (cached) " .. out)
+            mp.commandv("sub-add", out, "cached")
+            session_added_files[norm_path(out)] = true
+        end
     else
-        msg.info("[pista] sub-add (cached) " .. out)
-        mp.commandv("sub-add", out, "cached")
+        local existing = find_track_ids_by_file(out)
+        msg.info("[pista] ya cargada, reutiliza: " .. out)
+        if existing[1] then
+            if t["main-selection"] == 1 then
+                mp.set_property_number("secondary-sid", existing[1])
+            else
+                mp.set_property_number("sid", existing[1])
+            end
+        end
     end
 
     return out
 end
 
-local function find_track_ids_by_file(path)
+find_track_ids_by_file = function(path)
     local np = norm_path(path)
     local ids = {}
     for _, tr in ipairs(mp.get_property_native("track-list") or {}) do
@@ -526,6 +599,7 @@ local function unbind_all()
         mp.remove_key_binding(name)
     end
     registered = {}
+    binding_counter = 0
 end
 
 --------------------------------------------------------------------------
@@ -552,9 +626,36 @@ local function osd_corner_style()
     return "{\\an7\\pos(" .. fs .. "," .. fs .. ")" .. osd_style_tags() .. "}"
 end
 
+-- Help legend style: centered top (\an8), same height as corner panels.
+local function osd_top_center_style()
+    local w = mp.get_property_number("osd-width") or 1280
+    local fs = math.max(14, math.floor(osd_h() / 36))
+    return "{\\an8\\pos(" .. math.floor(w / 2) .. "," .. fs .. ")" .. osd_style_tags() .. "}"
+end
+
 -- Mensajes puntuales: van al toast unificado de modernx (un solo slot,
 -- preemptivo, sin cola). El editor/selector usan overlays propios arriba-izq;
 -- el toast va abajo-centro para no taparlos.
+-- Cached probe: prefer the modernx toast, fall back to native OSD.
+local modernx_probe = nil
+local function modernx_available()
+    if modernx_probe == nil then
+        modernx_probe = true
+        local ok, list = pcall(mp.get_property_native, "script-list")
+        if ok and type(list) == "table" then
+            modernx_probe = false
+            for _, s in ipairs(list) do
+                local n = type(s) == "table" and (s.name or s.path) or s
+                if type(n) == "string" and n:find("modernx", 1, true) then
+                    modernx_probe = true
+                    break
+                end
+            end
+        end
+    end
+    return modernx_probe
+end
+
 local function ui_msg(text, dur, kind)
     local ms
     if dur ~= nil then
@@ -562,48 +663,38 @@ local function ui_msg(text, dur, kind)
         -- los fallback antiguos usaban dur=100s: caparlos para no secuestrar el toast
         if ms > 8000 then ms = 8000 end
     end
+    if not modernx_available() then
+        mp.osd_message(tostring(text or ""), (ms and ms / 1000) or 2)
+        return
+    end
     mp.commandv("script-message-to", "modernx", "modernx-toast",
         kind or "info", "subedit", tostring(text or ""), ms and tostring(ms) or "")
 end
 
--- Animación de puntos braille recorriendo el perímetro de un cuadrado
--- (celda braille 2x4). TEMPORALMENTE DESACTIVADA: el timer no avanzaba de
--- cuadro y se quedaba atascado en el primer carácter. A arreglar otro día.
--- local loading_frames = {"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
--- local loading_i = 1
+-- Loading indicator: a single static message on the modernx toast
+-- (persistent slot, same source) until the menu/editor shows up.
+local loading_active = false
 
-local function stop_loading()
-    -- if loading_timer then
-    --     loading_timer:kill()
-    --     loading_timer = nil
-    -- end
-    if loading_overlay then
-        loading_overlay:remove()
-        loading_overlay = nil
+local function loading_toast(text)
+    if modernx_available() then
+        mp.commandv("script-message-to", "modernx", "modernx-toast",
+            "persistent", "subedit", text, "")
+    else
+        mp.osd_message(text, 8)
     end
 end
 
--- Spinner en la esquina superior izquierda (misma esquina que el menú
--- selector y los controles del editor en pantalla)
 local function show_loading()
-    stop_loading()
-    if not mp.create_osd_overlay then
-        ui_msg("Buscando subtítulos...", 100)
-        return
+    loading_active = true
+    loading_toast("Iniciando edición de subtítulos…")
+end
+
+local function stop_loading()
+    if not loading_active then return end
+    loading_active = false
+    if modernx_available() then
+        mp.commandv("script-message-to", "modernx", "modernx-toast-clear", "subedit")
     end
-    local w = mp.get_property_number("osd-width") or 1280
-    local h = osd_h()
-    local ov = mp.create_osd_overlay("ass-events")
-    if not ov then
-        ui_msg("Buscando subtítulos...", 100)
-        return
-    end
-    ov.res_x = w
-    ov.res_y = h
-    loading_overlay = ov
-    -- Animación braille desactivada (ver arriba): solo texto fijo.
-    ov.data = osd_corner_style() .. "  Buscando subtítulos..."
-    ov:update()
 end
 
 local function pause_enter()
@@ -630,14 +721,7 @@ local function build_screen_copy(doc)
         ndoc[k] = v
     end
     ndoc.lines = lines
-    ndoc.events = {}
-    for _, ev in ipairs(doc.events) do
-        local nev = {}
-        for k2, v2 in pairs(ev) do
-            nev[k2] = v2
-        end
-        ndoc.events[#ndoc.events + 1] = nev
-    end
+    -- NOTE: events shared by reference; the mask only rewrites lines.
     return ndoc
 end
 
@@ -648,12 +732,13 @@ end
 -- Compatible con la nomenclatura antigua de máscara (sustituye la extensión),
 -- pero dentro de la carpeta de sesión junto al vídeo.
 local function screen_temp_path(path)
-    local name = path:gsub("[^\\/]+$", "")
     local base = path:match("([^\\/]+)$") or "sub"
     base = base:gsub("%.([^%.\\/]+)$", ".tmp.%1")
     local dir = session_edit_dir
     if not dir then
-        return utils.join_path(name, base)
+        -- No session folder (URL, no local video): next to the source file.
+        local d, _ = utils.split_path(path)
+        return utils.join_path(d, base)
     end
     return utils.join_path(dir, base)
 end
@@ -711,14 +796,13 @@ end
 -- Comparación por prefijo normalizado (minúsculas + separadores "\").
 local function under_session_dir(path)
     if is_session_dir(path) then return true end
-    if not session_edit_dir or is_session_dir(session_edit_dir) then
-        local base = session_edit_dir and norm_path(session_edit_dir) or ""
-        local p = norm_path(path or "")
-        if base ~= "" and p:sub(1, #base) == base and (#p == #base or p:sub(#base + 1, #base + 1) == "\\") then
-            return true
-        end
+    if not session_edit_dir or not is_session_dir(session_edit_dir) then
+        return false
     end
-    return false
+    local base = norm_path(session_edit_dir)
+    local p = norm_path(path or "")
+    return p:sub(1, #base) == base
+        and (#p == #base or p:sub(#base + 1, #base + 1) == "\\")
 end
 
 local function log_del(path, motivo)
@@ -731,12 +815,12 @@ end
 -- Si el vídeo no es un archivo local (URL) devuelve nil: en ese caso no hay
 -- pantalla-máscara ni fuentes.
 local function get_session_edit_dir()
-    local video_path = mp.get_property("path")
-    if not video_path or type(video_path) ~= "string" or video_path:find("://") then
+    local video_path = abs_video_path()
+    if not video_path or type(video_path) ~= "string" or video_path:find("://", 1, true) then
         msg.info("[sesión] sin video local (path=" .. tostring(video_path) .. "): sin carpeta de sesión")
         return nil
     end
-    local dir, filename = utils.split_path(video_path)
+    local dir, _ = utils.split_path(video_path)
     local folder = utils.join_path(dir, SESSION_DIR_NAME)
     if not is_session_dir(folder) then
         msg.warn("[sesión] folder inesperado (NO es subedit.temp), no se crea carpeta de sesión: "
@@ -820,9 +904,8 @@ local function remove_session_edit_dir(discard_fonts)
         return
     end
     local entries = utils.readdir(folder, "all") or {}
-    msg.info("[borrado] remove_session_edit_dir: entradas en " .. folder .. ": " .. tostring(#entries))
+    local removed = 0
     for _, e in ipairs(entries) do
-        msg.info("[borrado]   entry: " .. tostring(e))
         if e ~= "fonts" and e ~= "." and e ~= ".." then
             local p = utils.join_path(folder, e)
             local info = utils.file_info(p)
@@ -833,9 +916,12 @@ local function remove_session_edit_dir(discard_fonts)
                     log_del(p, "os.remove sesión")
                     os.remove(p)
                 end
+                removed = removed + 1
             end
         end
     end
+    msg.info("[borrado] sesión " .. folder .. ": " .. tostring(removed)
+        .. " resto(s), fonts conservada")
 end
 
 -- Fuentes embebidas del contenedor (MKV/MP4) para el overlay del editor: la
@@ -864,6 +950,42 @@ local parse_ass_meta
 -- permite comparar "Trebuchet MS", "trebuc.ttf", "TrebuchetMS" como iguales.
 local function font_name_key(s)
     return tostring(s or ""):lower():gsub("[^%w]", "")
+end
+
+-- Stem of a font filename ("trebuc.ttf" -> "trebuc"), canonicalized.
+local function font_stem(name)
+    local stem = tostring(name or ""):match("^(.+)%.[^.]+$")
+    return stem and font_name_key(stem) or ""
+end
+
+-- Weight tokens stripped for matching ("Roboto-Regular" -> "roboto").
+-- Sorted longest-first + fixpoint loop: deterministic with stacked suffixes.
+local WEIGHT_WORDS = {
+    "extrablack", "extrabold", "condensed", "semibold", "demibold",
+    "regular", "oblique", "medium", "italic", "black", "heavy",
+    "light", "thin", "bold",
+}
+
+-- Canonical match key: lowercase alnum, no weight words, no trailing
+-- weight codes ("pr6b" -> "pr6"). Guarded: tiny results fall back to raw.
+local function font_match_key(s)
+    local raw = font_name_key(s)
+    local k, prev = raw, nil
+    repeat
+        prev = k
+        for _, w in ipairs(WEIGHT_WORDS) do
+            k = k:gsub(w .. "$", "")
+        end
+    until k == prev
+    k = k:gsub("[brielhmwd%d]+$", "")
+    if #k < 6 then return raw end
+    return k
+end
+
+-- Style names may carry padding spaces in some files; trim for lookups only
+-- (raw values are preserved for writing back).
+local function style_key(s)
+    return tostring(s or ""):match("^%s*(.-)%s*$")
 end
 
 -- Familias comunes de Windows: nombre canónico -> fichero en C:\Windows\Fonts
@@ -907,18 +1029,15 @@ end
 -- ¿La familia ya está cubierta por la cache fonts/ de la sesión?
 local function font_cache_has(dir, family)
     local key = font_name_key(family)
-    local mstem = nil
+    local mkey = font_match_key(family)
     local wfile = FONT_INSTALLED[key]
-    if wfile then
-        local stem = wfile:match("^(.+)%.[^.]+$")
-        mstem = stem and font_name_key(stem)
-    end
+    local mstem = wfile and font_stem(wfile) or nil
     local files = utils.readdir(dir, "files") or {}
     for _, f in ipairs(files) do
         if is_font_file(f) then
-            local stem = f:match("^(.+)%.[^.]+$")
-            local k = stem and font_name_key(stem) or ""
-            if k == key or (mstem and k == mstem) then
+            local k = font_stem(f)
+            if k == key or font_match_key(k) == mkey
+                or (mstem and k == mstem) then
                 return true
             end
         end
@@ -926,10 +1045,16 @@ local function font_cache_has(dir, family)
     return false
 end
 
--- ¿El texto está íntegramente en Latin-1? Si la línea contiene glifos fuera
--- (CJK, etc.) se conserva el modo clásico (extraer todo) para no romper el
--- render de esos caracteres en el overlay.
-local function is_latin1_text(s)
+-- Codepoint ranges whose glyphs usually live in dedicated (often attached)
+-- fonts: kana, CJK, hangul, thai, arabic, hebrew, indic.
+local COMPLEX_RANGES = {
+    {0x0590, 0x05FF}, {0x0600, 0x06FF}, {0x0900, 0x097F}, {0x0E00, 0x0E7F},
+    {0x1100, 0x11FF}, {0x3040, 0x30FF}, {0x3100, 0x312F}, {0x3400, 0x4DBF},
+    {0x4E00, 0x9FFF}, {0xAC00, 0xD7AF}, {0x20000, 0x2A6DF},
+}
+
+-- True if the text holds complex-script glyphs (… ♪ — "" are fine: targeted).
+local function text_has_complex_script(s)
     local i, n = 1, #s
     while i <= n do
         local b = s:byte(i)
@@ -944,19 +1069,21 @@ local function is_latin1_text(s)
             elseif b >= 0xF0 and b <= 0xF4 then
                 len, cp = 4, b - 0xF0
             else
-                return false
+                return true -- invalid byte: stay conservative
             end
-            if i + len - 1 > n then return false end
-            for k = 2, len do
-                local c = s:byte(i + k - 1)
-                if not (c and c >= 0x80 and c <= 0xBF) then return false end
+            if i + len - 1 > n then return true end
+            for kk = 2, len do
+                local c = s:byte(i + kk - 1)
+                if not (c and c >= 0x80 and c <= 0xBF) then return true end
                 cp = cp * 0x40 + (c - 0x80)
             end
-            if cp > 0xFF then return false end
+            for _, r in ipairs(COMPLEX_RANGES) do
+                if cp >= r[1] and cp <= r[2] then return true end
+            end
             i = i + len
         end
     end
-    return true
+    return false
 end
 
 -- Familias de fuente que usa la línea en edición: Fontname del Style +
@@ -977,7 +1104,7 @@ local function event_font_families(cand)
         out[#out + 1] = fam
     end
     if ev and ev.style and ev.style ~= "" then
-        local stf = meta.styles[ev.style]
+        local stf = meta.styles[style_key(ev.style)]
         if stf and stf[2] then add(stf[2]) end
     end
     if ev and ev.text and ev.text:find("fn", 1, true) then
@@ -997,17 +1124,23 @@ local function list_attachments(video_path)
         capture_stderr = true,
     })
     local attach = {}        -- 1-based: nombre de cada adjunto
-    local last_attach = false
+    local cur = nil          -- bloque del stream en curso
+    local function flush()
+        if cur and cur.is_attach then
+            attach[#attach + 1] = cur.fname or ""
+        end
+        cur = nil
+    end
     for line in tostring(probe and probe.stdout or ""):gmatch("[^\r\n]+") do
-        if line == "codec_type=attachment" then
-            attach[#attach + 1] = ""
-            last_attach = true
-        elseif line:match("^codec_type=") then
-            last_attach = false
-        elseif last_attach and line:match("^TAG:filename=") then
-            attach[#attach] = line:sub(14)
+        local ctype = line:match("^codec_type=(.+)$")
+        if ctype then
+            flush()
+            cur = { is_attach = (ctype == "attachment") }
+        elseif cur and line:match("^TAG:filename=") then
+            cur.fname = line:sub(14)
         end
     end
+    flush()
     return attach
 end
 
@@ -1019,28 +1152,32 @@ local function all_font_indices(attach)
     return out
 end
 
--- Empareja una familia con el adjunto de fuente correspondiente por nombre
--- normalizado (priorizando el nombre Windows canónico). Índice 1-based o nil.
+-- Empareja una familia con el adjunto de fuente correspondiente: nombre
+-- canónico de Windows (5), igualdad cruda (4), sin pesos (3) o prefijo (2/1).
+-- Índice 1-based o nil.
 local function match_attachment(family, attach)
     local key = font_name_key(family)
-    local mstem = nil
+    local mkey = font_match_key(family)
     local wfile = FONT_INSTALLED[key]
-    if wfile then
-        local stem = wfile:match("^(.+)%.[^.]+$")
-        mstem = stem and font_name_key(stem)
-    end
+    local mstem = wfile and font_stem(wfile) or nil
     local best, best_score = nil, 0
     for i = 1, #attach do
         local name = attach[i]
         if name and is_font_file(name) then
-            local stem = name:match("^(.+)%.[^.]+$")
-            local k = stem and font_name_key(stem) or ""
+            local k = font_stem(name)
+            local mk = font_match_key(k) -- stem already canonical, no ".ttf"
             local score = 0
             if mstem and k == mstem then
-                score = 3
+                score = 5
             elseif key ~= "" and k == key then
+                score = 4
+            elseif mkey ~= "" and mk == mkey then
+                score = 3
+            elseif key ~= "" and k ~= "" and #key >= 5
+                and (k:sub(1, #key) == key or key:sub(1, #k) == k) then
                 score = 2
-            elseif mstem and k ~= "" and (k:sub(1, #mstem) == mstem or mstem:sub(1, #k) == k) then
+            elseif mstem and k ~= "" and #mstem >= 5
+                and (k:sub(1, #mstem) == mstem or mstem:sub(1, #k) == k) then
                 score = 1
             end
             if score > best_score then
@@ -1077,8 +1214,9 @@ local function ensure_edit_fonts(cand)
     end
     msg.info("[fuentes] familias no instaladas: " .. table.concat(non_installed, ", "))
 
-    local video_path = mp.get_property("path")
-    if not video_path or type(video_path) ~= "string" or video_path:find("://") then
+    local video_path = abs_video_path()
+    if not video_path or type(video_path) ~= "string"
+        or video_path:find("://", 1, true) then
         return
     end
     local dir = get_font_cache_dir()
@@ -1096,27 +1234,37 @@ local function ensure_edit_fonts(cand)
     end
     msg.info("[fuentes] faltan en cache: " .. table.concat(needs, ", "))
 
-    -- Guard conservador: texto fuera de Latin-1 -> extraer todas las fuentes
-    -- (equivalente al comportamiento clásico; evita fallback de glifos).
-    local conservative = not is_latin1_text(cand and cand.event and (cand.event.text or ""))
-
+    -- Match every needed family; log the verdict per family for diagnosis.
     local attach = list_attachments(video_path)
+    local matched, unknown = {}, {}
+    for _, fam in ipairs(needs) do
+        local idx = match_attachment(fam, attach)
+        if idx then
+            matched[fam] = idx
+        else
+            unknown[#unknown + 1] = fam
+        end
+    end
+    local parts = {}
+    for _, fam in ipairs(needs) do
+        parts[#parts + 1] = fam .. "=>" .. (matched[fam] and attach[matched[fam]] or "?")
+    end
+    msg.info("[fuentes] match: " .. table.concat(parts, ", "))
+
+    -- Full dump only as a safety net: complex-script text (signs/CJK) with
+    -- no file match. A missing family (e.g. not embedded) can't be fixed by
+    -- dumping everything: the real render falls back too.
+    local complex = text_has_complex_script(cand and cand.event and (cand.event.text or ""))
     local want
-    if conservative then
+    if complex and #unknown > 0 then
         want = all_font_indices(attach)
     else
         want = {}
         for _, fam in ipairs(needs) do
-            local idx = match_attachment(fam, attach)
-            if idx then
-                want[idx] = true
-            else
-                conservative = true
-                break
-            end
+            if matched[fam] then want[matched[fam]] = true end
         end
-        if conservative then
-            want = all_font_indices(attach)
+        if #unknown > 0 then
+            msg.warn("[fuentes] sin adjunto para: " .. table.concat(unknown, ", "))
         end
     end
 
@@ -1138,8 +1286,20 @@ local function ensure_edit_fonts(cand)
             end
         end
     end
+    -- Point the OSD renderer at the session cache (also on cache hits:
+    -- cached fonts are useless if libass never looks at the folder).
+    local function apply_dir()
+        if not font_dir_state then
+            local old = mp.get_property("osd-fonts-dir") or ""
+            local ok = pcall(mp.set_property, "osd-fonts-dir", dir)
+            if not ok then return end
+            font_dir_state = { old = old }
+            msg.info("[fuentes] osd-fonts-dir = " .. dir .. " (anterior=" .. old .. ")")
+        end
+    end
     if n == 0 then
         msg.info("[fuentes] nada que extraer (ya en cache)")
+        apply_dir()
         return
     end
     args[#args + 1] = "-i"
@@ -1152,14 +1312,7 @@ local function ensure_edit_fonts(cand)
     })
     -- El exit != 0 es normal ("At least one output file must be specified");
     -- se decide por los ficheros realmente escritos.
-
-    if not font_dir_state then
-        local old = mp.get_property("osd-fonts-dir") or ""
-        local ok = pcall(mp.set_property, "osd-fonts-dir", dir)
-        if not ok then return end
-        font_dir_state = { old = old }
-        msg.info("[fuentes] osd-fonts-dir = " .. dir .. " (anterior=" .. old .. ")")
-    end
+    apply_dir()
 end
 
 local function restore_edit_fonts()
@@ -1176,7 +1329,28 @@ end
 local function refresh_screen_mask()
     if not edit or not screen then return end
     local tdoc = build_screen_copy(edit.doc)
-    apply_event_text(tdoc, edit.event, "")
+    -- Show in-memory edits of the other overlapping events in context,
+    -- then blank only the event being edited.
+    local ops = {}
+    for cand, pv in pairs(pending) do
+        if cand ~= edit.cand and cand.file == edit.file then
+            local text = pv.buffer
+            if edit.doc.kind == "ass" then
+                text = (pv.prefix or "") .. pv.buffer:gsub("\n", ass_newline(cand.event.text))
+            end
+            table.insert(ops, { ev = cand.event, text = text })
+        end
+    end
+    table.insert(ops, { ev = edit.event, text = "" })
+    table.sort(ops, function(a, b)
+        if edit.doc.kind == "ass" then
+            return a.ev.line_index > b.ev.line_index
+        end
+        return a.ev.first > b.ev.first
+    end)
+    for _, o in ipairs(ops) do
+        apply_event_text(tdoc, o.ev, o.text)
+    end
     if not write_file(screen.temp, serialize_doc(tdoc)) then
         msg.warn("No se pudo escribir la copia temporal, usando OSD")
         return false
@@ -1257,16 +1431,20 @@ end
 -- el script en esta ejecución y aún no guardados, y restaura la selección que
 -- había antes de la extracción (vuelve a la pista embebida del contenedor).
 local function cleanup_disposable()
+    -- Remove all session-added tracks (file kept, orphan track not).
+    for p, _ in pairs(session_added_files) do
+        for _, id in ipairs(find_track_ids_by_file(p)) do
+            msg.info("[borrado] sub-remove pista " .. tostring(id) .. " de " .. p)
+            mp.commandv("sub-remove", tostring(id))
+        end
+    end
+    session_added_files = {}
     local vdir = nil
-    local vp = mp.get_property("path")
-    if vp and type(vp) == "string" and not vp:find("://") then
+    local vp = abs_video_path()
+    if vp and type(vp) == "string" and not vp:find("://", 1, true) then
         vdir, _ = utils.split_path(vp)
     end
     for p, _ in pairs(script_created_files) do
-        for _, id in ipairs(find_track_ids_by_file(p)) do
-            msg.info("[borrado] sub-remove pista " .. tostring(id) .. " (script_created) de " .. p)
-            mp.commandv("sub-remove", tostring(id))
-        end
         -- RED DE SEGURIDAD: solo borrar archivos que coincidan con nuestro
         -- patrón de extracción: <nombre>.sub<N>.<ext>, ubicados en la carpeta
         -- del vídeo. Cualquier otra ruta se ignora y se informa por log.
@@ -1322,8 +1500,10 @@ local function exit_mode(message, dur, discard)
         cleanup_disposable()
     else
         session_rollback = nil
+        session_added_files = {}
     end
     remove_session_edit_dir()
+    restore_edit_fonts()
     state = "idle"
     edit = nil
     candidates = {}
@@ -1385,8 +1565,7 @@ local function render_selector()
     end
 end
 
-local function start_edit(cand)  -- forward declaration (definida más abajo)
-end
+local start_edit  -- assigned below (editor entry point)
 
 local function selector_key(key)
     if state ~= "select" then return end
@@ -1415,6 +1594,7 @@ local function register_selector_bindings()
 end
 
 local function enter_selector(cands)
+    stop_loading()
     candidates = cands
     sel_index = 1
     state = "select"
@@ -1449,8 +1629,7 @@ local function split_ass_tags(text)
     local prefix = ""
     while true do
         local seg = text:sub(pos)
-        local ws = seg:match("^%s*") or ""
-        local s, e = seg:find("^%b{}", #ws + 1)
+        local s, e = seg:find("^(%s*%b{})")
         if not s then break end
         prefix = prefix .. seg:sub(1, e)
         pos = pos + e
@@ -1459,6 +1638,29 @@ local function split_ass_tags(text)
     local had_inline = rest:find("%b{}") ~= nil
     local plain = rest:gsub("%b{}", "")
     return prefix, plain, had_inline
+end
+
+-- Newline flavor of the original event: keep \n vs \N on save.
+ass_newline = function(orig)
+    local hi, lo = 0, 0
+    for _ in orig:gmatch("\\N") do hi = hi + 1 end
+    for _ in orig:gmatch("\\n") do lo = lo + 1 end
+    if lo > hi then return "\\n" end
+    return "\\N"
+end
+
+-- Editable buffer + leading tags + inline-tags flag from the raw event text.
+-- Used at edit start, on line switch, and to detect clean (unedited) events.
+local function derive_buffer(cand)
+    local raw = cand.event.text
+    if cand.doc.kind == "ass" then
+        raw = raw:gsub("\\N", "\n"):gsub("\\n", "\n")
+    end
+    local prefix, buffer, had_inline = "", raw, false
+    if cand.doc.kind == "ass" then
+        prefix, buffer, had_inline = split_ass_tags(raw)
+    end
+    return buffer, prefix, had_inline
 end
 
 -- Detecta si un subtítulo es demasiado complejo para edición segura:
@@ -1477,6 +1679,7 @@ end
 -- Metadatos de cabecera ASS/SSA. Definida por asignación para poder declararla
 -- (forward) desde la zona de fuentes.
 parse_ass_meta = function(doc)
+    if doc._meta then return doc._meta end
     -- El default replica libass (ScaledBorderAndShadow por defecto = 0, como
     -- VSFilter): sin línea explícita, el contorno/sombra no se escala con el
     -- vídeo. Solo se escala si el header lo pide con "1".
@@ -1514,11 +1717,12 @@ parse_ass_meta = function(doc)
                     rest = rest:sub(c + 1)
                 end
                 if f[1] and f[1] ~= "" then
-                    meta.styles[f[1]] = f
+                    meta.styles[style_key(f[1])] = f
                 end
             end
         end
     end
+    doc._meta = meta
     return meta
 end
 
@@ -1616,7 +1820,7 @@ local function build_screen_context(cand, prefix)
         local kx = ctx.res_x / prx
         local ky = ctx.res_y / pry
 
-        local st = (ev.style ~= "") and meta.styles[ev.style] or nil
+        local st = (ev.style ~= "") and meta.styles[style_key(ev.style)] or nil
         local align, ml, mr, mv = 2, 0, 0, 0
         if st then
             if st[2] and st[2] ~= "" then
@@ -1829,7 +2033,6 @@ local function build_screen_context(cand, prefix)
         local pos = mp.get_property_number(
             secondary and "options/secondary-sub-pos" or "options/sub-pos",
             secondary and 0 or 100)
-        if not pos then pos = secondary and 0 or 100 end
         local align = (pos <= 50) and 8 or 2
         table.insert(tags, "\\an" .. align)
         table.insert(tags, string.format("\\pos(%d,%d)",
@@ -1896,8 +2099,7 @@ local function render_editor()
     end
 end
 
-local function save_subtitle()  -- forward declaration (definida más abajo)
-end
+local save_subtitle  -- assigned below (batch save)
 
 local kp_chars = {
     KP0 = "0", KP1 = "1", KP2 = "2", KP3 = "3", KP4 = "4",
@@ -1976,8 +2178,8 @@ local function handle_edit_key(key)
     render_editor()
 end
 
--- Lista de eventos ciclables (misma pista/archivo que el editado, ya visibles
--- en pantalla como contexto) para saltar con Ctrl+↑/↓ sin pasar por el menú.
+-- Cyclable events: overlapping events of the SAME file/track being edited
+-- (Ctrl+↑/↓ never jumps to the other sub track).
 local function edit_cycle_list()
     local list = {}
     if edit and candidates then
@@ -1997,7 +2199,7 @@ local function edit_cycle_index(list)
     return 1
 end
 
--- Leyenda de controles en la esquina superior izquierda (mismo estilo que el
+-- Leyenda de controles centrada arriba (mismo estilo que el
 -- menú selector), con contador "i/n" cuando hay varios subtítulos ciclables.
 local function update_help_overlay()
     if not (mp.create_osd_overlay and edit) then return end
@@ -2006,7 +2208,7 @@ local function update_help_overlay()
     if #list > 1 then
         counter = edit_cycle_index(list) .. "/" .. #list .. " · "
     end
-    local data = osd_corner_style()
+    local data = osd_top_center_style()
         .. escape_ass(counter .. "Enter guardar · Shift+Enter salto de línea · "
                    .. "Esc cancelar · ↑/↓ línea · Ctrl+↑/↓ subtítulo")
     if help_overlay then
@@ -2095,16 +2297,19 @@ local function switch_edit(dir)
     local cand = list[n]
     if not cand then return end
 
-    pending[edit.cand] = { buffer = edit.buffer, cursor = edit.cursor }
+    -- Keep the leaving event only if actually changed; clean hops
+    -- leave no trace (no false "unsaved" entries).
+    local orig_buf = derive_buffer(edit.cand)
+    if edit.buffer ~= orig_buf then
+        pending[edit.cand] = {
+            buffer = edit.buffer, cursor = edit.cursor,
+            prefix = edit.prefix, had_inline = edit.had_inline,
+        }
+    else
+        pending[edit.cand] = nil
+    end
 
-    local raw = cand.event.text
-    if cand.doc.kind == "ass" then
-        raw = raw:gsub("\\N", "\n"):gsub("\\n", "\n")
-    end
-    local prefix, buffer, had_inline = "", raw, false
-    if cand.doc.kind == "ass" then
-        prefix, buffer, had_inline = split_ass_tags(raw)
-    end
+    local buffer, prefix, had_inline = derive_buffer(cand)
     local pv = pending[cand]
     if pv then
         buffer = pv.buffer
@@ -2177,11 +2382,7 @@ start_edit = function(cand)
         selector_overlay = nil
     end
     local ev, doc = cand.event, cand.doc
-    local buffer, prefix, had_inline = ev.text, "", false
-    if doc.kind == "ass" then
-        buffer = buffer:gsub("\\N", "\n"):gsub("\\n", "\n")
-        prefix, buffer, had_inline = split_ass_tags(buffer)
-    end
+    local buffer, prefix, had_inline = derive_buffer(cand)
     edit = {
         cand = cand,
         doc = doc,
@@ -2212,23 +2413,73 @@ end
 --------------------------------------------------------------------------
 save_subtitle = function()
     if state ~= "edit" or not edit then return end
+    -- ENTER bypasses handle_edit_key: flush a pending dead key first.
+    if pending_dead ~= "" then
+        edit.buffer = insert_at(edit.buffer, edit.cursor, pending_dead)
+        edit.cursor = edit.cursor + utf8_len(pending_dead)
+        pending_dead = ""
+    end
     msg.info("[guardar] archivo=" .. tostring(edit.file))
 
-    local doc, ev = edit.doc, edit.event
-    local text = edit.buffer
-    if doc.kind == "ass" then
-        text = edit.prefix .. text:gsub("\n", "\\N")
+    -- Group by file: the same file selected twice yields twin doc objects
+    -- (same content, same indexes); all its edits land on a single doc.
+    local groups, order = {}, {}
+    local function add_edit(cand, buf, prefix, had_inline)
+        local g = groups[cand.file]
+        if not g then
+            g = { file = cand.file, doc = cand.doc, list = {} }
+            groups[cand.file] = g
+            order[#order + 1] = g
+        end
+        if cand.file == edit.file then
+            g.doc = edit.doc
+        end
+        table.insert(g.list, { ev = cand.event, buf = buf,
+            prefix = prefix, had_inline = had_inline })
     end
-
-    apply_event_text(doc, ev, text)
-
-    local content = (doc.bom and "\239\187\191" or "") .. table.concat(doc.lines)
-    if not write_file(edit.file, content) then
-        msg.warn("[guardar] ERROR al escribir archivo: " .. tostring(edit.file))
-        exit_mode("✗ Error al guardar el archivo", 3)
+    -- The current event counts only if actually changed (pendings are
+    -- dirty by construction). Nothing changed: leave without a trace.
+    if edit.buffer ~= derive_buffer(edit.cand) then
+        add_edit(edit.cand, edit.buffer, edit.prefix, edit.had_inline)
+    end
+    for cand, pv in pairs(pending) do
+        if cand ~= edit.cand then
+            add_edit(cand, pv.buffer, pv.prefix or "", pv.had_inline)
+        end
+    end
+    if #order == 0 then
+        exit_mode("Sin cambios", 1.5, true)
         return
     end
-    msg.info("[guardar] OK: " .. tostring(edit.file))
+    local total, had_warn = 0, false
+    for _, g in ipairs(order) do
+        local kind = g.doc.kind
+        for _, e in ipairs(g.list) do
+            if kind == "ass" then
+                e.text = e.prefix .. e.buf:gsub("\n", ass_newline(e.ev.text))
+            else
+                e.text = e.buf
+            end
+            if e.had_inline then had_warn = true end
+        end
+        -- Bottom-up so SRT splices keep earlier event indexes valid.
+        table.sort(g.list, function(a, b)
+            if kind == "ass" then
+                return a.ev.line_index > b.ev.line_index
+            end
+            return a.ev.first > b.ev.first
+        end)
+        for _, e in ipairs(g.list) do
+            apply_event_text(g.doc, e.ev, e.text)
+        end
+        if not write_file(g.file, serialize_doc(g.doc)) then
+            msg.warn("[guardar] ERROR al escribir archivo: " .. tostring(g.file))
+            exit_mode("✗ Error al guardar el archivo", 3)
+            return
+        end
+        total = total + #g.list
+    end
+    msg.info("[guardar] OK (" .. tostring(total) .. "): " .. tostring(edit.file))
     -- El archivo ya contiene el contenido guardado: ya nunca se borra,
     -- ni siquiera si en una sesión posterior se edita y se cancela.
     script_created_files[norm_path(edit.file)] = nil
@@ -2238,10 +2489,12 @@ save_subtitle = function()
     local was_secondary = (edit.sub.track["main-selection"] == 1)
 
     local extra = ""
-    if edit.had_inline then
+    if had_warn then
         extra = " (aviso: tags ASS intermedias descartadas)"
     end
-    exit_mode("✓ Subtítulo guardado" .. extra, 2.5)
+    local done_msg = (total == 1) and "✓ Subtítulo guardado"
+        or ("✓ " .. tostring(total) .. " subtítulos guardados")
+    exit_mode(done_msg .. extra, 2.5)
 
     -- Recargar la pista real DESPUÉS de restaurar la selección (exit_mode):
     -- sub-reload descarga y re-añade la pista, por lo que su id puede cambiar;
@@ -2327,26 +2580,38 @@ local function edit_subtitle(mode)
         sid2 = mp.get_property("secondary-sid") or "no",
     }
 
+    -- Pause BEFORE extraction: ffmpeg may block and the time would drift.
+    pause_enter()
     loading = true
     show_loading()
 
-    -- Se aplaza la búsqueda para que el spinner llegue a pintarse
+    -- Se aplaza la búsqueda para que el mensaje llegue a pintarse
     -- (collect_candidates puede bloquear extrayendo pistas con ffmpeg).
     -- La carpeta de sesión se crea AQUÍ, antes de esa extracción: al ser el
     -- primer subprocess del tick se evita el fallo transitorio de parseo de mpv
     -- (cubierto de todas formas por el retry de fs_command()).
     mp.add_timeout(0.05, function()
         get_session_edit_dir()
-        local ok, cands, errs = pcall(collect_candidates, subs, t)
-        stop_loading()
+        -- Re-read time: user may have seeked during the delay.
+        local now_t = mp.get_property_number("time-pos")
+        if not now_t then
+            stop_loading()
+            loading = false
+            cleanup_disposable()
+            ui_msg("No hay reproducción activa", 2, "warn")
+            return
+        end
+        local ok, cands, errs = pcall(collect_candidates, subs, now_t)
         loading = false
         if not ok then
+            stop_loading()
             cleanup_disposable()
             ui_msg("Error al buscar subtítulos", 3, "error")
             return
         end
 
         if #cands == 0 then
+            stop_loading()
             cleanup_disposable()
             local extra = ""
             if #errs > 0 then
@@ -2365,6 +2630,7 @@ local function edit_subtitle(mode)
             end
         end
         if #filtered == 0 then
+            stop_loading()
             cleanup_disposable()
             ui_msg("Subtítulo demasiado complejo para edición (tags entre las palabras)", 3, "warn")
             return
@@ -2378,10 +2644,18 @@ local function edit_subtitle(mode)
             return a.event.start_time < b.event.start_time
         end)
 
-pause_enter()
         -- Fuentes embebidas para el primer evento en edición (antes de crear
         -- el renderer en setup_screen). Por línea, se re-evalúan en switch_edit.
-        ensure_edit_fonts(cands[1])
+        -- NOTE: already paused on launch. Loading toast stays up through
+        -- font extraction; start_edit/enter_selector hide it.
+        local fonts_ok, fonts_err = pcall(ensure_edit_fonts, cands[1])
+        if not fonts_ok then
+            msg.warn("[fuentes] ERROR: " .. tostring(fonts_err))
+            stop_loading()
+            cleanup_disposable()
+            ui_msg("Error al preparar las fuentes", 3, "error")
+            return
+        end
         -- En modo pantalla se entra directo al primer candidato y se salta
         -- entre eventos con Ctrl+↑/↓; el menú selector queda para el modo OSD.
         candidates = cands
