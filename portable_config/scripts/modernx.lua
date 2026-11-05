@@ -311,7 +311,7 @@ local user_opts = {
     toast_bar_color = "",            -- override ("" = per-kind accent)
     toast_bar_position = "auto",     -- "auto"|"left"|"top"|"bottom"
     toast_bar_length = 1.0,          -- bar length ratio 0-1 (1 = full content)
-    toast_bar_gap = -1,              -- bar-to-text gap px (-1 = auto)
+    toast_bar_gap = -1,              -- bar-to-text gap px (-1 = auto; top/bottom bars only)
     toast_pad_bottom = 0,            -- extra space below the text
     -- <<< CUSTOM desuka >>>
 }
@@ -3133,6 +3133,23 @@ local function escape_toast_text(s)
     return string.sub(s, 1, 4000)
 end
 
+-- Strip trailing whitespace per line and drop leading/trailing blank lines
+-- (multiline senders often pad with \r\n and spaces, inflating the pill).
+local function normalize_toast_lines(s)
+    s = tostring(s or "")
+    s = s:gsub("\r\n", "\n"):gsub("\r", "\n")
+    local buf = {}
+    for line in (s .. "\n"):gmatch("(.-)\n") do
+        buf[#buf + 1] = line:gsub("%s+$", "")
+    end
+    local a, b = 1, #buf
+    while a <= b and buf[a] == "" do a = a + 1 end
+    while b >= a and buf[b] == "" do b = b - 1 end
+    local out = {}
+    for i = a, b do out[#out + 1] = buf[i] end
+    return table.concat(out, "\n")
+end
+
 function show_toast(text, kind, source, duration)
     if not user_opts.toast_enabled then
         show_message(tostring(text or ""), duration)
@@ -3151,7 +3168,7 @@ function show_toast(text, kind, source, duration)
         duration = tonumber(duration) or toast_default_duration(kind)
         if duration > 1000 then duration = duration / 1000 end -- allow ms from script-message
     end
-    state.toast_text = escape_toast_text(text)
+    state.toast_text = escape_toast_text(normalize_toast_lines(text))
     state.toast_kind = kind
     state.toast_source = source
     state.toast_head = nil
@@ -3190,11 +3207,11 @@ function show_toast_row(row, kind, source, duration)
         duration = tonumber(duration) or toast_default_duration(kind)
         if duration > 1000 then duration = duration / 1000 end
     end
-    state.toast_text = escape_toast_text(row.full or row.text or "")
+    state.toast_text = escape_toast_text(normalize_toast_lines(row.full or row.text or ""))
     state.toast_kind = kind
     state.toast_source = source
-    state.toast_head = escape_toast_text((row.head or ""):gsub("%s+$", ""))
-    local tail = tostring(row.tail or ""):gsub("^%s+", "")
+    state.toast_head = escape_toast_text(tostring(row.head or ""):gsub("%s+$", ""))
+    local tail = tostring(row.tail or ""):gsub("^%s+", ""):gsub("%s+$", "")
     state.toast_tail = (tail ~= "") and escape_toast_text(tail) or nil
     state.toast_flag_lang = row.flag_lang
     if not state.toast_hide_timer then
@@ -3393,7 +3410,8 @@ local function render_toast(ass)
     local bar_col = sanitize_hex_color(user_opts.toast_bar_color or "", "")
     if bar_col == "" then bar_col = toast_accent(state.toast_kind) end
     local bar_gap = tonumber(user_opts.toast_bar_gap)
-    if bar_gap == nil or bar_gap < 0 then
+    -- only -1 (or invalid) means auto; other negatives overlap the text
+    if bar_gap == nil or bar_gap == -1 then
         bar_gap = math.max(0, pad_y / 2 - bar_w / 2)
     end
     ass:new_event()
