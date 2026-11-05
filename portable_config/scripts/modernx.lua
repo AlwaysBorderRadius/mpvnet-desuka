@@ -3379,7 +3379,9 @@ local function render_toast(ass)
         local hole = mp.assdraw.ass_new()
         hole.scale = 1
         hole:draw_start()
-        hole:round_rect_cw(x0 + 1, y0 + 1, x1 - 1, y1 - 1, math.max(0, r - 1))
+        -- Top edge flush with the bg (no tuck): compensates a downward
+        -- rasterization shift of the clip. Bottom/sides keep the 1px tuck.
+        hole:round_rect_cw(x0 + 1, y0, x1 - 1, y1 - 1, math.max(0, r - 1))
         hole:draw_stop()
         local hole_path = hole.text:gsub("{\\p%d+}", "")
         ass:new_event()
