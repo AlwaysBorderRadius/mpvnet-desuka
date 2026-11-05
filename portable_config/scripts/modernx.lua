@@ -314,6 +314,8 @@ local user_opts = {
     toast_bar_gap = -1,              -- bar-to-edge gap px (-1 = auto; top/bottom bars only)
     toast_pad_bottom = 0,            -- extra space below the text
     toast_bg_border_kind_colors = false, -- bar + bg border follow kind accent
+    toast_bg_border_opacity = 1.0,   -- border opacity 0-1 (independent)
+    toast_bg_radius = 12,            -- background corner radius
     -- <<< CUSTOM desuka >>>
 }
 -- read options from config and command-line
@@ -3352,27 +3354,39 @@ local function render_toast(ass)
     end
     local y1 = cy_box + pill_h / 2
     if not asset then x1 = x1 - 10 end -- balance the text shift (plain only)
-    local r = math.min(12, pill_h / 2)
+    local r_opt = tonumber(user_opts.toast_bg_radius)
+    if r_opt == nil or r_opt < 0 then r_opt = 12 end
+    local r = math.min(r_opt, pill_h / 2)
     -- background pill, opacity + border from opts.
-    -- NOTE: the border is a layered flat rect, not \bord on the drawing:
-    -- libass does not reliably paint \3c on \p shapes (size grew, color did
-    -- not), while plain fills always render with exact colors.
+    -- NOTE: the border is a ring with a vector \iclip hole, not \bord on the
+    -- drawing (libass does not reliably paint \3c on \p shapes) and not a
+    -- solid underlay (it would show through a translucent bg). The hole path
+    -- is built with the same round_rect_cw (tags stripped), so edges match.
     local bg_op = tonumber(user_opts.toast_bg_opacity)
     if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
     local bg_aa = string.format("%02X", math.floor((1 - bg_op) * 255 + 0.5))
     local bg_bb = tonumber(user_opts.toast_bg_border_size) or 0
     if bg_bb < 0 then bg_bb = 0 end
+    local bb_op = tonumber(user_opts.toast_bg_border_opacity)
+    if bb_op == nil or bb_op < 0 or bb_op > 1 then bb_op = 1 end
+    local bb_aa = string.format("%02X", math.floor((1 - bb_op) * 255 + 0.5))
     local kind_col = toast_accent(state.toast_kind)
     local bb_col = kind_col
     if not user_opts.toast_bg_border_kind_colors then
         bb_col = sanitize_hex_color(user_opts.toast_bg_border_color, "#000000")
     end
     if bg_bb > 0 then
+        local hole = mp.assdraw.ass_new()
+        hole.scale = 1
+        hole:draw_start()
+        hole:round_rect_cw(x0, y0, x1, y1, r)
+        hole:draw_stop()
+        local hole_path = hole.text:gsub("{\\p%d+}", "")
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
         ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bb_col)
-            .. "&\\alpha&H" .. bg_aa .. "&}")
+            .. "&\\alpha&H" .. bb_aa .. "&\\iclip(1, " .. hole_path .. ")}")
         ass:draw_start()
         ass:round_rect_cw(x0 - bg_bb / 2, y0 - bg_bb / 2,
             x1 + bg_bb / 2, y1 + bg_bb / 2, r + bg_bb / 2)
@@ -4893,6 +4907,15 @@ function validate_user_opts()
     if type(user_opts.toast_bg_border_kind_colors) ~= "boolean" then
         mp.msg.warn("toast_bg_border_kind_colors must be boolean. Using false.")
         user_opts.toast_bg_border_kind_colors = false
+    end
+    if type(user_opts.toast_bg_border_opacity) ~= "number"
+        or user_opts.toast_bg_border_opacity < 0 or user_opts.toast_bg_border_opacity > 1 then
+        mp.msg.warn("toast_bg_border_opacity must be 0-1. Using 1.")
+        user_opts.toast_bg_border_opacity = 1.0
+    end
+    if type(user_opts.toast_bg_radius) ~= "number" or user_opts.toast_bg_radius < 0 then
+        mp.msg.warn("toast_bg_radius must be a non-negative number. Using 12.")
+        user_opts.toast_bg_radius = 12
     end
     -- <<< CUSTOM desuka >>>
 end
