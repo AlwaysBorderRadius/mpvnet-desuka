@@ -881,6 +881,20 @@ local thumbfast = {
     available = false
 }
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- True while a thumbfast thumbnail is on screen; the per-frame "clear"
+-- below only fires on the hover -> no-hover transition instead of 60/s.
+local thumb_hovering = false
+
+-- One-shot clear guarded by the flag: fires whenever a thumb was
+-- requested, unconditionally, so show/clear can't desync.
+local function thumb_clear()
+    if not thumb_hovering then return end
+    thumb_hovering = false
+    mp.commandv("script-message-to", "thumbfast", "clear")
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
 local sponsorblock_color_map = {
     sponsor = user_opts.sponsorblock_sponsor_color,
     intro = user_opts.sponsorblock_intro_color,
@@ -1017,6 +1031,7 @@ local state = {
     enabled = true,
     input_enabled = true,
     showhide_enabled = false,
+    wc_enabled = true, -- >>> EDIT AlwaysBorderRadius <<< -- window-controls bindings start enabled (see bottom)
 
     border = true,
     title_bar = true,
@@ -1167,6 +1182,10 @@ end
 
 local function set_virt_mouse_area(x0, y0, x1, y1, name)
     local sx, sy = get_virt_scale_factor()
+    if not (sx > 0 and sy > 0) then -- >>> EDIT AlwaysBorderRadius <<< -- no finite OSD size: clear instead of NaN
+        mp.set_mouse_area(0, 0, 0, 0, name)
+        return
+    end
     mp.set_mouse_area(x0 / sx, y0 / sy, x1 / sx, y1 / sy, name)
 end
 
@@ -2092,6 +2111,7 @@ function render_elements(master_ass)
                                     an = 2
 
                                     mp.commandv("script-message-to", "thumbfast", "thumb", hover_sec, thumbX, thumbY)
+                                    thumb_hovering = true -- >>> EDIT AlwaysBorderRadius <<< -- clear only on transition
                                 end
 
 
@@ -2121,8 +2141,10 @@ function render_elements(master_ass)
                         elem_ass:append(slider_lo.tooltip_style)
                         ass_append_alpha(elem_ass, slider_lo.alpha, 0)
                         elem_ass:append(tooltiplabel)
-                    elseif element.thumbnailable and thumbfast.available then
-                        mp.commandv("script-message-to", "thumbfast", "clear")
+                    elseif element.thumbnailable and (thumbfast.available or thumb_hovering) then
+                        -- >>> CUSTOM AlwaysBorderRadius <<<
+                        thumb_clear() -- one clear on leaving hover, not one per frame
+                        -- <<< CUSTOM AlwaysBorderRadius >>>
                     end
                 end
             end
@@ -2347,6 +2369,7 @@ local function newfilereset()
     request_init()
     -- >>> CUSTOM AlwaysBorderRadius <<<
     close_track_menu() -- new file, stale dropdown
+    thumb_clear() -- new file, stale thumbnail
     -- <<< CUSTOM AlwaysBorderRadius >>>
     state.downloaded_once = false
     state.videoDescription = "Loading description..."
@@ -6334,9 +6357,7 @@ function hide_osc()
     else
         osc_visible(false)
     end
-    if thumbfast.available then
-        mp.commandv("script-message-to", "thumbfast", "clear")
-    end
+    thumb_clear() -- >>> EDIT AlwaysBorderRadius <<< -- one-shot, flag-guarded
 end
 
 function osc_visible(visible)
@@ -6420,6 +6441,13 @@ local function enable_osc(enable)
             mp.disable_key_bindings('showhide_wc')
         end
         state.showhide_enabled = false
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        if state.wc_enabled then -- no render() will run to sync it
+            mp.disable_key_bindings('window-controls')
+            state.wc_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 end
 
@@ -6519,19 +6547,44 @@ local function render()
         end
     end
 
-    if osc_param.areas['window-controls'] then
-        for _, cords in ipairs(osc_param.areas['window-controls']) do
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Nil/empty-safe area lookup; bindings toggle on transition only.
+    local wc_areas = osc_param.areas['window-controls']
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    if wc_areas and wc_areas[1] then
+        for _, cords in ipairs(wc_areas) do
             if state.osc_visible then -- activate only when OSC is actually visible
                 set_virt_mouse_area(cords.x1, cords.y1, cords.x2, cords.y2, 'window-controls')
-                mp.enable_key_bindings('window-controls')
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- Toggle bindings on transition only, not 60x/s.
+                if not state.wc_enabled then
+                    mp.enable_key_bindings('window-controls')
+                    state.wc_enabled = true
+                end
+                -- <<< CUSTOM AlwaysBorderRadius >>>
             else
-                mp.disable_key_bindings('window-controls')
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                if state.wc_enabled then
+                    mp.disable_key_bindings('window-controls')
+                    state.wc_enabled = false
+                    set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+                end
+                -- <<< CUSTOM AlwaysBorderRadius >>>
             end
 
             if (mouse_hit_coords(cords.x1, cords.y1, cords.x2, cords.y2) and user_opts.osc_keep_with_cursor) then
                 mouse_over_osc = true
             end
         end
+    else
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Area gone (osc_init while top bar off): don't leak bindings on.
+        if state.wc_enabled then
+            mp.disable_key_bindings('window-controls')
+            state.wc_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -6879,6 +6932,14 @@ function tick()
     if not state.enabled then return end
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        thumb_clear() -- no stuck thumbnail into idle
+        if state.wc_enabled then -- idle never reaches render() to sync it
+            mp.disable_key_bindings('window-controls')
+            state.wc_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
         -- render idle message
         mp.msg.trace('idle message')
         local _, _, display_aspect = mp.get_osd_size()
@@ -6928,6 +6989,7 @@ function tick()
         render()
     else
         -- Flush OSD
+        thumb_clear() -- >>> EDIT AlwaysBorderRadius <<< -- no stuck thumbnail when OSC off
         render_wipe()
     end
 
@@ -7194,6 +7256,8 @@ function visibility_mode(mode)
     mp.disable_key_bindings("input")
     mp.disable_key_bindings("window-controls")
     state.input_enabled = false
+    state.wc_enabled = false -- >>> EDIT AlwaysBorderRadius <<< -- keep transition guard in sync
+    set_virt_mouse_area(0, 0, 0, 0, "window-controls") -- >>> EDIT AlwaysBorderRadius <<< -- no render() in never mode
     request_tick()
 end
 
@@ -7202,7 +7266,21 @@ mp.register_script_message("thumbfast-info", function(json)
     if type(data) ~= "table" or not data.width or not data.height then
         mp.msg.error("thumbfast-info: received json didn't produce a table with thumbnail information")
     else
-        thumbfast = data
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Whitelist merge, don't replace: foreign senders may omit
+        -- available/disabled, and nils would desync show/clear.
+        local w, h = tonumber(data.width), tonumber(data.height)
+        if not w or not h or w <= 0 or h <= 0 then
+            mp.msg.error("thumbfast-info: bad thumbnail dimensions")
+            return
+        end
+        thumbfast.width = w
+        thumbfast.height = h
+        thumbfast.available = data.available
+        if thumbfast.available == nil then thumbfast.available = true end
+        thumbfast.disabled = data.disabled
+        if thumbfast.disabled == nil then thumbfast.disabled = false end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 end)
 
