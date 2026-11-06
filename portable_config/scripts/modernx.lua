@@ -888,9 +888,11 @@ local thumb_hovering = false
 
 -- One-shot clear guarded by the flag: fires whenever a thumb was
 -- requested, unconditionally, so show/clear can't desync.
+local thumb_last_key = nil -- hover second + thumb box; resend only on change
 local function thumb_clear()
     if not thumb_hovering then return end
     thumb_hovering = false
+    thumb_last_key = nil
     mp.commandv("script-message-to", "thumbfast", "clear")
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
@@ -2110,7 +2112,15 @@ function render_elements(master_ass)
                                     tx = (thumbX + thumbfast.width / 2) * r_w
                                     an = 2
 
-                                    mp.commandv("script-message-to", "thumbfast", "thumb", hover_sec, thumbX, thumbY)
+                                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                                    -- Request only on hover start or when the hovered second
+                                    -- or thumb box changes; parked cursor must not re-request.
+                                    local thumb_key = math.floor(hover_sec) .. "x" .. thumbX .. "y" .. thumbY
+                                    if thumb_last_key == nil or thumb_key ~= thumb_last_key then
+                                        thumb_last_key = thumb_key
+                                        mp.commandv("script-message-to", "thumbfast", "thumb", hover_sec, thumbX, thumbY)
+                                    end
+                                    -- <<< CUSTOM AlwaysBorderRadius >>>
                                     thumb_hovering = true -- >>> EDIT AlwaysBorderRadius <<< -- clear only on transition
                                 end
 
@@ -3930,6 +3940,26 @@ function render_track_menu(ass)
     end
 end
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Release a stranded OSC press without firing it. The menu swallows the
+-- release (up) of gestures that started underneath it, so the element's
+-- reset (seekbar/volumebar drag state) would otherwise never run.
+local function track_menu_drop_gesture()
+    local n = state.active_element
+    local el = n and elements[n]
+    if el then
+        if el.eventresponder and el.eventresponder['reset'] then
+            el.eventresponder['reset'](el)
+        end
+        if el.state then
+            el.state.mbtnleft = false -- reset() doesn't clear it (up does, and up was swallowed)
+        end
+    end
+    state.active_element = nil
+    state.mouse_down_counter = 0
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
 function track_menu_handle_event(source, what)
     local m = state.track_menu
     if not m then return false end
@@ -3946,6 +3976,7 @@ function track_menu_handle_event(source, what)
         return false
     end
     if source == "mbtn_right" then
+        track_menu_drop_gesture()
         close_track_menu()
         return true
     end
@@ -3953,6 +3984,7 @@ function track_menu_handle_event(source, what)
         if what == "down" then
             for _, r in ipairs(g.rows) do
                 if mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 then
+                    track_menu_drop_gesture() -- abort any in-flight OSC drag first
                     m.pressed = r.index
                     request_tick()
                     return true
@@ -3961,6 +3993,7 @@ function track_menu_handle_event(source, what)
             -- inside the box but not on a row (header/padding/scrollbar):
             -- swallow so the click can't leak to the seekbar underneath
             if inside then
+                track_menu_drop_gesture()
                 request_tick()
                 return true
             end
@@ -3969,6 +4002,7 @@ function track_menu_handle_event(source, what)
             if m.pressed then
                 local p = m.pressed
                 m.pressed = nil
+                track_menu_drop_gesture()
                 for _, r in ipairs(g.rows) do
                     if mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 and r.index == p then
                         track_menu_select(m.items[r.index])
@@ -3981,6 +4015,7 @@ function track_menu_handle_event(source, what)
             if inside then
                 -- released over the menu with no press: swallow so the
                 -- click can't leak through to the OSC underneath
+                track_menu_drop_gesture()
                 return true
             end
             for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub" }) do
@@ -3990,7 +4025,8 @@ function track_menu_handle_event(source, what)
                     end
                 end
             end
-            -- dismiss click: close and swallow, never pass through
+            -- dismiss click: drop any stranded press, close and swallow
+            track_menu_drop_gesture()
             close_track_menu()
             return true
         end
@@ -7236,7 +7272,10 @@ mp.set_key_bindings({
         function(_) process_event("shift+mbtn_left", "down") end },
     { "wheel_up",            function(_) process_event("wheel_up", "press") end },
     { "wheel_down",          function(_) process_event("wheel_down", "press") end },
-    { "mbtn_left_dbl",       "ignore" },
+    { "mbtn_left_dbl", function(_) -- >>> EDIT AlwaysBorderRadius <<< -- mpv.net reports fast double presses as dbl-only (constituents swallowed): act as one click
+            process_event("mbtn_left", "down")
+            process_event("mbtn_left", "up")
+        end },
     { "shift+mbtn_left_dbl", "ignore" },
     { "mbtn_right_dbl",      "ignore" },
 }, "input", "force")
