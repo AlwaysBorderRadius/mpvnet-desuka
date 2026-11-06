@@ -6257,11 +6257,14 @@ local function osc_init()
     end
 
     -- Chapter title (below seekbar)
-    local chapter_index = mp.get_property_number("chapter", -1)
+    -- NOTE: chapter_index is read fresh inside each content() (not captured
+    -- once per osc_init): content runs every frame, and chapter changes don't
+    -- trigger re-init (there is no chapter observer by design, to avoid the
+    -- re-init hot loop).
     ne = new_element("separator", "button")
     ne.visible = true
     ne.content = function()
-        if chapter_index >= 0 or state.buffering then
+        if mp.get_property_number("chapter", -1) >= 0 or state.buffering then
             return " • "
         else
             return ""
@@ -6276,8 +6279,14 @@ local function osc_init()
         elseif state.buffering ~= nil and state.buffering then
             return "Buffering..." .. " " .. (mp.get_property("cache-buffering-state") or "0") .. "%"
         else
+            local chapter_index = mp.get_property_number("chapter", -1) -- >>> EDIT AlwaysBorderRadius <<< -- fresh per frame, no re-init needed
             if user_opts.chapter_fmt ~= "no" and chapter_index >= 0 then
-                request_init()
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- No request_init() here: content() already re-reads the
+                -- chapter list every frame; asking for re-init from render
+                -- rebuilds the whole OSC on every tick (hot loop on
+                -- videos with chapters) and wipes in-flight clicks.
+                -- <<< CUSTOM AlwaysBorderRadius >>>
                 local chapters = mp.get_property_native("chapter-list", {})
                 local chapter_title = (chapters[chapter_index + 1] and chapters[chapter_index + 1].title ~= "") and
                     chapters[chapter_index + 1].title
