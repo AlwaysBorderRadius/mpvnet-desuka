@@ -818,6 +818,20 @@ local function text_width(str, fontsize)
     end
     return total * (fs / ADVANCE_FS)
 end
+
+-- UTF-8 safe ellipsis truncation to a playres width (mirrors the toast path).
+local function fit_text_to_width(s, max_w, fontsize)
+    s = tostring(s or "")
+    if text_width(s, fontsize) <= max_w then return s end
+    local ell = "…"
+    local prev
+    while #s > 0 and text_width(s .. ell, fontsize) > max_w do
+        prev = s
+        s = s:gsub("[%z\1-\127\194-\244][\128-\191]*$", "")
+        if s == prev then s = s:sub(1, -2) end -- malformed tail: force progress
+    end
+    return s .. ell
+end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -2187,7 +2201,11 @@ function render_elements(master_ass)
                 element.eventresponder["mbtn_left_down"] ~= nil or
                 element.eventresponder["mbtn_left_up"] ~= nil
             )
-            local hovered = mouse_hit(element) and is_clickable and element.enabled and state.mouse_down_counter == 0
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- No hover styling through the open track menu (it paints above).
+            local hovered = mouse_hit(element) and not track_menu_under_cursor()
+                and is_clickable and element.enabled and state.mouse_down_counter == 0
+            -- <<< CUSTOM AlwaysBorderRadius >>>
             local hoverstyle = button_lo.hoverstyle
             if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
                 -- remove font scale tags for these elements, it looks out of place
@@ -2209,10 +2227,12 @@ function render_elements(master_ass)
 
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
-                if mouse_hit(element) then
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- No tooltip through the open track menu (it paints above).
+                if mouse_hit(element) and not track_menu_under_cursor() then
+                -- <<< CUSTOM AlwaysBorderRadius >>>
                     local an = 1
                     local ty = element.hitbox.y1
-                    local tx = get_virt_mouse_pos()
 
                     if ty < osc_param.playresy / 2 then
                         ty = element.hitbox.y2
@@ -2265,9 +2285,41 @@ function render_elements(master_ass)
                         total_w = total_w + gap + gap + flag_w
                     end
 
-                    if tx > osc_param.playresx / 2 then --move tooltip to left side of mouse cursor
-                        tx = tx - total_w
+                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- Clamp long labels inside the screen (both segments).
+                    local max_text = osc_param.playresx - 8
+                    if total_w > max_text then
+                        local room = max_text - ((flag_lang ~= nil) and (gap + gap + flag_w) or 0)
+                        if tail_text ~= "" then
+                            tail_text = fit_text_to_width(tail_text, math.max(0, room - head_w), fontsize)
+                            tail_w = text_width(tail_text, fontsize)
+                        end
+                        room = max_text - tail_w - ((flag_lang ~= nil) and (gap + gap + flag_w) or 0)
+                        if head_w > room then
+                            head_text = fit_text_to_width(head_text, math.max(0, room), fontsize)
+                            head_w = text_width(head_text, fontsize)
+                        end
+                        total_w = head_w + tail_w
+                        if flag_lang ~= nil then
+                            total_w = total_w + gap + gap + flag_w
+                        end
                     end
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
+
+                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- Fixed tooltip anchored to the button (not the cursor):
+                    -- left-side buttons grow right from their left edge,
+                    -- right-side buttons end at their right edge, clamped
+                    -- on screen so long labels never run off.
+                    local bcx = (element.hitbox.x1 + element.hitbox.x2) / 2
+                    local tx
+                    if bcx <= osc_param.playresx / 2 then
+                        tx = element.hitbox.x1
+                    else
+                        tx = element.hitbox.x2 - total_w
+                    end
+                    tx = math.min(math.max(tx, 4), math.max(4, osc_param.playresx - total_w - 4))
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
 
                     local flag_x
                     if flag_lang ~= nil then
@@ -3607,15 +3659,9 @@ local function track_menu_anchor(ttype)
     return nil
 end
 
--- UTF-8 safe ellipsis trunction, mirrors the toast path.
+-- Menu rows share the tooltip truncation helper (same UTF-8-safe loop).
 local function track_menu_fit(s, max_w, fontsize)
-    s = tostring(s or "")
-    if text_width(s, fontsize) <= max_w then return s end
-    local ell = "…"
-    while #s > 0 and text_width(s .. ell, fontsize) > max_w do
-        s = s:gsub("[%z\1-\127\194-\244][\128-\191]*$", "")
-    end
-    return s .. ell
+    return fit_text_to_width(s, max_w, fontsize)
 end
 
 local function track_menu_build(ttype)
