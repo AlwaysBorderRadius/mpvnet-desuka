@@ -1373,7 +1373,13 @@ local function request_tick()
 
     if not state.tick_timer:is_enabled() then
         local now = mp.get_time()
-        local timeout = tick_delay - (now - state.tick_last_time)
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Cap the rate while the track menu is open: its content is static,
+        -- so full-rate re-renders (with vector flags) only burn libass/GPU.
+        local delay = tick_delay
+        if state.track_menu then delay = math.max(delay, 1 / 30) end
+        local timeout = delay - (now - state.tick_last_time)
+        -- <<< CUSTOM AlwaysBorderRadius >>>
         if timeout < 0 then
             timeout = 0
         end
@@ -2428,7 +2434,7 @@ end
 
 local function set_tick_delay(_, display_fps)
     -- may be nil if unavailable or 0 fps is reported
-    if not display_fps then
+    if not display_fps or display_fps <= 0 then -- >>> EDIT AlwaysBorderRadius <<< -- 1/0 would freeze ticks forever
         return
     end
     tick_delay = 1 / display_fps

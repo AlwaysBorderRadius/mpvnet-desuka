@@ -20,16 +20,16 @@ eventos/5s a nivel warn; quitar cuando el freeze quede diagnosticado),
 backpressure adaptativo (shed de micro-moves solo bajo flood sostenido,
 nunca en drag ni con menú abierto; clics/rueda intactos).
 
-## 1. Suelo de tick a 1/60
+## 1. Suelo de tick a 1/30 solo con menú abierto → APLICADO
 
-- Qué: `tick_delay = max(1/display-fps, 1/60)` en `set_tick_delay()`.
-- Efecto: en pantallas de 144/240 Hz los renders completos bajan a 60/s
-  (2.4-4x menos trabajo); en 60 Hz no cambia nada.
-- Riesgo: el OSD iría a 60 Hz en pantallas rápidas. Para un OSC (fades de
-  150 ms, timecode, drag de seekbar) 60 Hz sobra, pero el dueño prefiere no
-  tocar fluidez sin medir antes.
-- Si se retoma, añadir también guard contra `display-fps <= 0`
-  (`1/0 = inf` = ticks muertos = OSD congelado para siempre).
+- `request_tick()` usa `max(tick_delay, 1/30)` mientras `state.track_menu`
+  existe. El menú es estático: a 30Hz es indistinguible y corta a la mitad
+  los re-renders con banderas, justo el caso que saturaba.
+- El OSC normal sigue a ritmo completo (sin cambios); el veto del usuario
+  sobre capar la interfaz queda respetado fuera del menú.
+- Si hiciera falta más, el siguiente paso sería el suelo global
+  (`tick_delay = max(1/display_fps, 1/60)` en `set_tick_delay`, con guard
+  para `display-fps <= 0`).
 
 ## 2. Short-circuit de micro-movimientos (+ `min_mouse_move`) → APLICADO EN FORMA ADAPTATIVA
 
