@@ -3840,11 +3840,17 @@ function track_menu_geometry()
     local total = #m.items
     local visible = math.min(total, max_rows)
     local scrollable = total > max_rows
-    local sb_reserve = scrollable and 14 or 0
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Scrollbar air: rows end sb_gap before the bar, the bar sits sb_right
+    -- from the right edge (mirrors the rows' left inset), and the first
+    -- row clears the header separator by top_gap.
+    local sb_w, sb_right, sb_gap, top_gap = 6, 3, 8, 6
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    local sb_reserve = scrollable and (sb_gap + sb_w + sb_right) or 0
     local menu_w = m.width + pad_x * 2 + sb_reserve
     local max_w = osc_param.playresx - 8
     if menu_w > max_w then menu_w = max_w end
-    local menu_h = pad_y * 2 + header_h + visible * row_h
+    local menu_h = pad_y * 2 + header_h + top_gap + visible * row_h
     local cx = (anchor.hitbox.x1 + anchor.hitbox.x2) / 2
     local x0 = cx - menu_w / 2
     x0 = math.max(4, math.min(x0, osc_param.playresx - menu_w - 4))
@@ -3856,15 +3862,20 @@ function track_menu_geometry()
         local idx = m.offset + i
         if idx > total then break end
         rows[#rows + 1] = {
-            x0 = x0, y0 = y0 + pad_y + header_h + (i - 1) * row_h,
-            x1 = x0 + menu_w - sb_reserve, y1 = y0 + pad_y + header_h + i * row_h,
+            x0 = x0, y0 = y0 + pad_y + header_h + top_gap + (i - 1) * row_h,
+            x1 = x0 + menu_w - sb_reserve, y1 = y0 + pad_y + header_h + top_gap + i * row_h,
             index = idx,
         }
+    end
+    local sb = nil
+    if scrollable then
+        sb = { x0 = x0 + menu_w - sb_right - sb_w, w = sb_w,
+            top = y0 + pad_y + header_h + top_gap, bottom = y1 - pad_y }
     end
     return { x0 = x0, y0 = y0, x1 = x0 + menu_w, y1 = y0 + menu_h,
         row_h = row_h, fontsize = fontsize, header_h = header_h,
         pad_x = pad_x, pad_y = pad_y, visible = visible,
-        scrollable = scrollable, rows = rows }
+        scrollable = scrollable, rows = rows, sb = sb }
 end
 
 -- True while the cursor sits on the open dropdown, so elements painted
@@ -3973,16 +3984,15 @@ function render_track_menu(ass)
             end
         end
     end
-    if g.scrollable then
-        local top = g.y0 + g.pad_y + g.header_h
-        local bottom = g.y1 - g.pad_y
-        local sb_x0 = g.x1 - g.pad_x - 6
+    if g.scrollable and g.sb then
+        local top, bottom, sb_x0 = g.sb.top, g.sb.bottom, g.sb.x0
+        local sb_w = g.sb.w
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
         ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
         ass:draw_start()
-        ass:round_rect_cw(sb_x0, top, sb_x0 + 6, bottom, math.min(row_r, 3))
+        ass:round_rect_cw(sb_x0, top, sb_x0 + sb_w, bottom, math.min(row_r, sb_w / 2))
         ass:draw_stop()
         local total = #m.items
         local h = (bottom - top) * (g.visible / total)
@@ -3992,7 +4002,7 @@ function render_track_menu(ass)
         ass:an(7)
         ass:append("{\\blur0\\bord0\\1c&HFFFFFF&}")
         ass:draw_start()
-        ass:round_rect_cw(sb_x0, y, sb_x0 + 6, y + h, math.max(0, math.min(row_r, 3, h / 2)))
+        ass:round_rect_cw(sb_x0, y, sb_x0 + sb_w, y + h, math.max(0, math.min(row_r, sb_w / 2, h / 2)))
         ass:draw_stop()
     end
 end
