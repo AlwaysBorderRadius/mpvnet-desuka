@@ -923,6 +923,11 @@ local sponsorblock_color_map = {
 }
 
 local tick_delay = 1 / 60 -- Fallback
+-- >>> CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC (remove after freeze diagnosis) <<<
+-- Call-site counters: request_tick vs request_init_resize, to find a tick-storm path.
+local watch_rt = 0
+local watch_riz = 0
+-- <<< CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC >>>
 local window_control_box_width = 138
 local max_descsize = 200
 local comments_per_page = 25
@@ -1367,6 +1372,7 @@ end
 -- The tick is then either executed immediately, or rate-limited if it was
 -- called a small time ago.
 local function request_tick()
+    watch_rt = watch_rt + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: call-site count
     if state.tick_timer == nil then
         state.tick_timer = mp.add_timeout(0, tick)
     end
@@ -1396,6 +1402,10 @@ end
 -- Like request_init(), but also request an immediate update
 local function request_init_resize()
     request_init()
+    -- request_init() already bumped watch_rt via request_tick(); move that
+    -- count over so rt (coalesced path) and riz (timeout-0 path) stay disjoint.
+    watch_rt = watch_rt - 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG
+    watch_riz = watch_riz + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: call-site count
     -- ensure immediate update
     state.tick_timer:kill()
     state.tick_timer.timeout = 0
@@ -2437,7 +2447,7 @@ local function set_tick_delay(_, display_fps)
     if not display_fps or display_fps <= 0 then -- >>> EDIT AlwaysBorderRadius <<< -- 1/0 would freeze ticks forever
         return
     end
-    tick_delay = 1 / display_fps
+    tick_delay = math.max(1 / display_fps, 1 / 60) -- >>> EDIT AlwaysBorderRadius <<< -- desperate: global 60Hz floor
 end
 
 local function newfilereset()
@@ -6976,8 +6986,9 @@ local watch_max_tick = 0
 local function watch_report()
     if watch_max_tick > 0.25 or watch_events > 750 then
         mp.msg.warn(string.format(
-            "modernx: loop health: max_tick=%.0fms inputs=%d mouse=%d ticks=%d%s%s%s",
+            "modernx: loop health: max_tick=%.0fms inputs=%d mouse=%d ticks=%d rt=%d riz=%d%s%s%s",
             watch_max_tick * 1000, watch_events, watch_mouse, watch_ticks,
+            watch_rt, watch_riz,
             state.track_menu and " menu=open" or "",
             flood_shedding and " shed=1" or "",
             string.format(" osc=%d in=%d", state.osc_visible and 1 or 0,
@@ -6986,8 +6997,14 @@ local function watch_report()
     watch_events = 0
     watch_mouse = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG reset
     watch_ticks = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG reset
+    watch_rt = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG reset
+    watch_riz = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG reset
     watch_max_tick = 0
 end
+-- Storm-breaker state: a render storm starves input draining (queue overflow).
+local storm_n = 0
+local storm_t = 0
+local storm_active = false
 -- Independent reporter: if ticks themselves stall, the in-tick report would
 -- never fire, so report on a separate timer to tell flood from dead loop.
 -- <<< CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC >>>
@@ -7009,7 +7026,7 @@ end)
 function process_event(source, what)
     virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- input always reads live coords
     watch_events = watch_events + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: input rate
-    if source == 'mouse_move' then -- >>> EDIT AlwaysBorderRadius <<< -- flood count covers menu-consumed moves too
+    if source == 'mouse_move' then -- >>> EDIT AlwaysBorderRadius <<< -- arrival rate (pre-shed): what fills the queue
         flood_moves = flood_moves + 1
         watch_mouse = watch_mouse + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG
         if flood_moves > FLOOD_TRIP_COUNT and not flood_shedding then
@@ -7080,6 +7097,19 @@ function process_event(source, what)
         end
         -- <<< CUSTOM AlwaysBorderRadius >>>
 
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Desperate global shed: sub-3px moves with no drag and no menu do not
+        -- refresh the reference point, so slow drifts accumulate and pass;
+        -- no show_osc, no drag handling, no tick. Clicks, wheels, drags pass.
+        if state.active_element == nil and not state.track_menu then
+            local gdx = state.last_mouseX and math.abs(mouseX - state.last_mouseX) or 999
+            local gdy = state.last_mouseY and math.abs(mouseY - state.last_mouseY) or 999
+            if gdx < FLOOD_MIN_MOVE and gdy < FLOOD_MIN_MOVE then
+                return
+            end
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
+
         if (user_opts.min_mouse_move == 0) or
             (not ((state.last_mouseX == nil) or (state.last_mouseY == nil)) and
                 ((math.abs(mouseX - state.last_mouseX) >= user_opts.min_mouse_move)
@@ -7114,6 +7144,32 @@ end
 function tick()
     if not state.enabled then return end
     watch_ticks = watch_ticks + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAGNOSTIC: tick count
+    -- >>> CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC (remove after freeze diagnosis) <<<
+    -- Circuit breaker: shed renders above 240/s so the loop can drain input.
+    -- External events (mouse, playback-time) restart normal ticks on their own.
+    local storm_now = mp.get_time()
+    if storm_now - storm_t >= 1 then
+        -- Hysteresis on release: a single calm-ish window does not clear a
+        -- sustained storm, so transitions (and warns) do not flap.
+        if storm_active and storm_n <= 120 then
+            storm_active = false
+            mp.msg.warn("modernx: diag tick storm over") -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: transition only
+        end
+        storm_t = storm_now
+        storm_n = 0
+    end
+    storm_n = storm_n + 1
+    -- Animated fades re-arm every tick by design and end on their own; only
+    -- shed unanimated ticks so a stuck fade can never wedge the breaker on.
+    if storm_n > 240 and state.anitype == nil then
+        if not storm_active then
+            storm_active = true
+            mp.msg.warn("modernx: diag tick storm, shedding renders") -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: transition only
+        end
+        state.tick_last_time = storm_now
+        return
+    end
+    -- <<< CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC >>>
     local wt0 = mp.get_time() -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAGNOSTIC: tick duration
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)

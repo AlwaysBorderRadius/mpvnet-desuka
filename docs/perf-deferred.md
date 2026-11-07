@@ -15,21 +15,22 @@ Estado actual (ya aplicado, no tocar): `thumbfast clear` solo en transición,
 menú, thumb bajo demanda (solo si cambia el segundo de hover),
 caché de `get_virt_mouse_pos()` por frame (la ruta de input la invalida al
 entrar: los clics siguen leyendo en vivo), tooltips fijos anclados al botón,
-`msg-level=all=warn`, tripwire temporal de salud del bucle (`max_tick` +
-eventos/5s a nivel warn; quitar cuando el freeze quede diagnosticado),
-backpressure adaptativo (shed de micro-moves solo bajo flood sostenido,
-nunca en drag ni con menú abierto; clics/rueda intactos).
+`msg-level=all=warn`, tripwire temporal de salud del bucle (quitar cuando el
+freeze quede diagnosticado), backpressure adaptativo (shed de micro-moves
+solo bajo flood sostenido, nunca en drag ni con menú abierto; clics/rueda
+intactos), **medidas desesperadas aplicadas tras el freeze del 2026-11-07**:
+suelo global de tick a 1/60, shed global de micro-moves sin drag ni menú,
+disyuntor de tormenta de ticks (>240/s poda renders, TEMP DIAGNOSTIC),
+contadores `rt`/`riz` de origen de ticks (TEMP DIAGNOSTIC).
 
-## 1. Suelo de tick a 1/30 solo con menú abierto → APLICADO
+## 1. Suelo de tick → APLICADO GLOBAL A 1/60 (+ 1/30 SOLO CON MENÚ)
 
-- `request_tick()` usa `max(tick_delay, 1/30)` mientras `state.track_menu`
-  existe. El menú es estático: a 30Hz es indistinguible y corta a la mitad
-  los re-renders con banderas, justo el caso que saturaba.
-- El OSC normal sigue a ritmo completo (sin cambios); el veto del usuario
-  sobre capar la interfaz queda respetado fuera del menú.
-- Si hiciera falta más, el siguiente paso sería el suelo global
-  (`tick_delay = max(1/display_fps, 1/60)` en `set_tick_delay`, con guard
-  para `display-fps <= 0`).
+- `set_tick_delay()`: `tick_delay = max(1/display_fps, 1/60)` con el guard
+  `display-fps <= 0` ya existente. `request_tick()` mantiene además
+  `max(tick_delay, 1/30)` con el menú abierto.
+- Nuevo hallazgo que lo justifica: `loop health` con `ticks=192895/5s`
+  (tormenta de ticks con `max_tick` bajo): el peligro no es solo un tick
+  lento, sino decenas de miles de ticks/s baratos que impiden drenar input.
 
 ## 2. Short-circuit de micro-movimientos (+ `min_mouse_move`) → APLICADO EN FORMA ADAPTATIVA
 
@@ -45,6 +46,27 @@ nunca en drag ni con menú abierto; clics/rueda intactos).
 - Contador y ventana viven en un único timer compartido de 5 s (también lo
   usa el tripwire temporal); al quitar el tripwire, el timer permanente se
   queda solo con el rollover del flood.
+
+## 2b. Shed global de micro-movimientos → APLICADO (DESESPERADA)
+
+- Con freeze aun con shed adaptativo activo, se aplica el veto fijo que se
+  había aparcado: sin drag y sin menú, los movimientos < 3 px en ambos ejes
+  vuelven sin `show_osc` ni tick y **sin** refrescar la referencia (como el
+  shed adaptativo), así que las derivas lentas acumulan y acaban pasando.
+- El temblor de mano ya no genera ticks; gestos direccionales y derivas
+  siguen pasando al superar el umbral. Clics/rueda intactos.
+
+## 4. Disyuntor de tormenta de ticks → APLICADO (TEMP DIAGNOSTIC)
+
+- Si un segundo acumula > 240 ticks, se podan los renders (se mantiene la
+  cadencia del timer) y se avisa una vez (`diag tick storm`);
+  la salida («over») exige una ventana tranquila (<= 120), con histéresis
+  para no flapear. Los ticks de fade animado están exentos (re-arman por
+  diseño y terminan solos): solo se podan ticks sin animación.
+- Contadores `rt` (llamadas a `request_tick`) y `riz` (llamadas a
+  `request_init_resize`) en el `loop health` para localizar la vía de la
+  tormenta en el próximo log. Histéresis de tooltip innecesaria: los
+  tooltips ya van anclados al botón, no siguen al cursor.
 
 ## 3. Caché de `get_virt_mouse_pos()` por frame → APLICADO
 
