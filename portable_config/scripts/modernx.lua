@@ -6946,30 +6946,55 @@ local function element_has_action(element, action)
         element.eventresponder[action]
 end
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Adaptive input backpressure: count mouse moves; engage shedding as soon as
+-- the trip count is hit. A 5s timer (below) rolls the window and releases on
+-- quiet windows with hysteresis. Shed moves never update last_mouse*, so slow
+-- drifts still get through eventually. Clicks/wheels are never shed.
+local flood_moves = 0
+local flood_shedding = false
+local FLOOD_TRIP_COUNT = 750 -- engage above this many moves/window
+local FLOOD_RELEASE_COUNT = 500 -- disengage below this many moves/window
+local FLOOD_MIN_MOVE = 3 -- px: smaller moves are shed while engaged
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
 -- >>> CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC (remove after freeze diagnosis) <<<
 -- Loop-health tripwire at warn level (visible without debug spam):
 -- input events per 5s window + slowest tick in the window.
 local watch_events = 0
-local watch_window = 0
 local watch_max_tick = 0
-local function watch_report(now)
-    if now - watch_window >= 5 then
-        if watch_max_tick > 0.25 or watch_events > 750 then
-            mp.msg.warn(string.format(
-                "modernx: loop health: max_tick=%.0fms events=%d/5s%s",
-                watch_max_tick * 1000, watch_events,
-                state.track_menu and " menu=open" or ""))
-        end
-        watch_events = 0
-        watch_window = now
-        watch_max_tick = 0
+local function watch_report()
+    if watch_max_tick > 0.25 or watch_events > 750 then
+        mp.msg.warn(string.format(
+            "modernx: loop health: max_tick=%.0fms events=%d/5s%s",
+            watch_max_tick * 1000, watch_events,
+            state.track_menu and " menu=open" or ""))
     end
+    watch_events = 0
+    watch_max_tick = 0
 end
+-- Independent reporter: if ticks themselves stall, the in-tick report would
+-- never fire, so report on a separate timer to tell flood from dead loop.
 -- <<< CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC >>>
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Single 5s cadence shared by the flood window and the tripwire report
+-- above, so both always cover the same window (remove only the TEMP block
+-- when the freeze is diagnosed; this timer stays).
+mp.add_periodic_timer(5, function()
+    if flood_shedding and flood_moves < FLOOD_RELEASE_COUNT then flood_shedding = false end
+    flood_moves = 0
+    watch_report() -- TEMP: remove with the tripwire block above
+end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 function process_event(source, what)
     virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- input always reads live coords
     watch_events = watch_events + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: input rate
+    if source == 'mouse_move' then -- >>> EDIT AlwaysBorderRadius <<< -- flood count covers menu-consumed moves too
+        flood_moves = flood_moves + 1
+        if flood_moves > FLOOD_TRIP_COUNT then flood_shedding = true end
+    end
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track dropdown gets first pick of mouse events while open.
     if state.track_menu and track_menu_handle_event(source, what) then
@@ -7020,6 +7045,19 @@ function process_event(source, what)
         state.mouse_in_window = true
 
         local mouseX, mouseY = get_virt_mouse_pos()
+
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Adaptive shed (engaged above): drop sub-threshold moves only when
+        -- idle (no drag) and menu closed. Never consumes the movement budget.
+        if flood_shedding and state.active_element == nil and not state.track_menu then
+            local fdx = state.last_mouseX and math.abs(mouseX - state.last_mouseX) or 999
+            local fdy = state.last_mouseY and math.abs(mouseY - state.last_mouseY) or 999
+            if fdx < FLOOD_MIN_MOVE and fdy < FLOOD_MIN_MOVE then
+                return -- shed: no show_osc, no drag handling, no tick
+            end
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
+
         if (user_opts.min_mouse_move == 0) or
             (not ((state.last_mouseX == nil) or (state.last_mouseY == nil)) and
                 ((math.abs(mouseX - state.last_mouseX) >= user_opts.min_mouse_move)
@@ -7122,7 +7160,7 @@ function tick()
     -- >>> CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC (remove after freeze diagnosis) <<<
     local wdt = mp.get_time() - wt0
     if wdt > watch_max_tick then watch_max_tick = wdt end
-    watch_report(mp.get_time())
+    -- reporting runs on its own timer below, so a dead tick loop still shows up
     -- <<< CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC >>>
 
     if state.anitype ~= nil then

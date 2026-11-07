@@ -16,7 +16,9 @@ menú, thumb bajo demanda (solo si cambia el segundo de hover),
 caché de `get_virt_mouse_pos()` por frame (la ruta de input la invalida al
 entrar: los clics siguen leyendo en vivo), tooltips fijos anclados al botón,
 `msg-level=all=warn`, tripwire temporal de salud del bucle (`max_tick` +
-eventos/5s a nivel warn; quitar cuando el freeze quede diagnosticado).
+eventos/5s a nivel warn; quitar cuando el freeze quede diagnosticado),
+backpressure adaptativo (shed de micro-moves solo bajo flood sostenido,
+nunca en drag ni con menú abierto; clics/rueda intactos).
 
 ## 1. Suelo de tick a 1/60
 
@@ -29,20 +31,20 @@ eventos/5s a nivel warn; quitar cuando el freeze quede diagnosticado).
 - Si se retoma, añadir también guard contra `display-fps <= 0`
   (`1/0 = inf` = ticks muertos = OSD congelado para siempre).
 
-## 2. Short-circuit de micro-movimientos (+ `min_mouse_move`)
+## 2. Short-circuit de micro-movimientos (+ `min_mouse_move`) → APLICADO EN FORMA ADAPTATIVA
 
-- Qué: en `process_event()` (`mouse_move`), si el desplazamiento < umbral
-  (2-3 px) y no hay drag activo (`state.active_element == nil`) ni menú
-  abierto, actualizar `last_mouseX/Y` y volver sin `show_osc` ni
-  `request_tick`.
-- Efecto: recorta el grueso de los ~1000 ev/s de un ratón 1000 Hz en reposo
-  con temblor de mano.
-- Riesgo: el highlight/tooltip del hover puede retrasarse como máximo el
-  umbral (2-3 px sobre botones de ~24 px: imperceptible). No afecta a drags
-  (seek/volumen siguen al píxel) ni al menú abierto.
-- Alternativa suave (ya existe la opción, hoy a 0): subir solo
-  `min_mouse_move` a 2-3 en `modernx.conf`. Ojo: hoy esa opción solo salta el
-  `show_osc()`, no el tick/render; sin el early-out el ahorro es menor.
+- Implementado como backpressure con histéresis (no como veto fijo): el shed
+  se activa en cuanto se supera el umbral (750 moves, sin esperar al borde
+  de ventana) y el timer de 5 s lo desactiva en ventanas tranquilas (< 500).
+- Solo descarta micro-moves (< 3 px **en ambos ejes**) sin drag activo ni
+  menú abierto: temblor puro; un gesto direccional (p. ej. 10 px en X)
+  siempre pasa.
+- Los movimientos descartados no consumen presupuesto de desplazamiento
+  (`last_mouseX/Y` no se toca), así que derivas lentas acaban procesándose.
+- Clics y rueda nunca se podan. Comportamiento idéntico fuera de flood.
+- Contador y ventana viven en un único timer compartido de 5 s (también lo
+  usa el tripwire temporal); al quitar el tripwire, el timer permanente se
+  queda solo con el rollover del flood.
 
 ## 3. Caché de `get_virt_mouse_pos()` por frame → APLICADO
 
