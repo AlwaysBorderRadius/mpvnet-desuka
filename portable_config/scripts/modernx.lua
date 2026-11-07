@@ -3766,6 +3766,7 @@ function open_track_menu(ttype)
     state.track_menu = { ttype = ttype, header = header, items = items, width = width, offset = offset, pressed = nil }
     reset_timeout()
     show_osc()
+    mp.msg.warn("modernx: diag menu open " .. ttype) -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: marker
     mp.add_forced_key_binding("ESC", "modernx-track-menu-close", close_track_menu)
     request_tick()
 end
@@ -3773,6 +3774,7 @@ end
 function close_track_menu()
     if state.track_menu == nil then return end
     state.track_menu = nil
+    mp.msg.warn("modernx: diag menu close") -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: marker
     mp.remove_key_binding("modernx-track-menu-close")
     request_tick()
 end
@@ -6968,15 +6970,22 @@ local FLOOD_MIN_MOVE = 3 -- px: smaller moves are shed while engaged
 -- Loop-health tripwire at warn level (visible without debug spam):
 -- input events per 5s window + slowest tick in the window.
 local watch_events = 0
+local watch_mouse = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: mouse_move share
+local watch_ticks = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: tick executions
 local watch_max_tick = 0
 local function watch_report()
     if watch_max_tick > 0.25 or watch_events > 750 then
         mp.msg.warn(string.format(
-            "modernx: loop health: max_tick=%.0fms events=%d/5s%s",
-            watch_max_tick * 1000, watch_events,
-            state.track_menu and " menu=open" or ""))
+            "modernx: loop health: max_tick=%.0fms inputs=%d mouse=%d ticks=%d%s%s%s",
+            watch_max_tick * 1000, watch_events, watch_mouse, watch_ticks,
+            state.track_menu and " menu=open" or "",
+            flood_shedding and " shed=1" or "",
+            string.format(" osc=%d in=%d", state.osc_visible and 1 or 0,
+                state.input_enabled and 1 or 0)))
     end
     watch_events = 0
+    watch_mouse = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG reset
+    watch_ticks = 0 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG reset
     watch_max_tick = 0
 end
 -- Independent reporter: if ticks themselves stall, the in-tick report would
@@ -6988,7 +6997,10 @@ end
 -- above, so both always cover the same window (remove only the TEMP block
 -- when the freeze is diagnosed; this timer stays).
 mp.add_periodic_timer(5, function()
-    if flood_shedding and flood_moves < FLOOD_RELEASE_COUNT then flood_shedding = false end
+    if flood_shedding and flood_moves < FLOOD_RELEASE_COUNT then
+        flood_shedding = false
+        mp.msg.warn("modernx: diag flood released") -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: transition only
+    end
     flood_moves = 0
     watch_report() -- TEMP: remove with the tripwire block above
 end)
@@ -6999,7 +7011,11 @@ function process_event(source, what)
     watch_events = watch_events + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: input rate
     if source == 'mouse_move' then -- >>> EDIT AlwaysBorderRadius <<< -- flood count covers menu-consumed moves too
         flood_moves = flood_moves + 1
-        if flood_moves > FLOOD_TRIP_COUNT then flood_shedding = true end
+        watch_mouse = watch_mouse + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG
+        if flood_moves > FLOOD_TRIP_COUNT and not flood_shedding then
+            flood_shedding = true
+            mp.msg.warn("modernx: diag flood engaged") -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: transition only
+        end
     end
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track dropdown gets first pick of mouse events while open.
@@ -7097,6 +7113,7 @@ end
 -- called by mpv on every frame
 function tick()
     if not state.enabled then return end
+    watch_ticks = watch_ticks + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAGNOSTIC: tick count
     local wt0 = mp.get_time() -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAGNOSTIC: tick duration
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)
