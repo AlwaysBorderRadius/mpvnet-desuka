@@ -6744,7 +6744,14 @@ local function render()
             if not state.hide_timer then
                 state.hide_timer = mp.add_timeout(0, tick)
             end
-            state.hide_timer.timeout = timeout
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- Never re-arm sooner than 1/30 (same value as the open-menu tick
+            -- cap; the global tick_timer floor stays 1/60): timeout<=0 here
+            -- means "hide overdue but cursor still on OSC", and an immediate
+            -- tick re-arms itself every render (hot loop that starved input
+            -- draining -> 'Too many events queued'). Re-check at 30Hz.
+            state.hide_timer.timeout = math.max(timeout, 1 / 30)
+            -- <<< CUSTOM AlwaysBorderRadius >>>
             -- re-arm
             state.hide_timer:kill()
             state.hide_timer:resume()

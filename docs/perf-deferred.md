@@ -1,5 +1,23 @@
 # Optimizaciones diferidas (rendimiento del OSC)
 
+## 0. Causa raíz del freeze (2026-11) → CONTENIDA
+
+- `render()`: con el cursor quieto sobre el OSC y el hide-timeout vencido
+  (`bottom_hover=no`), re-armaba `hide_timer` con `timeout <= 0` → tick
+  inmediato que volvía a `render()` y se re-armaba: miles de renders/s.
+- Cada tick es barato (`max_tick` bajo, `set_osd` descarta texto idéntico),
+  pero el hilo Lua saturado no drena la cola de entrada →
+  `Too many events queued` → `Can't find script 'modernx'`.
+  Por eso congelaba en hover/parado/pausa y mover el ratón "descongelaba"
+  (refresca `showtime` y rompe el bucle).
+- Contención: `hide_timer.timeout = max(timeout, 1/30)` (re-chequeo a
+  30 Hz; el suelo 1/30 es el mismo del menú abierto, el global sigue 1/60).
+  Verificado headless (menú abierto, cursor aparcado, `showtime` rancio,
+  `bottom_hover=no`): sin el fix el disyuntor salta y cuenta 1037 ticks/3 s
+  podando renders; con el fix 174 ticks/3 s (~55/s entre ambos timers) sin
+  tormenta.
+- El disyuntor de tormenta queda como red de seguridad.
+
 Contexto: `modernx.lua` procesa cada evento de ratón en el hilo principal de mpv
 y pinta el OSD a ritmo de `tick` (limitado por `display-fps`). Con ratones de
 1000 Hz + pantallas de 144/240 Hz, un meneo sostenido genera cientos de eventos/s
