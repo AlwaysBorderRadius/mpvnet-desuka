@@ -1186,7 +1186,14 @@ local function get_virt_scale_factor()
 end
 
 -- return mouse position in virtual ASS coordinates (playresx/y)
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Per-render cache: dozens of hit-tests per tick share a single read.
+-- Only valid while render() runs (set/cleared there); process_event
+-- clears it on entry so input paths always read live coordinates.
+local virt_mouse_cache = nil
+-- <<< CUSTOM AlwaysBorderRadius >>>
 local function get_virt_mouse_pos()
+    if virt_mouse_cache then return virt_mouse_cache[1], virt_mouse_cache[2] end
     if state.mouse_in_window then
         local sx, sy = get_virt_scale_factor()
         local x, y = mp.get_mouse_pos()
@@ -6546,6 +6553,7 @@ local function render()
     mp.msg.trace('rendering')
     local current_screen_sizeX, current_screen_sizeY, _ = mp.get_osd_size()
     local mouseX, mouseY = get_virt_mouse_pos()
+    virt_mouse_cache = { mouseX, mouseY } -- >>> EDIT AlwaysBorderRadius <<< -- freeze coords for this frame
     local now = mp.get_time()
 
     -- check if display changed, if so request reinit
@@ -6925,6 +6933,7 @@ local function render()
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- submit
+    virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- end of frame: drop frozen coords
     set_osd(osc_param.playresy * osc_param.display_aspect, osc_param.playresy, ass.text)
 end
 
@@ -6937,7 +6946,30 @@ local function element_has_action(element, action)
         element.eventresponder[action]
 end
 
+-- >>> CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC (remove after freeze diagnosis) <<<
+-- Loop-health tripwire at warn level (visible without debug spam):
+-- input events per 5s window + slowest tick in the window.
+local watch_events = 0
+local watch_window = 0
+local watch_max_tick = 0
+local function watch_report(now)
+    if now - watch_window >= 5 then
+        if watch_max_tick > 0.25 or watch_events > 750 then
+            mp.msg.warn(string.format(
+                "modernx: loop health: max_tick=%.0fms events=%d/5s%s",
+                watch_max_tick * 1000, watch_events,
+                state.track_menu and " menu=open" or ""))
+        end
+        watch_events = 0
+        watch_window = now
+        watch_max_tick = 0
+    end
+end
+-- <<< CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC >>>
+
 function process_event(source, what)
+    virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- input always reads live coords
+    watch_events = watch_events + 1 -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAG: input rate
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track dropdown gets first pick of mouse events while open.
     if state.track_menu and track_menu_handle_event(source, what) then
@@ -7021,6 +7053,7 @@ end
 -- called by mpv on every frame
 function tick()
     if not state.enabled then return end
+    local wt0 = mp.get_time() -- >>> EDIT AlwaysBorderRadius <<< -- TEMP DIAGNOSTIC: tick duration
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)
         -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -7085,6 +7118,12 @@ function tick()
     end
 
     state.tick_last_time = mp.get_time()
+
+    -- >>> CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC (remove after freeze diagnosis) <<<
+    local wdt = mp.get_time() - wt0
+    if wdt > watch_max_tick then watch_max_tick = wdt end
+    watch_report(mp.get_time())
+    -- <<< CUSTOM AlwaysBorderRadius TEMP DIAGNOSTIC >>>
 
     if state.anitype ~= nil then
         -- state.anistart can be nil - animation should now start, or it can

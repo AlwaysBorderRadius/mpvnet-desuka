@@ -12,7 +12,11 @@ vuelve a haber saturación con el log en `info`.
 Estado actual (ya aplicado, no tocar): `thumbfast clear` solo en transición,
 `enable/disable_key_bindings('window-controls')` solo en transición,
 `input-doubleclick-time=200`, `mbtn_left_dbl` como clic, `drop_gesture` en el
-menú, thumb bajo demanda (solo si cambia el segundo de hover).
+menú, thumb bajo demanda (solo si cambia el segundo de hover),
+caché de `get_virt_mouse_pos()` por frame (la ruta de input la invalida al
+entrar: los clics siguen leyendo en vivo), tooltips fijos anclados al botón,
+`msg-level=all=warn`, tripwire temporal de salud del bucle (`max_tick` +
+eventos/5s a nivel warn; quitar cuando el freeze quede diagnosticado).
 
 ## 1. Suelo de tick a 1/60
 
@@ -40,15 +44,10 @@ menú, thumb bajo demanda (solo si cambia el segundo de hover).
   `min_mouse_move` a 2-3 en `modernx.conf`. Ojo: hoy esa opción solo salta el
   `show_osc()`, no el tick/render; sin el early-out el ahorro es menor.
 
-## 3. Caché de `get_virt_mouse_pos()` por frame
+## 3. Caché de `get_virt_mouse_pos()` por frame → APLICADO
 
-- Qué: hoy cada `mouse_hit()` hace 2 IPCs (`get_mouse_pos` + `get_osd_size`);
-  un render roza las ~100 llamadas para leer una posición que no debería
-  cambiar a mitad de frame. Cachear el par `(mx, my)` una vez por render y
-  reutilizarlo en `render_elements()` / `render_track_menu()`.
-- Efecto: ~100 IPC menos por frame, cero cambio visible (misma foto fija
-  para todos los hit-tests del frame; de hecho evita inconsistencias si el
-  ratón se mueve a mitad de render).
-- Riesgo: la caché debe vivir SOLO en la ruta de render. La ruta de clic
-  (`process_event` down/up) debe seguir leyendo en vivo o un clic justo en
-  un borde podría evaluarse con la posición del frame anterior.
+- Era: cada `mouse_hit()` hacía 2 IPCs (`get_mouse_pos` + `get_osd_size`);
+  un render rozaba las ~100 llamadas.
+- Ahora los hit-tests de un mismo tick comparten una lectura; `process_event`
+  la invalida al entrar para que los clics sigan leyendo en vivo.
+- Se mantiene aquí como referencia de lo ya hecho (cero cambio visible).
