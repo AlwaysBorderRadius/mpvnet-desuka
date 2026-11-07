@@ -3844,7 +3844,7 @@ function track_menu_geometry()
     -- Scrollbar air: rows end sb_gap before the bar, the bar sits sb_right
     -- from the right edge (mirrors the rows' left inset), and the first
     -- row clears the header separator by top_gap.
-    local sb_w, sb_right, sb_gap, top_gap = 6, 3, 8, 6
+    local sb_w, sb_right, sb_gap, top_gap = 6, 3, 0, 6
     -- <<< CUSTOM AlwaysBorderRadius >>>
     local sb_reserve = scrollable and (sb_gap + sb_w + sb_right) or 0
     local menu_w = m.width + pad_x * 2 + sb_reserve
@@ -4027,6 +4027,19 @@ local function track_menu_drop_gesture()
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
+-- True while the cursor is over another track button, so it can toggle its
+-- own dropdown instead of being swallowed as an outside dismiss click.
+local function track_menu_on_cy_button(_mx, _my)
+    for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub" }) do
+        for _, el in pairs(elements) do
+            if el.name == nm and el.hitbox and mouse_hit_coords(el.hitbox.x1, el.hitbox.y1, el.hitbox.x2, el.hitbox.y2) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 function track_menu_handle_event(source, what)
     local m = state.track_menu
     if not m then return false end
@@ -4064,7 +4077,12 @@ function track_menu_handle_event(source, what)
                 request_tick()
                 return true
             end
-            return false
+            -- outside the box: dismiss like an up-outside, but let another
+            -- track button toggle its own menu instead of swallowing it
+            if track_menu_on_cy_button(mx, my) then return false end
+            track_menu_drop_gesture()
+            close_track_menu()
+            return true
         elseif what == "up" then
             if m.pressed then
                 local p = m.pressed
@@ -4085,13 +4103,7 @@ function track_menu_handle_event(source, what)
                 track_menu_drop_gesture()
                 return true
             end
-            for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub" }) do
-                for _, el in pairs(elements) do
-                    if el.name == nm and el.hitbox and mouse_hit_coords(el.hitbox.x1, el.hitbox.y1, el.hitbox.x2, el.hitbox.y2) then
-                        return false -- another track button toggles its own menu
-                    end
-                end
-            end
+            if track_menu_on_cy_button(mx, my) then return false end -- another track button toggles its own menu
             -- dismiss click: drop any stranded press, close and swallow
             track_menu_drop_gesture()
             close_track_menu()
