@@ -170,6 +170,7 @@ local user_opts = {
     track_flag_gap = 2,           -- space on each side of the flag in the tooltip
     track_menu_max_rows = 8,      -- max visible rows in the track dropdown (rest scrolls)
     track_menu_font_size = 18,    -- font size of the track dropdown rows
+    track_menu_radius = 5,        -- corner radius of dropdown rows and scrollbar (0 = square)
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     volume_control = true,          -- show mute button and volume slider
@@ -3882,6 +3883,7 @@ function render_track_menu(ass)
     if not g then return end
     local mx, my = get_virt_mouse_pos()
     local gap = user_opts.track_flag_gap or 2
+    local row_r = math.max(0, user_opts.track_menu_radius or 5) -- >>> EDIT AlwaysBorderRadius <<< -- rounded rows/scrollbar
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
@@ -3912,7 +3914,8 @@ function render_track_menu(ass)
                 ass:an(7)
                 ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")
                 ass:draw_start()
-                ass:rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1)
+                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                    math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
                 ass:draw_stop()
             elseif hovered then
                 ass:new_event()
@@ -3920,7 +3923,8 @@ function render_track_menu(ass)
                 ass:an(7)
                 ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
                 ass:draw_start()
-                ass:rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1)
+                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                    math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
                 ass:draw_stop()
             end
             local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}"
@@ -3978,7 +3982,7 @@ function render_track_menu(ass)
         ass:an(7)
         ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
         ass:draw_start()
-        ass:rect_cw(sb_x0, top, sb_x0 + 6, bottom)
+        ass:round_rect_cw(sb_x0, top, sb_x0 + 6, bottom, math.min(row_r, 3))
         ass:draw_stop()
         local total = #m.items
         local h = (bottom - top) * (g.visible / total)
@@ -3988,7 +3992,7 @@ function render_track_menu(ass)
         ass:an(7)
         ass:append("{\\blur0\\bord0\\1c&HFFFFFF&}")
         ass:draw_start()
-        ass:rect_cw(sb_x0, y, sb_x0 + 6, y + h)
+        ass:round_rect_cw(sb_x0, y, sb_x0 + 6, y + h, math.max(0, math.min(row_r, 3, h / 2)))
         ass:draw_stop()
     end
 end
@@ -5359,6 +5363,10 @@ function validate_user_opts()
     if type(user_opts.track_menu_font_size) ~= "number" or user_opts.track_menu_font_size <= 0 then
         mp.msg.warn("track_menu_font_size must be a positive number. Using 18.")
         user_opts.track_menu_font_size = 18
+    end
+    if type(user_opts.track_menu_radius) ~= "number" or user_opts.track_menu_radius < 0 then
+        mp.msg.warn("track_menu_radius must be a non-negative number. Using 5.")
+        user_opts.track_menu_radius = 5
     end
 
     -- >>> CUSTOM desuka: toast opts <<<
