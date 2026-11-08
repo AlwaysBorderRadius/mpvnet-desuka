@@ -2210,8 +2210,10 @@ function render_elements(master_ass)
                 element.eventresponder["mbtn_left_up"] ~= nil
             )
             -- >>> CUSTOM AlwaysBorderRadius <<<
-            -- No hover styling while the track menu is open (modal).
-            local hovered = mouse_hit(element) and not state.track_menu
+            -- No hover styling while the track menu is open (modal), except
+            -- the other track buttons (still clickable to toggle menus).
+            local cy_button = element.name == "cy_video" or element.name == "cy_audio" or element.name == "cy_sub"
+            local hovered = mouse_hit(element) and (not state.track_menu or cy_button)
                 and is_clickable and element.enabled and state.mouse_down_counter == 0
             -- <<< CUSTOM AlwaysBorderRadius >>>
             local hoverstyle = button_lo.hoverstyle
@@ -2236,7 +2238,9 @@ function render_elements(master_ass)
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
                 -- >>> CUSTOM AlwaysBorderRadius <<<
-                -- No tooltip while the track menu is open (modal).
+                -- No tooltip while the track menu is open (modal). No cy_*
+                -- exception here on purpose: it would paint underneath the
+                -- open menu (wasted render, invisible).
                 if mouse_hit(element) and not state.track_menu then
                 -- <<< CUSTOM AlwaysBorderRadius >>>
                     local an = 1
