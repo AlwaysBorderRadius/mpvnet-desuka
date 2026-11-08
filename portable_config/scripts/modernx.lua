@@ -4053,7 +4053,13 @@ function track_menu_handle_event(source, what)
             track_menu_scroll(source == "wheel_down" and 1 or -1)
             return true
         end
-        return false
+        -- Outside the box: swallow so neither volume nor seekbar react
+        -- while the dropdown is open (modal like outside clicks), but let
+        -- another track button keep its wheel action.
+        if track_menu_on_cy_button(mx, my) then return false end
+        reset_timeout()
+        request_tick()
+        return true
     end
     if source == "mbtn_right" then
         track_menu_drop_gesture()

@@ -50,6 +50,8 @@ Commits en `dev`, en orden de aplicación con `git cherry-pick`:
   sostenido, nunca en drag ni con menú; clics/rueda intactos.
 - Caché de `get_virt_mouse_pos()` por render (la ruta de input la invalida
   al entrar: los clics siguen leyendo en vivo).
+- Menú modal: clic fuera dismitea y traga; rueda fuera se traga (ni volumen
+  ni seek mientras está abierto; dentro hace scroll).
 - Tooltips fijos anclados al botón; `msg-level=all=warn`; menú de pistas +
   guards anti-hover; doble-clic como clic; `drop_gesture`; thumb bajo
   demanda + clear en transición; fix del hot loop de `osc_init` (12 k
