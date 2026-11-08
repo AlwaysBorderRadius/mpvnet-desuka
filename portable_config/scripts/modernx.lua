@@ -1674,7 +1674,7 @@ local function draw_seekbar_handle(element, elem_ass, override_alpha)
     local xp = get_slider_ele_pos_for(element, pos)                                  -- handle position
     local handle_hovered = mouse_hit_coords(element.hitbox.x1 + xp - rh, element.hitbox.y1 + elem_geo.h / 2 - rh,
         element.hitbox.x1 + xp + rh, element.hitbox.y1 + elem_geo.h / 2 + rh) and element.enabled
-        and not track_menu_under_cursor() -- >>> EDIT AlwaysBorderRadius <<< -- no handle hover through the open menu
+        and not state.track_menu -- >>> EDIT AlwaysBorderRadius <<< -- no handle hover while the menu is open
 
     if display_handle then
         -- Apply size hover_effect only if hovering over the handle
@@ -2052,9 +2052,9 @@ function render_elements(master_ass)
                 -- add tooltip
                 if element.slider.tooltipF ~= nil and element.enabled then
                     -- >>> CUSTOM AlwaysBorderRadius <<<
-                    -- The open track dropdown sits above the seekbar: never
-                    -- hover through it (no time tooltip/thumbfast behind it).
-                    if mouse_hit(element) and not track_menu_under_cursor() then
+                    -- No slider tooltip/thumbfast while the track menu is
+                    -- open (modal), anywhere on screen.
+                    if mouse_hit(element) and not state.track_menu then
                     -- <<< CUSTOM AlwaysBorderRadius >>>
                         local sliderpos = get_slider_value(element)
                         local tooltiplabel = element.slider.tooltipF(sliderpos)
@@ -2210,8 +2210,8 @@ function render_elements(master_ass)
                 element.eventresponder["mbtn_left_up"] ~= nil
             )
             -- >>> CUSTOM AlwaysBorderRadius <<<
-            -- No hover styling through the open track menu (it paints above).
-            local hovered = mouse_hit(element) and not track_menu_under_cursor()
+            -- No hover styling while the track menu is open (modal).
+            local hovered = mouse_hit(element) and not state.track_menu
                 and is_clickable and element.enabled and state.mouse_down_counter == 0
             -- <<< CUSTOM AlwaysBorderRadius >>>
             local hoverstyle = button_lo.hoverstyle
@@ -2236,8 +2236,8 @@ function render_elements(master_ass)
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
                 -- >>> CUSTOM AlwaysBorderRadius <<<
-                -- No tooltip through the open track menu (it paints above).
-                if mouse_hit(element) and not track_menu_under_cursor() then
+                -- No tooltip while the track menu is open (modal).
+                if mouse_hit(element) and not state.track_menu then
                 -- <<< CUSTOM AlwaysBorderRadius >>>
                     local an = 1
                     local ty = element.hitbox.y1
@@ -3876,15 +3876,6 @@ function track_menu_geometry()
         row_h = row_h, fontsize = fontsize, header_h = header_h,
         pad_x = pad_x, pad_y = pad_y, visible = visible,
         scrollable = scrollable, rows = rows, sb = sb }
-end
-
--- True while the cursor sits on the open dropdown, so elements painted
--- underneath (seekbar) ignore the hover (no tooltip/thumbfast through it).
-function track_menu_under_cursor()
-    if not state.track_menu then return false end
-    local g = track_menu_geometry()
-    if not g then return false end
-    return mouse_hit_coords(g.x0, g.y0, g.x1, g.y1)
 end
 
 function render_track_menu(ass)
