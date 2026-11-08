@@ -409,7 +409,8 @@ local language = {
         -- >>> CUSTOM AlwaysBorderRadius <<<
         novideo = 'No video tracks available',
         -- <<< CUSTOM AlwaysBorderRadius >>>
-        track = ' tracks:',
+        -- used by track_header(): "%s tracks:" / "Pista de %s:"
+        tracks_header = '%s tracks:',
         playlist = 'Playlist',
         playlistshuffled = 'Shuffled playlist',
         nolist = 'Playlist is empty',
@@ -431,7 +432,7 @@ local language = {
     -- Spanish translation
     ['es'] = {
         welcome = 'Arrastra archivos o URLs aquí para reproducir',
-        off = 'OFF',
+        off = 'Desactivado',
         na = 'No disponible',
         none = 'Ninguno disponible',
         video = 'Video',
@@ -440,7 +441,8 @@ local language = {
         nosub = 'No hay subtítulos disponibles',
         noaudio = 'No hay pistas de audio disponibles',
         novideo = 'No hay pistas de video disponibles',
-        track = ' pista:',
+        -- used by track_header(): "%s tracks:" / "Pista de %s:"
+        tracks_header = 'Pista de %s:',
         playlist = 'Playlist',
         playlistshuffled = 'Playlist mezclada',
         nolist = 'Playlist vacía',
@@ -1410,6 +1412,16 @@ end
 local valid_types = { video = texts.video, audio = texts.audio, sub = texts.subtitle }
 local tracks_osc, tracks_mpv
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Dropdown/legacy header: "Pista de subtítulos:" (es) / "Subtitle tracks:" (en).
+local function track_header(ttype)
+    local label = valid_types[ttype] or ""
+    -- lower() is ASCII-only, safe here: type labels carry ASCII capitals only
+    if (user_opts.language or "en") == "es" then label = label:lower() end
+    return string.format(texts.tracks_header, label)
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
 -- updates the OSC internal playlists, should be run each time the track-layout changes
 function update_tracklist()
     local tracktable = mp.get_property_native('track-list', {})
@@ -1442,7 +1454,7 @@ end
 -- Build the track menu text and the positioned rows (flag head/tail split).
 function get_tracklist(ttype)
     update_tracklist()
-    local message = valid_types[ttype] .. texts.track
+    local message = track_header(ttype)
     local meta = nil
     if not tracks_osc or #tracks_osc[ttype] == 0 then
         message = texts.none
@@ -3723,7 +3735,7 @@ local function track_menu_build(ttype)
         end
         items[#items + 1] = item
     end
-    local header = valid_types[ttype] .. texts.track
+    local header = track_header(ttype)
     local fontsize = user_opts.track_menu_font_size or 18
     local gap = user_opts.track_flag_gap or 2
     local width = text_width(header, fontsize)
