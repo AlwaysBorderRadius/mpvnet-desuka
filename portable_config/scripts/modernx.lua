@@ -168,6 +168,9 @@ local user_opts = {
     track_language_mode = "code",  -- "code" | "name" | "flag"
     track_flag_size = 16,         -- height of the flag vector in playres units (exact, aspect preserved)
     track_flag_gap = 2,           -- space on each side of the flag in the tooltip
+    track_menu_max_rows = 8,      -- max visible rows in the track dropdown (rest scrolls)
+    track_menu_font_size = 18,    -- font size of the track dropdown rows
+    track_menu_radius = 5,        -- corner radius of dropdown rows and scrollbar (0 = square)
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     volume_control = true,          -- show mute button and volume slider
@@ -816,6 +819,20 @@ local function text_width(str, fontsize)
     end
     return total * (fs / ADVANCE_FS)
 end
+
+-- UTF-8 safe ellipsis truncation to a playres width (mirrors the toast path).
+local function fit_text_to_width(s, max_w, fontsize)
+    s = tostring(s or "")
+    if text_width(s, fontsize) <= max_w then return s end
+    local ell = "…"
+    local prev
+    while #s > 0 and text_width(s .. ell, fontsize) > max_w do
+        prev = s
+        s = s:gsub("[%z\1-\127\194-\244][\128-\191]*$", "")
+        if s == prev then s = s:sub(1, -2) end -- malformed tail: force progress
+    end
+    return s .. ell
+end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -878,6 +895,22 @@ local thumbfast = {
     disabled = true,
     available = false
 }
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- True while a thumbfast thumbnail is on screen; the per-frame "clear"
+-- below only fires on the hover -> no-hover transition instead of 60/s.
+local thumb_hovering = false
+
+-- One-shot clear guarded by the flag: fires whenever a thumb was
+-- requested, unconditionally, so show/clear can't desync.
+local thumb_last_key = nil -- hover second + thumb box; resend only on change
+local function thumb_clear()
+    if not thumb_hovering then return end
+    thumb_hovering = false
+    thumb_last_key = nil
+    mp.commandv("script-message-to", "thumbfast", "clear")
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 local sponsorblock_color_map = {
     sponsor = user_opts.sponsorblock_sponsor_color,
@@ -1015,6 +1048,7 @@ local state = {
     enabled = true,
     input_enabled = true,
     showhide_enabled = false,
+    wc_enabled = true, -- >>> EDIT AlwaysBorderRadius <<< -- window-controls bindings start enabled (see bottom)
 
     border = true,
     title_bar = true,
@@ -1062,6 +1096,11 @@ local state = {
     message_text = nil,
     message_hide_timer = nil, ---@type mp.Timer?
     message_meta = nil, -- structured track list rows for render_message_block
+
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown menu (click cy_video/cy_audio/cy_sub to pick with the mouse)
+    track_menu = nil, -- { ttype, items, header, width, offset, pressed } or nil
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- >>> CUSTOM desuka: unified toast (single slot, preemptive, no queue) <<<
     toast_text = nil,       -- plain text with \N linebreaks (no ASS)
@@ -1148,7 +1187,14 @@ local function get_virt_scale_factor()
 end
 
 -- return mouse position in virtual ASS coordinates (playresx/y)
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Per-render cache: dozens of hit-tests per tick share a single read.
+-- Only valid while render() runs (set/cleared there); process_event
+-- clears it on entry so input paths always read live coordinates.
+local virt_mouse_cache = nil
+-- <<< CUSTOM AlwaysBorderRadius >>>
 local function get_virt_mouse_pos()
+    if virt_mouse_cache then return virt_mouse_cache[1], virt_mouse_cache[2] end
     if state.mouse_in_window then
         local sx, sy = get_virt_scale_factor()
         local x, y = mp.get_mouse_pos()
@@ -1160,6 +1206,10 @@ end
 
 local function set_virt_mouse_area(x0, y0, x1, y1, name)
     local sx, sy = get_virt_scale_factor()
+    if not (sx > 0 and sy > 0) then -- >>> EDIT AlwaysBorderRadius <<< -- no finite OSD size: clear instead of NaN
+        mp.set_mouse_area(0, 0, 0, 0, name)
+        return
+    end
     mp.set_mouse_area(x0 / sx, y0 / sy, x1 / sx, y1 / sy, name)
 end
 
@@ -1624,6 +1674,7 @@ local function draw_seekbar_handle(element, elem_ass, override_alpha)
     local xp = get_slider_ele_pos_for(element, pos)                                  -- handle position
     local handle_hovered = mouse_hit_coords(element.hitbox.x1 + xp - rh, element.hitbox.y1 + elem_geo.h / 2 - rh,
         element.hitbox.x1 + xp + rh, element.hitbox.y1 + elem_geo.h / 2 + rh) and element.enabled
+        and not state.track_menu -- >>> EDIT AlwaysBorderRadius <<< -- no handle hover while the menu is open
 
     if display_handle then
         -- Apply size hover_effect only if hovering over the handle
@@ -2000,7 +2051,11 @@ function render_elements(master_ass)
 
                 -- add tooltip
                 if element.slider.tooltipF ~= nil and element.enabled then
-                    if mouse_hit(element) then
+                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- No slider tooltip/thumbfast while the track menu is
+                    -- open (modal), anywhere on screen.
+                    if mouse_hit(element) and not state.track_menu then
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
                         local sliderpos = get_slider_value(element)
                         local tooltiplabel = element.slider.tooltipF(sliderpos)
                         local an = slider_lo.tooltip_an
@@ -2079,7 +2134,16 @@ function render_elements(master_ass)
                                     tx = (thumbX + thumbfast.width / 2) * r_w
                                     an = 2
 
-                                    mp.commandv("script-message-to", "thumbfast", "thumb", hover_sec, thumbX, thumbY)
+                                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                                    -- Request only on hover start or when the hovered second
+                                    -- or thumb box changes; parked cursor must not re-request.
+                                    local thumb_key = math.floor(hover_sec) .. "x" .. thumbX .. "y" .. thumbY
+                                    if thumb_last_key == nil or thumb_key ~= thumb_last_key then
+                                        thumb_last_key = thumb_key
+                                        mp.commandv("script-message-to", "thumbfast", "thumb", hover_sec, thumbX, thumbY)
+                                    end
+                                    -- <<< CUSTOM AlwaysBorderRadius >>>
+                                    thumb_hovering = true -- >>> EDIT AlwaysBorderRadius <<< -- clear only on transition
                                 end
 
 
@@ -2109,8 +2173,10 @@ function render_elements(master_ass)
                         elem_ass:append(slider_lo.tooltip_style)
                         ass_append_alpha(elem_ass, slider_lo.alpha, 0)
                         elem_ass:append(tooltiplabel)
-                    elseif element.thumbnailable and thumbfast.available then
-                        mp.commandv("script-message-to", "thumbfast", "clear")
+                    elseif element.thumbnailable and (thumbfast.available or thumb_hovering) then
+                        -- >>> CUSTOM AlwaysBorderRadius <<<
+                        thumb_clear() -- one clear on leaving hover, not one per frame
+                        -- <<< CUSTOM AlwaysBorderRadius >>>
                     end
                 end
             end
@@ -2143,7 +2209,13 @@ function render_elements(master_ass)
                 element.eventresponder["mbtn_left_down"] ~= nil or
                 element.eventresponder["mbtn_left_up"] ~= nil
             )
-            local hovered = mouse_hit(element) and is_clickable and element.enabled and state.mouse_down_counter == 0
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- No hover styling while the track menu is open (modal), except
+            -- the other track buttons (still clickable to toggle menus).
+            local cy_button = element.name == "cy_video" or element.name == "cy_audio" or element.name == "cy_sub"
+            local hovered = mouse_hit(element) and (not state.track_menu or cy_button)
+                and is_clickable and element.enabled and state.mouse_down_counter == 0
+            -- <<< CUSTOM AlwaysBorderRadius >>>
             local hoverstyle = button_lo.hoverstyle
             if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
                 -- remove font scale tags for these elements, it looks out of place
@@ -2165,10 +2237,14 @@ function render_elements(master_ass)
 
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
-                if mouse_hit(element) then
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- No tooltip while the track menu is open (modal). No cy_*
+                -- exception here on purpose: it would paint underneath the
+                -- open menu (wasted render, invisible).
+                if mouse_hit(element) and not state.track_menu then
+                -- <<< CUSTOM AlwaysBorderRadius >>>
                     local an = 1
                     local ty = element.hitbox.y1
-                    local tx = get_virt_mouse_pos()
 
                     if ty < osc_param.playresy / 2 then
                         ty = element.hitbox.y2
@@ -2221,9 +2297,41 @@ function render_elements(master_ass)
                         total_w = total_w + gap + gap + flag_w
                     end
 
-                    if tx > osc_param.playresx / 2 then --move tooltip to left side of mouse cursor
-                        tx = tx - total_w
+                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- Clamp long labels inside the screen (both segments).
+                    local max_text = osc_param.playresx - 8
+                    if total_w > max_text then
+                        local room = max_text - ((flag_lang ~= nil) and (gap + gap + flag_w) or 0)
+                        if tail_text ~= "" then
+                            tail_text = fit_text_to_width(tail_text, math.max(0, room - head_w), fontsize)
+                            tail_w = text_width(tail_text, fontsize)
+                        end
+                        room = max_text - tail_w - ((flag_lang ~= nil) and (gap + gap + flag_w) or 0)
+                        if head_w > room then
+                            head_text = fit_text_to_width(head_text, math.max(0, room), fontsize)
+                            head_w = text_width(head_text, fontsize)
+                        end
+                        total_w = head_w + tail_w
+                        if flag_lang ~= nil then
+                            total_w = total_w + gap + gap + flag_w
+                        end
                     end
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
+
+                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- Fixed tooltip anchored to the button (not the cursor):
+                    -- left-side buttons grow right from their left edge,
+                    -- right-side buttons end at their right edge, clamped
+                    -- on screen so long labels never run off.
+                    local bcx = (element.hitbox.x1 + element.hitbox.x2) / 2
+                    local tx
+                    if bcx <= osc_param.playresx / 2 then
+                        tx = element.hitbox.x1
+                    else
+                        tx = element.hitbox.x2 - total_w
+                    end
+                    tx = math.min(math.max(tx, 4), math.max(4, osc_param.playresx - total_w - 4))
+                    -- <<< CUSTOM AlwaysBorderRadius >>>
 
                     local flag_x
                     if flag_lang ~= nil then
@@ -2325,7 +2433,7 @@ end
 
 local function set_tick_delay(_, display_fps)
     -- may be nil if unavailable or 0 fps is reported
-    if not display_fps then
+    if not display_fps or display_fps <= 0 then -- >>> EDIT AlwaysBorderRadius <<< -- 1/0 would freeze ticks forever
         return
     end
     tick_delay = 1 / display_fps
@@ -2333,6 +2441,10 @@ end
 
 local function newfilereset()
     request_init()
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    close_track_menu() -- new file, stale dropdown
+    thumb_clear() -- new file, stale thumbnail
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     state.downloaded_once = false
     state.videoDescription = "Loading description..."
     state.file_size_normalized = "Approximating size..."
@@ -3524,6 +3636,491 @@ mp.register_script_message("cycle-sub-down", function()
     mp.commandv("no-osd", "cycle", "sub", "down")
     show_selected_track_row("sub")
 end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Track dropdown menu: click cy_video/cy_audio/cy_sub to pick with the mouse.
+-- Anchored above the button, scrollable with the wheel, closes on
+-- selection / outside click / right-click / ESC / OSC hide.
+function track_menu_button_name(ttype)
+    if ttype == "video" then return "cy_video" end
+    if ttype == "audio" then return "cy_audio" end
+    return "cy_sub"
+end
+
+local function track_menu_item_width(item, fontsize, gap)
+    if item.head and item.flag_lang then
+        local asset, flag_w = get_flag_geometry(item.flag_lang)
+        if asset then
+            local w = text_width(item.head:gsub("%s+$", ""), fontsize) + gap + flag_w
+            if item.tail and item.tail ~= "" then
+                w = w + gap + text_width(item.tail:gsub("^%s+", ""), fontsize)
+            end
+            return w
+        end
+    end
+    return text_width(item.full or "", fontsize)
+end
+
+-- Button the menu hangs from; nil while hidden (narrow window) or mid-rebuild.
+local function track_menu_anchor(ttype)
+    local want = track_menu_button_name(ttype)
+    for _, el in pairs(elements) do
+        if el.name == want and el.hitbox then return el end
+    end
+    return nil
+end
+
+-- Menu rows share the tooltip truncation helper (same UTF-8-safe loop).
+local function track_menu_fit(s, max_w, fontsize)
+    return fit_text_to_width(s, max_w, fontsize)
+end
+
+local function track_menu_build(ttype)
+    update_tracklist()
+    local cur = get_track(ttype)
+    local marker_off = (cur == 0) and '● ' or '○ '
+    local items = { { osc_id = 0, selected = (cur == 0), full = marker_off .. texts.off } }
+    local name_map = get_track_name_map()
+    local mode = user_opts.track_language_mode or "code"
+    for n = 1, #tracks_osc[ttype] do
+        local track = tracks_osc[ttype][n]
+        local lang, title = 'unknown', ''
+        if not (track.lang == nil) then lang = track.lang end
+        if not (track.title == nil) then
+            title = track.title
+        elseif track.metadata and track.metadata["name"] then
+            title = track.metadata["name"]
+        end
+        if type(title) ~= "string" then title = "" end
+        title = title:gsub("[\r\n]+", " ")
+        local item = { osc_id = n, mpv_id = track.id, selected = (track.id == tonumber(mp.get_property(ttype))) }
+        local drew_flag = (mode == "flag") and flag_drawn(lang)
+        local lang_label
+        if lang ~= nil and lang ~= 'unknown' and lang ~= '' then
+            if drew_flag then
+                lang_label = format_track_label(lang, "name", name_map)
+            elseif mode == "flag" then
+                lang_label = format_track_label(lang, "code")
+            else
+                lang_label = format_track_label(lang, mode, name_map)
+            end
+        end
+        local label
+        if lang_label ~= nil then
+            label = (title ~= "") and (lang_label .. " — " .. title) or lang_label
+        else
+            label = title
+        end
+        item.full = (item.selected and '● ' or '○ ') .. n .. ': ' .. label
+        if drew_flag then
+            item.head = (item.selected and '● ' or '○ ') .. n .. ':'
+            if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
+                item.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
+                if item.tail == "" then item.tail = nil end
+            end
+            item.flag_lang = lang
+        end
+        items[#items + 1] = item
+    end
+    local header = valid_types[ttype] .. texts.track
+    local fontsize = user_opts.track_menu_font_size or 18
+    local gap = user_opts.track_flag_gap or 2
+    local width = text_width(header, fontsize)
+    for _, item in ipairs(items) do
+        width = math.max(width, track_menu_item_width(item, fontsize, gap))
+    end
+    return header, items, width
+end
+
+function track_menu_refresh()
+    local m = state.track_menu
+    if not m then return end
+    local header, items, width = track_menu_build(m.ttype)
+    m.header, m.items, m.width = header, items, width
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    local max_off = math.max(0, #items - max_rows)
+    if m.offset > max_off then m.offset = max_off end
+    if m.pressed and (m.pressed < 1 or m.pressed > #items) then m.pressed = nil end
+    -- keep the selected row in view after external changes
+    local sel = get_track(m.ttype) + 1
+    if sel < m.offset + 1 or sel > m.offset + max_rows then
+        m.offset = math.min(math.max(0, sel - max_rows), max_off)
+    end
+    request_tick()
+end
+
+function open_track_menu(ttype)
+    if ttype ~= "video" and ttype ~= "audio" and ttype ~= "sub" then return end
+    if not track_menu_anchor(ttype) then
+        show_tracklist(ttype) -- button hidden (narrow window): legacy block list
+        return
+    end
+    local header, items, width = track_menu_build(ttype)
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    local cur = get_track(ttype)
+    local sel_idx = cur + 1
+    local offset = 0
+    if sel_idx > max_rows then offset = math.min(sel_idx - max_rows, math.max(0, #items - max_rows)) end
+    state.track_menu = { ttype = ttype, header = header, items = items, width = width, offset = offset, pressed = nil }
+    reset_timeout()
+    show_osc()
+    mp.add_forced_key_binding("ESC", "modernx-track-menu-close", close_track_menu)
+    request_tick()
+end
+
+function close_track_menu()
+    if state.track_menu == nil then return end
+    state.track_menu = nil
+    mp.remove_key_binding("modernx-track-menu-close")
+    request_tick()
+end
+
+function toggle_track_menu(ttype)
+    if state.track_menu and state.track_menu.ttype == ttype then
+        close_track_menu()
+    else
+        open_track_menu(ttype)
+    end
+end
+
+function track_menu_cycle(ttype, step)
+    close_track_menu()
+    update_tracklist()
+    if ttype == "audio" then mp.set_property("lavfi-complex", "") end
+    if ttype == "sub" then mp.set_property_number("secondary-sid", 0) end
+    set_track(ttype, step)
+    show_selected_track_row(ttype)
+end
+
+function track_menu_select(item)
+    local m = state.track_menu
+    if not m or not item then return end
+    local ttype = m.ttype
+    update_tracklist()
+    if ttype == "audio" then mp.set_property("lavfi-complex", "") end
+    if ttype == "sub" then mp.set_property_number("secondary-sid", 0) end
+    if item.osc_id == 0 then
+        mp.commandv('set', ttype, 'no')
+    elseif item.mpv_id then
+        mp.commandv('set', ttype, item.mpv_id)
+    end
+    close_track_menu()
+    -- confirm like the cycle path does (item text, no stale re-read)
+    if item.flag_lang then
+        show_toast_row({ full = item.full, head = item.head, tail = item.tail, flag_lang = item.flag_lang },
+            "info", "modernx-track")
+    elseif item.osc_id == 0 then
+        show_toast(valid_types[ttype] .. ': ' .. texts.off, "info", "modernx-track")
+    else
+        show_toast(item.full or "", "info", "modernx-track")
+    end
+end
+
+function track_menu_scroll(delta)
+    local m = state.track_menu
+    if not m then return end
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    local max_off = math.max(0, #m.items - max_rows)
+    m.offset = math.max(0, math.min(max_off, m.offset + delta))
+    reset_timeout()
+    request_tick()
+end
+
+function track_menu_geometry()
+    local m = state.track_menu
+    if not m then return nil end
+    local anchor = track_menu_anchor(m.ttype)
+    if not anchor then return nil end
+    local fontsize = user_opts.track_menu_font_size or 18
+    if fontsize <= 0 then fontsize = 18 end
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    if max_rows < 3 then max_rows = 3 end
+    local row_h = fontsize * 1.5
+    local flag_need = (user_opts.track_flag_size or 16) + 8
+    if flag_need > row_h then row_h = flag_need end
+    local pad_x, pad_y = 12, 8
+    local header_h = fontsize * 1.2
+    local total = #m.items
+    local visible = math.min(total, max_rows)
+    local scrollable = total > max_rows
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Scrollbar air: rows end sb_gap before the bar, the bar sits sb_right
+    -- from the right edge (mirrors the rows' left inset), and the first
+    -- row clears the header separator by top_gap.
+    local sb_w, sb_right, sb_gap, top_gap = 6, 3, 0, 6
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    local sb_reserve = scrollable and (sb_gap + sb_w + sb_right) or 0
+    local menu_w = m.width + pad_x * 2 + sb_reserve
+    local max_w = osc_param.playresx - 8
+    if menu_w > max_w then menu_w = max_w end
+    local menu_h = pad_y * 2 + header_h + top_gap + visible * row_h
+    local cx = (anchor.hitbox.x1 + anchor.hitbox.x2) / 2
+    local x0 = cx - menu_w / 2
+    x0 = math.max(4, math.min(x0, osc_param.playresx - menu_w - 4))
+    local y1 = anchor.hitbox.y1 - 8
+    local y0 = y1 - menu_h
+    if y0 < 4 then y0 = 4 y1 = y0 + menu_h end
+    local rows = {}
+    for i = 1, visible do
+        local idx = m.offset + i
+        if idx > total then break end
+        rows[#rows + 1] = {
+            x0 = x0, y0 = y0 + pad_y + header_h + top_gap + (i - 1) * row_h,
+            x1 = x0 + menu_w - sb_reserve, y1 = y0 + pad_y + header_h + top_gap + i * row_h,
+            index = idx,
+        }
+    end
+    local sb = nil
+    if scrollable then
+        sb = { x0 = x0 + menu_w - sb_right - sb_w, w = sb_w,
+            top = y0 + pad_y + header_h + top_gap, bottom = y1 - pad_y }
+    end
+    return { x0 = x0, y0 = y0, x1 = x0 + menu_w, y1 = y0 + menu_h,
+        row_h = row_h, fontsize = fontsize, header_h = header_h,
+        pad_x = pad_x, pad_y = pad_y, visible = visible,
+        scrollable = scrollable, rows = rows, sb = sb }
+end
+
+function render_track_menu(ass)
+    local m = state.track_menu
+    if not m then return end
+    local g = track_menu_geometry()
+    if not g then return end
+    local mx, my = get_virt_mouse_pos()
+    local gap = user_opts.track_flag_gap or 2
+    local row_r = math.max(0, user_opts.track_menu_radius or 5) -- >>> EDIT AlwaysBorderRadius <<< -- rounded rows/scrollbar
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord1\\1c&H141414&\\3c&H999999&}")
+    ass:draw_start()
+    ass:round_rect_cw(g.x0, g.y0, g.x1, g.y1, 6)
+    ass:draw_stop()
+    ass:new_event()
+    ass:pos(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h / 2)
+    ass:an(4)
+    ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}")
+    ass:append(m.header)
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord0\\1c&H999999&}")
+    ass:draw_start()
+    ass:rect_cw(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h, g.x1 - g.pad_x, g.y0 + g.pad_y + g.header_h + 1)
+    ass:draw_stop()
+    for _, r in ipairs(g.rows) do
+        local item = m.items[r.index]
+        if item then
+            local hovered = mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1
+            local pressed = (m.pressed == r.index) and hovered
+            if item.selected or pressed then
+                ass:new_event()
+                ass:pos(0, 0)
+                ass:an(7)
+                ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")
+                ass:draw_start()
+                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                    math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
+                ass:draw_stop()
+            elseif hovered then
+                ass:new_event()
+                ass:pos(0, 0)
+                ass:an(7)
+                ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+                ass:draw_start()
+                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                    math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
+                ass:draw_stop()
+            end
+            local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}"
+            local tx = g.x0 + g.pad_x
+            local ty = (r.y0 + r.y1) / 2
+            local avail = r.x1 - tx - 4 -- text must stay inside the rounded box
+            local asset, flag_w, flag_h = nil, 0, 0
+            if item.flag_lang then asset, flag_w, flag_h = get_flag_geometry(item.flag_lang) end
+            if item.head and asset then
+                local head = item.head:gsub("%s+$", "")
+                local head_w = text_width(head, g.fontsize)
+                if head_w + gap + flag_w > avail then
+                    -- no room for the vector flag: fitted plain row instead
+                    ass:new_event()
+                    ass:pos(tx, ty)
+                    ass:an(4)
+                    ass:append(style)
+                    ass:append(track_menu_fit(item.full, avail, g.fontsize))
+                else
+                    ass:new_event()
+                    ass:pos(tx, ty)
+                    ass:an(4)
+                    ass:append(style)
+                    ass:append(head)
+                    local flag_ass = render_flag_geometry(asset, tx + head_w + gap, ty - flag_h / 2)
+                    if flag_ass then
+                        ass:new_event()
+                        ass:merge(flag_ass)
+                    end
+                    if item.tail and item.tail ~= "" then
+                        local tail = track_menu_fit(item.tail:gsub("^%s+", ""),
+                            avail - head_w - gap - flag_w - gap, g.fontsize)
+                        ass:new_event()
+                        ass:pos(tx + head_w + gap + flag_w + gap, ty)
+                        ass:an(4)
+                        ass:append(style)
+                        ass:append(tail)
+                    end
+                end
+            else
+                ass:new_event()
+                ass:pos(tx, ty)
+                ass:an(4)
+                ass:append(style)
+                ass:append(track_menu_fit(item.full, avail, g.fontsize))
+            end
+        end
+    end
+    if g.scrollable and g.sb then
+        local top, bottom, sb_x0 = g.sb.top, g.sb.bottom, g.sb.x0
+        local sb_w = g.sb.w
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+        ass:draw_start()
+        ass:round_rect_cw(sb_x0, top, sb_x0 + sb_w, bottom, math.min(row_r, sb_w / 2))
+        ass:draw_stop()
+        local total = #m.items
+        local h = (bottom - top) * (g.visible / total)
+        local y = top + (bottom - top) * (m.offset / total)
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&HFFFFFF&}")
+        ass:draw_start()
+        ass:round_rect_cw(sb_x0, y, sb_x0 + sb_w, y + h, math.max(0, math.min(row_r, sb_w / 2, h / 2)))
+        ass:draw_stop()
+    end
+end
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Release a stranded OSC press without firing it. The menu swallows the
+-- release (up) of gestures that started underneath it, so the element's
+-- reset (seekbar/volumebar drag state) would otherwise never run.
+local function track_menu_drop_gesture()
+    local n = state.active_element
+    local el = n and elements[n]
+    if el then
+        if el.eventresponder and el.eventresponder['reset'] then
+            el.eventresponder['reset'](el)
+        end
+        if el.state then
+            el.state.mbtnleft = false -- reset() doesn't clear it (up does, and up was swallowed)
+        end
+    end
+    state.active_element = nil
+    state.mouse_down_counter = 0
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
+-- True while the cursor is over another track button, so it can toggle its
+-- own dropdown instead of being swallowed as an outside dismiss click.
+local function track_menu_on_cy_button(_mx, _my)
+    for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub" }) do
+        for _, el in pairs(elements) do
+            if el.name == nm and el.hitbox and mouse_hit_coords(el.hitbox.x1, el.hitbox.y1, el.hitbox.x2, el.hitbox.y2) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function track_menu_handle_event(source, what)
+    local m = state.track_menu
+    if not m then return false end
+    if source == "mouse_move" then return false end
+    local mx, my = get_virt_mouse_pos()
+    local g = track_menu_geometry()
+    if not g then close_track_menu() return false end
+    local inside = mx >= g.x0 and mx <= g.x1 and my >= g.y0 and my <= g.y1
+    if source == "wheel_up" or source == "wheel_down" then
+        if inside then
+            track_menu_scroll(source == "wheel_down" and 1 or -1)
+            return true
+        end
+        -- Outside the box: swallow so neither volume nor seekbar react
+        -- while the dropdown is open (modal like outside clicks), but let
+        -- another track button keep its wheel action.
+        if track_menu_on_cy_button(mx, my) then return false end
+        reset_timeout()
+        request_tick()
+        return true
+    end
+    if source == "mbtn_right" then
+        track_menu_drop_gesture()
+        close_track_menu()
+        return true
+    end
+    if source == "mbtn_left" or source == "shift+mbtn_left" then
+        if what == "down" then
+            for _, r in ipairs(g.rows) do
+                if mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 then
+                    track_menu_drop_gesture() -- abort any in-flight OSC drag first
+                    m.pressed = r.index
+                    request_tick()
+                    return true
+                end
+            end
+            -- inside the box but not on a row (header/padding/scrollbar):
+            -- swallow so the click can't leak to the seekbar underneath
+            if inside then
+                track_menu_drop_gesture()
+                request_tick()
+                return true
+            end
+            -- outside the box: dismiss like an up-outside, but let another
+            -- track button toggle its own menu instead of swallowing it
+            if track_menu_on_cy_button(mx, my) then return false end
+            track_menu_drop_gesture()
+            close_track_menu()
+            return true
+        elseif what == "up" then
+            if m.pressed then
+                local p = m.pressed
+                m.pressed = nil
+                track_menu_drop_gesture()
+                for _, r in ipairs(g.rows) do
+                    if mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 and r.index == p then
+                        track_menu_select(m.items[r.index])
+                        return true
+                    end
+                end
+                request_tick()
+                return true
+            end
+            if inside then
+                -- released over the menu with no press: swallow so the
+                -- click can't leak through to the OSC underneath
+                track_menu_drop_gesture()
+                return true
+            end
+            if track_menu_on_cy_button(mx, my) then return false end -- another track button toggles its own menu
+            -- dismiss click: drop any stranded press, close and swallow
+            track_menu_drop_gesture()
+            close_track_menu()
+            return true
+        end
+    end
+    return false
+end
+
+-- Keyboard / input.conf access to the dropdown (toggles like a left click).
+mp.register_script_message("open-track-menu", function(tt)
+    if tt == "video" or tt == "audio" or tt == "sub" then
+        toggle_track_menu(tt)
+    end
+end)
+mp.register_script_message("close-track-menu", function() close_track_menu() end)
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
 function bind_keys(keys, name, func, opts)
@@ -4782,6 +5379,18 @@ function validate_user_opts()
         mp.msg.warn("track_flag_size must be a positive number. Using 16.")
         user_opts.track_flag_size = 16
     end
+    if type(user_opts.track_menu_max_rows) ~= "number" or user_opts.track_menu_max_rows < 3 then
+        mp.msg.warn("track_menu_max_rows must be >= 3. Using 8.")
+        user_opts.track_menu_max_rows = 8
+    end
+    if type(user_opts.track_menu_font_size) ~= "number" or user_opts.track_menu_font_size <= 0 then
+        mp.msg.warn("track_menu_font_size must be a positive number. Using 18.")
+        user_opts.track_menu_font_size = 18
+    end
+    if type(user_opts.track_menu_radius) ~= "number" or user_opts.track_menu_radius < 0 then
+        mp.msg.warn("track_menu_radius must be a non-negative number. Using 5.")
+        user_opts.track_menu_radius = 5
+    end
 
     -- >>> CUSTOM desuka: toast opts <<<
     if type(user_opts.toast_enabled) ~= "boolean" then
@@ -5207,27 +5816,31 @@ local function osc_init()
     ne.nothingavailable = texts.novideo
     ne.eventresponder['mbtn_left_up'] =
         function()
-            set_track('video', 1)
-            show_tracklist('video')
+            toggle_track_menu('video')
         end
     ne.eventresponder['enter'] =
         function()
-            set_track('video', 1)
-            show_tracklist('video')
+            toggle_track_menu('video')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
-            set_track('video', -1)
-            show_tracklist('video')
+            track_menu_cycle('video', -1)
+        end
+    ne.eventresponder['wheel_up_press'] = -- >>> EDIT AlwaysBorderRadius <<< -- wheel parity with cy_audio/cy_sub
+        function()
+            track_menu_cycle('video', 1)
+        end
+    ne.eventresponder['wheel_down_press'] = -- >>> EDIT AlwaysBorderRadius <<< -- wheel parity with cy_audio/cy_sub
+        function()
+            track_menu_cycle('video', -1)
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function()
-            set_track('video', 1)
-            show_tracklist('video')
+            track_menu_cycle('video', 1)
         end
     ne.eventresponder['shift+mbtn_right_down'] =
         function()
-            show_tracklist('video')
+            toggle_track_menu('video')
         end
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -5257,33 +5870,23 @@ local function osc_init()
     ne.nothingavailable = texts.noaudio
     ne.eventresponder['mbtn_left_up'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', 1)
-            show_tracklist('audio')
+            toggle_track_menu('audio')
         end
     ne.eventresponder['enter'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', 1)
-            show_tracklist('audio')
+            toggle_track_menu('audio')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', -1)
-            show_tracklist('audio')
+            track_menu_cycle('audio', -1)
         end
     ne.eventresponder['wheel_up_press'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', 1)
-            show_tracklist('audio')
+            track_menu_cycle('audio', 1)
         end
     ne.eventresponder['wheel_down_press'] =
         function()
-            mp.set_property("lavfi-complex", "")
-            set_track('audio', -1)
-            show_tracklist('audio')
+            track_menu_cycle('audio', -1)
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function() mp.commandv("script-binding", "select/select-aid") end
@@ -5318,33 +5921,23 @@ local function osc_init()
     ne.nothingavailable = texts.nosub
     ne.eventresponder['mbtn_left_up'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
-            show_tracklist("sub")
+            toggle_track_menu('sub')
         end
     ne.eventresponder['enter'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
-            show_tracklist('sub')
+            toggle_track_menu('sub')
         end
     ne.eventresponder['mbtn_right_up'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', -1)
-            show_tracklist('sub')
+            track_menu_cycle('sub', -1)
         end
     ne.eventresponder['wheel_up_press'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
-            show_tracklist('sub')
+            track_menu_cycle('sub', 1)
         end
     ne.eventresponder['wheel_down_press'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', -1)
-            show_tracklist('sub')
+            track_menu_cycle('sub', -1)
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function()
@@ -5352,8 +5945,7 @@ local function osc_init()
         end
     ne.eventresponder['shift+mbtn_right_down'] =
         function()
-            mp.set_property_number("secondary-sid", 0)
-            set_track('sub', 1)
+            track_menu_cycle('sub', 1)
         end
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -5785,11 +6377,14 @@ local function osc_init()
     end
 
     -- Chapter title (below seekbar)
-    local chapter_index = mp.get_property_number("chapter", -1)
+    -- NOTE: chapter_index is read fresh inside each content() (not captured
+    -- once per osc_init): content runs every frame, and chapter changes don't
+    -- trigger re-init (there is no chapter observer by design, to avoid the
+    -- re-init hot loop).
     ne = new_element("separator", "button")
     ne.visible = true
     ne.content = function()
-        if chapter_index >= 0 or state.buffering then
+        if mp.get_property_number("chapter", -1) >= 0 or state.buffering then
             return " • "
         else
             return ""
@@ -5804,8 +6399,14 @@ local function osc_init()
         elseif state.buffering ~= nil and state.buffering then
             return "Buffering..." .. " " .. (mp.get_property("cache-buffering-state") or "0") .. "%"
         else
+            local chapter_index = mp.get_property_number("chapter", -1) -- >>> EDIT AlwaysBorderRadius <<< -- fresh per frame, no re-init needed
             if user_opts.chapter_fmt ~= "no" and chapter_index >= 0 then
-                request_init()
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- No request_init() here: content() already re-reads the
+                -- chapter list every frame; asking for re-init from render
+                -- rebuilds the whole OSC on every tick (hot loop on
+                -- videos with chapters) and wipes in-flight clicks.
+                -- <<< CUSTOM AlwaysBorderRadius >>>
                 local chapters = mp.get_property_native("chapter-list", {})
                 local chapter_title = (chapters[chapter_index + 1] and chapters[chapter_index + 1].title ~= "") and
                     chapters[chapter_index + 1].title
@@ -5867,6 +6468,10 @@ end
 
 function hide_osc()
     mp.msg.trace('hide_osc')
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown never outlives the OSC.
+    close_track_menu()
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     if not state.enabled then
         -- typically hide happens at render() from tick(), but now tick() is
         -- no-op and won't render again to remove the osc, so do that manually.
@@ -5881,9 +6486,7 @@ function hide_osc()
     else
         osc_visible(false)
     end
-    if thumbfast.available then
-        mp.commandv("script-message-to", "thumbfast", "clear")
-    end
+    thumb_clear() -- >>> EDIT AlwaysBorderRadius <<< -- one-shot, flag-guarded
 end
 
 function osc_visible(visible)
@@ -5967,6 +6570,13 @@ local function enable_osc(enable)
             mp.disable_key_bindings('showhide_wc')
         end
         state.showhide_enabled = false
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        if state.wc_enabled then -- no render() will run to sync it
+            mp.disable_key_bindings('window-controls')
+            state.wc_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 end
 
@@ -5974,6 +6584,7 @@ local function render()
     mp.msg.trace('rendering')
     local current_screen_sizeX, current_screen_sizeY, _ = mp.get_osd_size()
     local mouseX, mouseY = get_virt_mouse_pos()
+    virt_mouse_cache = { mouseX, mouseY } -- >>> EDIT AlwaysBorderRadius <<< -- freeze coords for this frame
     local now = mp.get_time()
 
     -- check if display changed, if so request reinit
@@ -6046,6 +6657,7 @@ local function render()
 
     -- mouse input area
     local mouse_over_osc = false
+    local menu_hovered = false -- track dropdown hover (autohide guard) -- >>> EDIT AlwaysBorderRadius <<<
 
     for _, cords in ipairs(osc_param.areas['input']) do
         if state.osc_visible then -- activate only when OSC is actually visible
@@ -6065,40 +6677,95 @@ local function render()
         end
     end
 
-    if osc_param.areas['window-controls'] then
-        for _, cords in ipairs(osc_param.areas['window-controls']) do
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Nil/empty-safe area lookup; bindings toggle on transition only.
+    local wc_areas = osc_param.areas['window-controls']
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    if wc_areas and wc_areas[1] then
+        for _, cords in ipairs(wc_areas) do
             if state.osc_visible then -- activate only when OSC is actually visible
                 set_virt_mouse_area(cords.x1, cords.y1, cords.x2, cords.y2, 'window-controls')
-                mp.enable_key_bindings('window-controls')
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- Toggle bindings on transition only, not 60x/s.
+                if not state.wc_enabled then
+                    mp.enable_key_bindings('window-controls')
+                    state.wc_enabled = true
+                end
+                -- <<< CUSTOM AlwaysBorderRadius >>>
             else
-                mp.disable_key_bindings('window-controls')
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                if state.wc_enabled then
+                    mp.disable_key_bindings('window-controls')
+                    state.wc_enabled = false
+                    set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+                end
+                -- <<< CUSTOM AlwaysBorderRadius >>>
             end
 
             if (mouse_hit_coords(cords.x1, cords.y1, cords.x2, cords.y2) and user_opts.osc_keep_with_cursor) then
                 mouse_over_osc = true
             end
         end
+    else
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Area gone (osc_init while top bar off): don't leak bindings on.
+        if state.wc_enabled then
+            mp.disable_key_bindings('window-controls')
+            state.wc_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
+
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown open: clicks anywhere (even on bare video) must reach
+    -- the script so outside clicks dismiss it; see fullscreen area below.
+    if state.track_menu and state.osc_visible then
+        local mg = track_menu_geometry()
+        if mg then
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- While the dropdown is open, every click must reach the script
+            -- (the video area has no click binding of its own): fullscreen
+            -- input area, the menu handler dismisses outside clicks itself.
+            set_virt_mouse_area(0, 0, osc_param.playresx, osc_param.playresy, 'input')
+            -- <<< CUSTOM AlwaysBorderRadius >>>
+            if mouse_hit_coords(mg.x0, mg.y0, mg.x1, mg.y1) then
+                mouse_over_osc = true
+                menu_hovered = true
+            end
+        else
+            close_track_menu()
+        end
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- autohide
     if not (state.showtime == nil) and (get_hide_timeout() >= 0) then
         local timeout = state.showtime + (get_hide_timeout() / 1000) - now
         if timeout <= 0 then
             if (state.active_element == nil) and (user_opts.bottom_hover) or (not mouse_over_osc) then
-                if (not (state.paused and user_opts.keep_on_pause)) then
+                -- >>> CUSTOM AlwaysBorderRadius <<<
+                if (not (state.paused and user_opts.keep_on_pause)) and not menu_hovered then
                     hide_osc()
                 end
-            end
-        else
+                -- <<< CUSTOM AlwaysBorderRadius >>>
+            else
             -- the timer is only used to recheck the state and to possibly run
             -- the code above again
             if not state.hide_timer then
                 state.hide_timer = mp.add_timeout(0, tick)
             end
-            state.hide_timer.timeout = timeout
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- Never re-arm sooner than 1/30: timeout<=0 here means
+            -- "hide overdue but cursor still on OSC", and an immediate tick
+            -- re-arms itself every render (hot loop that starved input
+            -- draining -> 'Too many events queued'). Re-check at 30Hz.
+            state.hide_timer.timeout = math.max(timeout, 1 / 30)
+            -- <<< CUSTOM AlwaysBorderRadius >>>
             -- re-arm
             state.hide_timer:kill()
             state.hide_timer:resume()
+            end
         end
     end
 
@@ -6113,6 +6780,10 @@ local function render()
     -- actual OSC
     if state.osc_visible then
         render_elements(ass)
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Track dropdown renders on top of the OSC elements.
+        render_track_menu(ass)
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 
     if state.persistent_progresstoggle then
@@ -6297,6 +6968,7 @@ local function render()
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- submit
+    virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- end of frame: drop frozen coords
     set_osd(osc_param.playresy * osc_param.display_aspect, osc_param.playresy, ass.text)
 end
 
@@ -6309,7 +6981,78 @@ local function element_has_action(element, action)
         element.eventresponder[action]
 end
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Adaptive input backpressure: count mouse moves; engage shedding as soon as
+-- the trip count is hit. A 5s timer (below) rolls the window and releases on
+-- quiet windows with hysteresis. Shed moves never update last_mouse*, so slow
+-- drifts still get through eventually. Clicks/wheels are never shed.
+local flood_moves = 0
+local flood_shedding = false
+local FLOOD_TRIP_COUNT = 750 -- engage above this many moves/window
+local FLOOD_RELEASE_COUNT = 500 -- disengage below this many moves/window
+local FLOOD_MIN_MOVE = 3 -- px: smaller moves are shed while engaged
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Loop-health report at warn level (visible without debug spam):
+-- input events per 5s window + slowest tick in the window.
+local watch_events = 0
+local watch_mouse = 0 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health mouse share
+local watch_ticks = 0 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health tick count
+local watch_max_tick = 0
+local function watch_report()
+    if watch_max_tick > 0.25 or watch_events > 750 then
+        mp.msg.warn(string.format(
+            "modernx: loop health: max_tick=%.0fms inputs=%d mouse=%d ticks=%d%s%s%s",
+            watch_max_tick * 1000, watch_events, watch_mouse, watch_ticks,
+            state.track_menu and " menu=open" or "",
+            flood_shedding and " shed=1" or "",
+            string.format(" osc=%d in=%d", state.osc_visible and 1 or 0,
+                state.input_enabled and 1 or 0)))
+    end
+    watch_events = 0
+    watch_mouse = 0
+    watch_ticks = 0
+    watch_max_tick = 0
+end
+-- Storm-breaker state: a render storm starves input draining (queue overflow).
+local storm_n = 0
+local storm_t = 0
+local storm_active = false
+local storm_limit = 240
+-- Independent reporter: if ticks themselves stall, the in-tick report would
+-- never fire, so report on a separate timer to tell flood from dead loop.
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Single 5s cadence shared by the flood window and the loop-health report
+-- above, so both always cover the same window.
+mp.add_periodic_timer(5, function()
+    if flood_shedding and flood_moves < FLOOD_RELEASE_COUNT then
+        flood_shedding = false
+    end
+    flood_moves = 0
+    watch_report()
+end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
 function process_event(source, what)
+    virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- input always reads live coords
+    watch_events = watch_events + 1 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health input rate
+    if source == 'mouse_move' then -- >>> EDIT AlwaysBorderRadius <<< -- arrival rate (pre-shed): what fills the queue
+        flood_moves = flood_moves + 1
+        watch_mouse = watch_mouse + 1 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health
+        if flood_moves > FLOOD_TRIP_COUNT and not flood_shedding then
+            flood_shedding = true
+        end
+    end
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Track dropdown gets first pick of mouse events while open.
+    if state.track_menu and track_menu_handle_event(source, what) then
+        request_tick()
+        return
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     local action = string.format('%s%s', source,
         what and ('_' .. what) or '')
 
@@ -6353,6 +7096,19 @@ function process_event(source, what)
         state.mouse_in_window = true
 
         local mouseX, mouseY = get_virt_mouse_pos()
+
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Adaptive shed (engaged above): drop sub-threshold moves only when
+        -- idle (no drag) and menu closed. Never consumes the movement budget.
+        if flood_shedding and state.active_element == nil and not state.track_menu then
+            local fdx = state.last_mouseX and math.abs(mouseX - state.last_mouseX) or 999
+            local fdy = state.last_mouseY and math.abs(mouseY - state.last_mouseY) or 999
+            if fdx < FLOOD_MIN_MOVE and fdy < FLOOD_MIN_MOVE then
+                return -- shed: no show_osc, no drag handling, no tick
+            end
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
+
         if (user_opts.min_mouse_move == 0) or
             (not ((state.last_mouseX == nil) or (state.last_mouseY == nil)) and
                 ((math.abs(mouseX - state.last_mouseX) >= user_opts.min_mouse_move)
@@ -6386,8 +7142,47 @@ end
 -- called by mpv on every frame
 function tick()
     if not state.enabled then return end
+    watch_ticks = watch_ticks + 1 -- >>> EDIT AlwaysBorderRadius <<< -- storm-breaker tick count
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Circuit breaker: shed renders above the storm limit so the loop can
+    -- drain input. The limit scales with the display rate (legit ticks/s
+    -- ~= display-fps; a storm is orders of magnitude above that).
+    -- External events (mouse, playback-time) restart normal ticks on own.
+    local storm_now = mp.get_time()
+    if storm_now - storm_t >= 1 then
+        -- Hysteresis on release: a single calm-ish window does not clear a
+        -- sustained storm, so transitions (and warns) do not flap.
+        storm_limit = math.max(240, math.ceil(4 / math.max(tick_delay, 1 / 1000)))
+        if storm_active and storm_n <= storm_limit / 2 then
+            storm_active = false
+            mp.msg.warn("modernx: diag tick storm over")
+        end
+        storm_t = storm_now
+        storm_n = 0
+    end
+    storm_n = storm_n + 1
+    -- Animated fades re-arm every tick by design and end on their own; only
+    -- shed unanimated ticks so a stuck fade can never wedge the breaker on.
+    if storm_n > storm_limit and state.anitype == nil then
+        if not storm_active then
+            storm_active = true
+            mp.msg.warn("modernx: diag tick storm, shedding renders")
+        end
+        state.tick_last_time = storm_now
+        return
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    local wt0 = mp.get_time() -- >>> EDIT AlwaysBorderRadius <<< -- loop-health tick duration
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        thumb_clear() -- no stuck thumbnail into idle
+        if state.wc_enabled then -- idle never reaches render() to sync it
+            mp.disable_key_bindings('window-controls')
+            state.wc_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+        end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
         -- render idle message
         mp.msg.trace('idle message')
         local _, _, display_aspect = mp.get_osd_size()
@@ -6437,10 +7232,17 @@ function tick()
         render()
     else
         -- Flush OSD
+        thumb_clear() -- >>> EDIT AlwaysBorderRadius <<< -- no stuck thumbnail when OSC off
         render_wipe()
     end
 
     state.tick_last_time = mp.get_time()
+
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    local wdt = mp.get_time() - wt0
+    if wdt > watch_max_tick then watch_max_tick = wdt end
+    -- reporting runs on its own timer, so a dead tick loop still shows up
+    -- <<< CUSTOM AlwaysBorderRadius >>>
 
     if state.anitype ~= nil then
         -- state.anistart can be nil - animation should now start, or it can
@@ -6460,6 +7262,12 @@ end
 mp.register_event('start-file', newfilereset)
 mp.register_event("file-loaded", startupevents)
 mp.observe_property('track-list', nil, request_init)
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Keep the open dropdown in sync with external track changes.
+mp.observe_property('track-list', nil, function()
+    if state.track_menu then track_menu_refresh() end
+end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
 mp.observe_property('playlist', nil, request_init)
 mp.observe_property("chapter-list", "native", function(_, list) -- chapter list changes
     list = list or {}                                           -- safety, shouldn't return nil
@@ -6510,9 +7318,7 @@ if user_opts.key_bindings then
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Cycle audio tracks key binding.
     mp.add_key_binding("z", "cycleaudiotracks", function()
-        mp.set_property_number("secondary-sid", 0)
-        set_track("audio", 1)
-        show_tracklist("audio")
+        track_menu_cycle("audio", 1)
     end);
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -6523,9 +7329,7 @@ if user_opts.key_bindings then
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Cycle captions key binding.
     mp.add_key_binding("c", "cyclecaptions", function()
-        mp.set_property_number("secondary-sid", 0)
-        set_track("sub", 1)
-        show_tracklist("sub")
+        track_menu_cycle("sub", 1)
     end);
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -6672,7 +7476,10 @@ mp.set_key_bindings({
         function(_) process_event("shift+mbtn_left", "down") end },
     { "wheel_up",            function(_) process_event("wheel_up", "press") end },
     { "wheel_down",          function(_) process_event("wheel_down", "press") end },
-    { "mbtn_left_dbl",       "ignore" },
+    { "mbtn_left_dbl", function(_) -- >>> EDIT AlwaysBorderRadius <<< -- mpv.net reports fast double presses as dbl-only (constituents swallowed): act as one click
+            process_event("mbtn_left", "down")
+            process_event("mbtn_left", "up")
+        end },
     { "shift+mbtn_left_dbl", "ignore" },
     { "mbtn_right_dbl",      "ignore" },
 }, "input", "force")
@@ -6701,6 +7508,8 @@ function visibility_mode(mode)
     mp.disable_key_bindings("input")
     mp.disable_key_bindings("window-controls")
     state.input_enabled = false
+    state.wc_enabled = false -- >>> EDIT AlwaysBorderRadius <<< -- keep transition guard in sync
+    set_virt_mouse_area(0, 0, 0, 0, "window-controls") -- >>> EDIT AlwaysBorderRadius <<< -- no render() in never mode
     request_tick()
 end
 
@@ -6709,7 +7518,21 @@ mp.register_script_message("thumbfast-info", function(json)
     if type(data) ~= "table" or not data.width or not data.height then
         mp.msg.error("thumbfast-info: received json didn't produce a table with thumbnail information")
     else
-        thumbfast = data
+        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- Whitelist merge, don't replace: foreign senders may omit
+        -- available/disabled, and nils would desync show/clear.
+        local w, h = tonumber(data.width), tonumber(data.height)
+        if not w or not h or w <= 0 or h <= 0 then
+            mp.msg.error("thumbfast-info: bad thumbnail dimensions")
+            return
+        end
+        thumbfast.width = w
+        thumbfast.height = h
+        thumbfast.available = data.available
+        if thumbfast.available == nil then thumbfast.available = true end
+        thumbfast.disabled = data.disabled
+        if thumbfast.disabled == nil then thumbfast.disabled = false end
+        -- <<< CUSTOM AlwaysBorderRadius >>>
     end
 end)
 
