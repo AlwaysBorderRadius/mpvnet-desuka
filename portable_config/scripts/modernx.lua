@@ -6717,19 +6717,17 @@ local function render()
     end
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    -- Track dropdown: one rect per 'input' slot, so merge the OSC areas
-    -- with the menu box into a single union rect instead of replacing it.
+    -- Track dropdown open: clicks anywhere (even on bare video) must reach
+    -- the script so outside clicks dismiss it; see fullscreen area below.
     if state.track_menu and state.osc_visible then
         local mg = track_menu_geometry()
         if mg then
-            local ux0, uy0, ux1, uy1 = mg.x0, mg.y0, mg.x1, mg.y1
-            for _, cords in ipairs(osc_param.areas['input']) do
-                ux0 = math.min(ux0, cords.x1)
-                uy0 = math.min(uy0, cords.y1)
-                ux1 = math.max(ux1, cords.x2)
-                uy1 = math.max(uy1, cords.y2)
-            end
-            set_virt_mouse_area(ux0, uy0, ux1, uy1, 'input')
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- While the dropdown is open, every click must reach the script
+            -- (the video area has no click binding of its own): fullscreen
+            -- input area, the menu handler dismisses outside clicks itself.
+            set_virt_mouse_area(0, 0, osc_param.playresx, osc_param.playresy, 'input')
+            -- <<< CUSTOM AlwaysBorderRadius >>>
             if mouse_hit_coords(mg.x0, mg.y0, mg.x1, mg.y1) then
                 mouse_over_osc = true
                 menu_hovered = true
