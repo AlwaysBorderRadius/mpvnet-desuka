@@ -1687,6 +1687,24 @@ function get_chapter(possec)
     end
 end
 
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Gradual hover (0 to full over ~120 ms with ease-out): tracks per-element
+-- hover start, snaps back to 0 on leave, and requests ticks only while
+-- animating so the ramp actually paints.
+local function hover_k(element, hovered)
+    if hovered then
+        if element._hover_t0 == nil then element._hover_t0 = mp.get_time() end
+        local k = (mp.get_time() - element._hover_t0) / 0.12
+        if k >= 1 then return 1 end
+        if k < 0 then k = 0 end
+        request_tick()
+        return k
+    end
+    element._hover_t0 = nil
+    return 0
+end
+-- <<< CUSTOM AlwaysBorderRadius >>>
+
 local function draw_seekbar_handle(element, elem_ass, override_alpha)
     local pos = element.slider.posF()
     if not pos then
@@ -1701,10 +1719,17 @@ local function draw_seekbar_handle(element, elem_ass, override_alpha)
         and not state.track_menu -- >>> EDIT AlwaysBorderRadius <<< -- no handle hover while the menu is open
 
     if display_handle then
-        -- Apply size hover_effect only if hovering over the handle
-        if handle_hovered and user_opts.hover_effect_for_sliders then
+        -- Apply size hover_effect only if hovering over the handle.
+        -- No ramp (and no extra ticks) without the size effect.
+        local hk = 0
+        if user_opts.hover_effect_for_sliders and contains(user_opts.hover_effect, "size") then
+            hk = hover_k(element, handle_hovered)
+        end
+        if hk > 0 and user_opts.hover_effect_for_sliders then
             if contains(user_opts.hover_effect, "size") then
-                rh = rh * (user_opts.hover_button_size / 100)
+                local hbs = tonumber(user_opts.hover_button_size) or 100
+                local he = hk >= 1 and 1 or (1 - (1 - hk) * (1 - hk) * (1 - hk))
+                rh = rh * (1 + (hbs / 100 - 1) * he)
             end
         end
 
@@ -2239,12 +2264,24 @@ function render_elements(master_ass)
             local cy_button = element.name == "cy_video" or element.name == "cy_audio" or element.name == "cy_sub"
             local hovered = mouse_hit(element) and (not state.track_menu or cy_button)
                 and is_clickable and element.enabled and state.mouse_down_counter == 0
+            -- Gradual hover: ease size and glow from 0 to full over ~120 ms.
+            -- No ramp (and no extra ticks) when neither is enabled.
+            local hk = 0
+            if contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "glow") then
+                hk = hover_k(element, hovered)
+            end
+            local he = hk >= 1 and 1 or (1 - (1 - hk) * (1 - hk) * (1 - hk))
             -- <<< CUSTOM AlwaysBorderRadius >>>
             local hoverstyle = button_lo.hoverstyle
             if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
                 -- remove font scale tags for these elements, it looks out of place
                 if element.name == "title" or element.name == "description" or element.name == "tc_left" or element.name == "tc_right" or element.name == "chapter_title" then
-                    hoverstyle = hoverstyle:gsub("\\fscx%d+\\fscy%d+", "")
+                    hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", "")
+                elseif he < 1 then
+                    -- ramp the hover size in (fresh tags every frame, so floats must match too)
+                    local hbs = tonumber(user_opts.hover_button_size) or 115
+                    local s = 100 + (hbs - 100) * he
+                    hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", string.format("\\fscx%f\\fscy%f", s, s))
                 end
                 elem_ass:append(hoverstyle .. buttontext)
             else
@@ -2252,10 +2289,12 @@ function render_elements(master_ass)
             end
 
             -- apply blur effect if "glow" is in hover effects
-            if hovered and contains(user_opts.hover_effect, "glow") then
+            if hk > 0 and contains(user_opts.hover_effect, "glow") then
                 local shadow_ass = mp.assdraw.ass_new()
                 shadow_ass:merge(style_ass)
-                shadow_ass:append("{\\blur" .. user_opts.button_glow_amount .. "}" .. hoverstyle .. buttontext)
+                -- ramp the glow in with the same ease
+                local glow = (tonumber(user_opts.button_glow_amount) or 0) * he
+                shadow_ass:append("{\\blur" .. string.format("%.2f", glow) .. "}" .. hoverstyle .. buttontext)
                 elem_ass:merge(shadow_ass)
             end
 
@@ -4826,7 +4865,7 @@ local function add_layout(name)
                 tooltip_style = "",
                 tooltip_an = 2,
                 alpha = { [1] = 0, [2] = 255, [3] = 88, [4] = 255 },
-                hoverstyle = osc_styles.element_hover:gsub("\\fscx%d+\\fscy%d+", ""), -- font scales messes with handle positions in werid ways
+                hoverstyle = osc_styles.element_hover:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", ""), -- font scales messes with handle positions in werid ways
             }
         elseif elements[name].type == "box" then
             elements[name].layout.box = { radius = 0, hexagon = false }
