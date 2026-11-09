@@ -2299,7 +2299,9 @@ function render_elements(master_ass)
             -- <<< CUSTOM AlwaysBorderRadius >>>
 
             -- >>> CUSTOM AlwaysBorderRadius <<<
-            -- Unscaled fade-out glow (no big-text flash) + glow as underlay.
+            -- Unscaled fade-out glow (no big-text flash) + glow on top, as
+            -- upstream: the blur itself masks sub-pixel doubling, and an
+            -- underlay exposed a ghost copy.
             local hoverstyle = button_lo.hoverstyle
             -- remove font scale tags for these elements, it looks out of place.
             -- Always (not only while hovered): the fade-out glow must use the
@@ -2313,8 +2315,13 @@ function render_elements(master_ass)
                 hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", string.format("\\fscx%f\\fscy%f", s, s))
             end
 
-            -- apply blur effect if "glow" is in hover effects.
-            -- underlay: glow first, base text on top (not the other way round).
+            if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
+                elem_ass:append(hoverstyle .. buttontext)
+            else
+                elem_ass:append(buttontext)
+            end
+
+            -- apply blur effect if "glow" is in hover effects, on top.
             if he > 0 and contains(user_opts.hover_effect, "glow") then
                 local shadow_ass = mp.assdraw.ass_new()
                 shadow_ass:merge(style_ass)
@@ -2324,12 +2331,6 @@ function render_elements(master_ass)
                 elem_ass:merge(shadow_ass)
             end
             -- <<< CUSTOM AlwaysBorderRadius >>>
-
-            if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
-                elem_ass:append(hoverstyle .. buttontext)
-            else
-                elem_ass:append(buttontext)
-            end
 
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
