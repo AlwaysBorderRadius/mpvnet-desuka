@@ -3412,12 +3412,12 @@ local function render_toast(ass)
     local bar_len = tonumber(user_opts.toast_bar_length)
     if bar_len == nil or bar_len < 0 or bar_len > 1 then bar_len = 1 end
     local content_max = cap - pad_x * 2 - 10
-    local pill_w, pill_h, head_w, tail_w
+    local pill_w, pill_h, head_w, tail_w, head_gap
     local content_w, content_h = 0, 0
     local lines = nil
     if asset then
         head_w = toast_measure(state.toast_head, fontsize)
-        local head_gap = (head_w > 0) and gap or 0 -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
+        head_gap = ((head_w or 0) > 0) and gap or 0 -- >>> EDIT AlwaysBorderRadius <<< -- function scope: also used by the paint block below
         if state.toast_tail then
             local budget = content_max - head_w - head_gap - flag_w - gap
             if toast_measure(state.toast_tail, fontsize) > budget then
