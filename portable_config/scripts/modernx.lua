@@ -1688,20 +1688,47 @@ function get_chapter(possec)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- Gradual hover (0 to full over ~120 ms with ease-out): tracks per-element
--- hover start, snaps back to 0 on leave, and requests ticks only while
--- animating so the ramp actually paints.
+-- Gradual hover: ease-out entrance (~100 ms), quicker fade-out (~80 ms).
+-- Single linear progress 0..1 with direction; the displayed value always
+-- eases through it, so leave/re-enter mid-flight never jumps. Ticks only
+-- while animating (plus one kickstart tick); resting clears a finished fade.
+local HOVER_IN = 0.10
+local HOVER_OUT = 0.08
+local function hover_ease(p) return 1 - (1 - p) * (1 - p) * (1 - p) end
 local function hover_k(element, hovered)
-    if hovered then
-        if element._hover_t0 == nil then element._hover_t0 = mp.get_time() end
-        local k = (mp.get_time() - element._hover_t0) / 0.12
-        if k >= 1 then return 1 end
-        if k < 0 then k = 0 end
-        request_tick()
-        return k
+    local now = mp.get_time()
+    local want = hovered and "in" or "out"
+    local h = element._hover
+    if h == nil then
+        if not hovered then return 0 end
+        h = { p = 0, t = now, dir = "in" }
+        element._hover = h
+    elseif h.dir ~= want then
+        -- direction changed: advance to now first for continuity
+        if h.dir == "in" then
+            h.p = math.min(1, math.max(0, h.p + (now - h.t) / HOVER_IN))
+        else
+            h.p = math.max(0, math.min(1, h.p - (now - h.t) / HOVER_OUT))
+        end
+        h.t = now
+        h.dir = want
     end
-    element._hover_t0 = nil
-    return 0
+    local p
+    if h.dir == "in" then
+        p = math.min(1, math.max(0, h.p + (now - h.t) / HOVER_IN))
+    else
+        p = math.max(0, math.min(1, h.p - (now - h.t) / HOVER_OUT))
+    end
+    if p <= 0 then
+        -- only a finished fade-out clears the state; a fresh fade-in rests
+        -- at 0 but still needs its kickstart tick (same-timestamp calls)
+        if h.dir == "out" then element._hover = nil else request_tick() end
+        return 0
+    end
+    if p >= 1 then return 1 end
+    h.p, h.t = p, now
+    request_tick()
+    return hover_ease(p)
 end
 -- <<< CUSTOM AlwaysBorderRadius >>>
 
@@ -1721,14 +1748,13 @@ local function draw_seekbar_handle(element, elem_ass, override_alpha)
     if display_handle then
         -- Apply size hover_effect only if hovering over the handle.
         -- No ramp (and no extra ticks) without the size effect.
-        local hk = 0
+        local he = 0
         if user_opts.hover_effect_for_sliders and contains(user_opts.hover_effect, "size") then
-            hk = hover_k(element, handle_hovered)
+            he = hover_k(element, handle_hovered)
         end
-        if hk > 0 and user_opts.hover_effect_for_sliders then
+        if he > 0 and user_opts.hover_effect_for_sliders then
             if contains(user_opts.hover_effect, "size") then
                 local hbs = tonumber(user_opts.hover_button_size) or 100
-                local he = hk >= 1 and 1 or (1 - (1 - hk) * (1 - hk) * (1 - hk))
                 rh = rh * (1 + (hbs / 100 - 1) * he)
             end
         end
@@ -2264,13 +2290,12 @@ function render_elements(master_ass)
             local cy_button = element.name == "cy_video" or element.name == "cy_audio" or element.name == "cy_sub"
             local hovered = mouse_hit(element) and (not state.track_menu or cy_button)
                 and is_clickable and element.enabled and state.mouse_down_counter == 0
-            -- Gradual hover: ease size and glow from 0 to full over ~120 ms.
+            -- Gradual hover: ease size and glow in and out (~100/80 ms).
             -- No ramp (and no extra ticks) when neither is enabled.
-            local hk = 0
+            local he = 0
             if contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "glow") then
-                hk = hover_k(element, hovered)
+                he = hover_k(element, hovered)
             end
-            local he = hk >= 1 and 1 or (1 - (1 - hk) * (1 - hk) * (1 - hk))
             -- <<< CUSTOM AlwaysBorderRadius >>>
             local hoverstyle = button_lo.hoverstyle
             if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
@@ -2289,7 +2314,7 @@ function render_elements(master_ass)
             end
 
             -- apply blur effect if "glow" is in hover effects
-            if hk > 0 and contains(user_opts.hover_effect, "glow") then
+            if he > 0 and contains(user_opts.hover_effect, "glow") then
                 local shadow_ass = mp.assdraw.ass_new()
                 shadow_ass:merge(style_ass)
                 -- ramp the glow in with the same ease
