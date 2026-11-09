@@ -171,6 +171,11 @@ local user_opts = {
     track_menu_max_rows = 8,      -- max visible rows in the track dropdown (rest scrolls)
     track_menu_font_size = 18,    -- font size of the track dropdown rows
     track_menu_radius = 5,        -- corner radius of dropdown rows and scrollbar (0 = square)
+    track_menu_bg_color = "#141414", -- dropdown background plate
+    track_menu_bg_opacity = 1,      -- dropdown background opacity 0-1
+    track_menu_border_color = "#999999", -- dropdown border plate
+    track_menu_border_size = 1,     -- dropdown border width in playres px (0 = none)
+    track_menu_animation = true,    -- fade+drop on open, fade on close
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     volume_control = true,          -- show mute button and volume slider
@@ -1105,7 +1110,8 @@ local state = {
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track dropdown menu (click cy_video/cy_audio/cy_sub to pick with the mouse)
-    track_menu = nil, -- { ttype, items, header, width, offset, pressed } or nil
+    track_menu = nil, -- { ttype, items, header, width, offset, pressed, born } or nil
+    track_menu_fading = nil, -- closing snapshot { m, g, t0 } for the fade-out
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- >>> CUSTOM desuka: unified toast (single slot, preemptive, no queue) <<<
@@ -3844,7 +3850,8 @@ function open_track_menu(ttype)
     local sel_idx = cur + 1
     local offset = 0
     if sel_idx > max_rows then offset = math.min(sel_idx - max_rows, math.max(0, #items - max_rows)) end
-    state.track_menu = { ttype = ttype, header = header, items = items, width = width, offset = offset, pressed = nil }
+    state.track_menu = { ttype = ttype, header = header, items = items, width = width, offset = offset, pressed = nil, born = mp.get_time() }
+    state.track_menu_fading = nil -- a fresh open replaces any closing fade
     reset_timeout()
     show_osc()
     mp.add_forced_key_binding("ESC", "modernx-track-menu-close", close_track_menu)
@@ -3853,6 +3860,14 @@ end
 
 function close_track_menu()
     if state.track_menu == nil then return end
+    if user_opts.track_menu_animation and state.osc_visible then
+        -- Closing fade snapshot; render_track_menu() only runs while the OSC
+        -- is visible, so skip it when already hidden (nothing to paint over).
+        local g = track_menu_geometry()
+        if g then state.track_menu_fading = { m = state.track_menu, g = g, t0 = mp.get_time() } end
+    else
+        state.track_menu_fading = nil
+    end
     state.track_menu = nil
     mp.remove_key_binding("modernx-track-menu-close")
     request_tick()
@@ -3964,32 +3979,49 @@ function track_menu_geometry()
         scrollable = scrollable, rows = rows, sb = sb }
 end
 
-function render_track_menu(ass)
-    local m = state.track_menu
-    if not m then return end
-    local g = track_menu_geometry()
-    if not g then return end
+local function render_track_menu_one(ass, m, g, fade, dy, allow_hover)
     local mx, my = get_virt_mouse_pos()
+    if not allow_hover then mx, my = -9999, -9999 end -- fading snapshot: no hover
     local gap = user_opts.track_flag_gap or 2
     local row_r = math.max(0, user_opts.track_menu_radius or 5) -- >>> EDIT AlwaysBorderRadius <<< -- rounded rows/scrollbar
+    local bg_col = osc_color_convert(sanitize_hex_color(user_opts.track_menu_bg_color, "#141414"))
+    local bg_op = tonumber(user_opts.track_menu_bg_opacity)
+    if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
+    local bd_col = osc_color_convert(sanitize_hex_color(user_opts.track_menu_border_color, "#999999"))
+    local bd_w = tonumber(user_opts.track_menu_border_size)
+    if bd_w == nil or bd_w < 0 then bd_w = 1 end
+    -- NOTE: the border plate stays opaque even with a translucent bg
+    -- (glass look); only the entrance/exit fade touches its alpha.
+    local fa = string.format("%02X", math.floor((1 - fade) * 255 + 0.5)) -- element alpha
+    local bg_aa = string.format("%02X", math.floor((1 - bg_op * fade) * 255 + 0.5))
+    -- border plate, then background plate (reliable at any width, unlike \bordN on \p shapes)
+    if bd_w > 0 then
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&H" .. bd_col .. "\\alpha&H" .. fa .. "&}")
+        ass:draw_start()
+        ass:round_rect_cw(g.x0 - bd_w, g.y0 + dy - bd_w, g.x1 + bd_w, g.y1 + dy + bd_w, 6 + bd_w)
+        ass:draw_stop()
+    end
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord1\\1c&H141414&\\3c&H999999&}")
+    ass:append("{\\blur0\\bord0\\1c&H" .. bg_col .. "\\alpha&H" .. bg_aa .. "&}")
     ass:draw_start()
-    ass:round_rect_cw(g.x0, g.y0, g.x1, g.y1, 6)
+    ass:round_rect_cw(g.x0, g.y0 + dy, g.x1, g.y1 + dy, 6)
     ass:draw_stop()
     ass:new_event()
-    ass:pos(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h / 2)
+    ass:pos(g.x0 + g.pad_x, g.y0 + dy + g.pad_y + g.header_h / 2)
     ass:an(4)
-    ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}")
+    ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "\\alpha&H" .. fa .. "&}")
     ass:append(m.header)
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord0\\1c&H999999&}")
+    ass:append("{\\blur0\\bord0\\1c&H999999&\\alpha&H" .. fa .. "&}")
     ass:draw_start()
-    ass:rect_cw(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h, g.x1 - g.pad_x, g.y0 + g.pad_y + g.header_h + 1)
+    ass:rect_cw(g.x0 + g.pad_x, g.y0 + dy + g.pad_y + g.header_h, g.x1 - g.pad_x, g.y0 + dy + g.pad_y + g.header_h + 1)
     ass:draw_stop()
     for _, r in ipairs(g.rows) do
         local item = m.items[r.index]
@@ -4000,24 +4032,24 @@ function render_track_menu(ass)
                 ass:new_event()
                 ass:pos(0, 0)
                 ass:an(7)
-                ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")
+                ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "\\alpha&H" .. fa .. "&}")
                 ass:draw_start()
-                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                ass:round_rect_cw(r.x0 + 3, r.y0 + dy + 1, r.x1 - 3, r.y1 + dy - 1,
                     math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
                 ass:draw_stop()
             elseif hovered then
                 ass:new_event()
                 ass:pos(0, 0)
                 ass:an(7)
-                ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+                ass:append("{\\blur0\\bord0\\1c&H3A3A3A&\\alpha&H" .. fa .. "&}")
                 ass:draw_start()
-                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                ass:round_rect_cw(r.x0 + 3, r.y0 + dy + 1, r.x1 - 3, r.y1 + dy - 1,
                     math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
                 ass:draw_stop()
             end
-            local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}"
+            local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "\\alpha&H" .. fa .. "&}"
             local tx = g.x0 + g.pad_x
-            local ty = (r.y0 + r.y1) / 2
+            local ty = (r.y0 + r.y1) / 2 + dy
             local avail = r.x1 - tx - 4 -- text must stay inside the rounded box
             local asset, flag_w, flag_h = nil, 0, 0
             if item.flag_lang then asset, flag_w, flag_h = get_flag_geometry(item.flag_lang) end
@@ -4040,7 +4072,7 @@ function render_track_menu(ass)
                         ass:append(style)
                         ass:append(head)
                     end
-                    local flag_ass = render_flag_geometry(asset, tx + head_w + head_gap, ty - flag_h / 2)
+                    local flag_ass = render_flag_geometry(asset, tx + head_w + head_gap, ty - flag_h / 2, fa)
                     if flag_ass then
                         ass:new_event()
                         ass:merge(flag_ass)
@@ -4065,12 +4097,12 @@ function render_track_menu(ass)
         end
     end
     if g.scrollable and g.sb then
-        local top, bottom, sb_x0 = g.sb.top, g.sb.bottom, g.sb.x0
+        local top, bottom, sb_x0 = g.sb.top + dy, g.sb.bottom + dy, g.sb.x0
         local sb_w = g.sb.w
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
-        ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+        ass:append("{\\blur0\\bord0\\1c&H3A3A3A&\\alpha&H" .. fa .. "&}")
         ass:draw_start()
         ass:round_rect_cw(sb_x0, top, sb_x0 + sb_w, bottom, math.min(row_r, sb_w / 2))
         ass:draw_stop()
@@ -4080,11 +4112,45 @@ function render_track_menu(ass)
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
-        ass:append("{\\blur0\\bord0\\1c&HFFFFFF&}")
+        ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\alpha&H" .. fa .. "&}")
         ass:draw_start()
         ass:round_rect_cw(sb_x0, y, sb_x0 + sb_w, y + h, math.max(0, math.min(row_r, sb_w / 2, h / 2)))
         ass:draw_stop()
     end
+end
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Dropdown open/close animation (fade + drop on open, fade on close) and
+-- closing fade-out snapshot. Ticks are requested only while animating.
+function render_track_menu(ass)
+    local now = mp.get_time()
+    local anim = user_opts.track_menu_animation
+    local f = state.track_menu_fading
+    if f then
+        local age = now - f.t0
+        if (not anim) or age >= 0.15 or not f.g then
+            state.track_menu_fading = nil
+        else
+            render_track_menu_one(ass, f.m, f.g, 1 - age / 0.15, 0, false)
+            request_tick()
+        end
+    end
+    local m = state.track_menu
+    if not m then return end
+    local g = track_menu_geometry()
+    if not g then return end
+    local fade, dy = 1, 0
+    if anim then
+        local age = now - (m.born or now)
+        if age < 0 then age = 0 end
+        if age < 0.15 then
+            local k = age / 0.15
+            fade = k
+            dy = -((1 - k) * (1 - k) * (1 - k)) * 6
+            request_tick()
+        end
+    end
+    render_track_menu_one(ass, m, g, fade, dy, true)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -5480,6 +5546,29 @@ function validate_user_opts()
         mp.msg.warn("track_menu_radius must be a non-negative number. Using 5.")
         user_opts.track_menu_radius = 5
     end
+    if type(user_opts.track_menu_bg_opacity) ~= "number"
+        or user_opts.track_menu_bg_opacity < 0 or user_opts.track_menu_bg_opacity > 1 then
+        mp.msg.warn("track_menu_bg_opacity must be 0-1. Using 1.")
+        user_opts.track_menu_bg_opacity = 1
+    end
+    if type(user_opts.track_menu_border_size) ~= "number"
+        or user_opts.track_menu_border_size < 0 or user_opts.track_menu_border_size > 8 then
+        mp.msg.warn("track_menu_border_size must be 0-8. Using 1.")
+        user_opts.track_menu_border_size = 1
+    end
+    if type(user_opts.track_menu_animation) ~= "boolean" then
+        mp.msg.warn("track_menu_animation must be boolean. Using true.")
+        user_opts.track_menu_animation = true
+    end
+    if sanitize_hex_color(user_opts.track_menu_bg_color, nil) == nil then
+        mp.msg.warn('track_menu_bg_color must be hex ("#141414"). Using #141414.')
+        user_opts.track_menu_bg_color = "#141414"
+    end
+    if sanitize_hex_color(user_opts.track_menu_border_color, nil) == nil then
+        mp.msg.warn('track_menu_border_color must be hex ("#999999"). Using #999999.')
+        user_opts.track_menu_border_color = "#999999"
+    end
+    -- colors are sanitized with fallback at paint time (see toast opts)
 
     -- >>> CUSTOM desuka: toast opts <<<
     if type(user_opts.toast_enabled) ~= "boolean" then
