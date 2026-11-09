@@ -2297,23 +2297,24 @@ function render_elements(master_ass)
                 he = hover_k(element, hovered)
             end
             -- <<< CUSTOM AlwaysBorderRadius >>>
+
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- Unscaled fade-out glow (no big-text flash) + glow as underlay.
             local hoverstyle = button_lo.hoverstyle
-            if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
-                -- remove font scale tags for these elements, it looks out of place
-                if element.name == "title" or element.name == "description" or element.name == "tc_left" or element.name == "tc_right" or element.name == "chapter_title" then
-                    hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", "")
-                elseif he < 1 then
-                    -- ramp the hover size in (fresh tags every frame, so floats must match too)
-                    local hbs = tonumber(user_opts.hover_button_size) or 115
-                    local s = 100 + (hbs - 100) * he
-                    hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", string.format("\\fscx%f\\fscy%f", s, s))
-                end
-                elem_ass:append(hoverstyle .. buttontext)
-            else
-                elem_ass:append(buttontext)
+            -- remove font scale tags for these elements, it looks out of place.
+            -- Always (not only while hovered): the fade-out glow must use the
+            -- same unstripped size, or it flashes bigger on top at the end.
+            if element.name == "title" or element.name == "description" or element.name == "tc_left" or element.name == "tc_right" or element.name == "chapter_title" then
+                hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", "")
+            elseif he < 1 and contains(user_opts.hover_effect, "size") then
+                -- ramp the hover size in (fresh tags every frame, so floats must match too)
+                local hbs = tonumber(user_opts.hover_button_size) or 115
+                local s = 100 + (hbs - 100) * he
+                hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", string.format("\\fscx%f\\fscy%f", s, s))
             end
 
-            -- apply blur effect if "glow" is in hover effects
+            -- apply blur effect if "glow" is in hover effects.
+            -- underlay: glow first, base text on top (not the other way round).
             if he > 0 and contains(user_opts.hover_effect, "glow") then
                 local shadow_ass = mp.assdraw.ass_new()
                 shadow_ass:merge(style_ass)
@@ -2321,6 +2322,13 @@ function render_elements(master_ass)
                 local glow = (tonumber(user_opts.button_glow_amount) or 0) * he
                 shadow_ass:append("{\\blur" .. string.format("%.2f", glow) .. "}" .. hoverstyle .. buttontext)
                 elem_ass:merge(shadow_ass)
+            end
+            -- <<< CUSTOM AlwaysBorderRadius >>>
+
+            if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
+                elem_ass:append(hoverstyle .. buttontext)
+            else
+                elem_ass:append(buttontext)
             end
 
             -- add tooltip for audio and subtitle tracks
