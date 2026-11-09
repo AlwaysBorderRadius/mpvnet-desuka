@@ -2315,6 +2315,31 @@ function render_elements(master_ass)
                 hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", string.format("\\fscx%f\\fscy%f", s, s))
             end
 
+            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- Window buttons: soft background halo in their own hover color.
+            -- Plain blurred rect (no text), so no doubling risk; under the
+            -- icon, fading in and out with the same ease as the hover.
+            if he > 0 and element.hitbox and
+                (element.name == "close" or element.name == "minimize" or element.name == "maximize") then
+                local halo_col = hoverstyle:match("\\c&H(%x+)&")
+                if halo_col then
+                    local hb = element.hitbox
+                    local halo_aa = string.format("%02X", math.floor((1 - he) * 255 + 0.5))
+                    elem_ass:new_event()
+                    elem_ass:pos(0, 0)
+                    elem_ass:an(7)
+                    elem_ass:append("{\\blur8\\bord0\\1c&H" .. halo_col .. "\\alpha&H" .. halo_aa .. "&}")
+                    elem_ass:draw_start()
+                    elem_ass:round_rect_cw(hb.x1, hb.y1, hb.x2, hb.y2, 6)
+                    elem_ass:draw_stop()
+                    -- restore the style context the base text below expects
+                    -- (pos/an come from the merged style, not set per event)
+                    elem_ass:new_event()
+                    elem_ass:merge(style_ass)
+                end
+            end
+            -- <<< CUSTOM AlwaysBorderRadius >>>
+
             if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
                 elem_ass:append(hoverstyle .. buttontext)
             else
