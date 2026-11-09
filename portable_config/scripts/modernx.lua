@@ -171,6 +171,12 @@ local user_opts = {
     track_menu_max_rows = 8,      -- max visible rows in the track dropdown (rest scrolls)
     track_menu_font_size = 18,    -- font size of the track dropdown rows
     track_menu_radius = 5,        -- corner radius of dropdown rows and scrollbar (0 = square)
+    track_menu_bg_color = "#141414", -- dropdown background plate
+    track_menu_bg_opacity = 1,      -- dropdown background opacity 0-1
+    track_menu_border_color = "#999999", -- dropdown border plate
+    track_menu_border_size = 1,     -- dropdown border width in playres px (0 = none)
+    track_menu_animation = true,    -- fade+rise on open, fade on close
+    track_menu_animation_distance = 12, -- rise travel in playres px (0 = fade only)
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     volume_control = true,          -- show mute button and volume slider
@@ -290,6 +296,7 @@ local user_opts = {
     -- >>> CUSTOM desuka: unified toast channel (replaces native OSD) <<<
     -- Single visible toast, preemptive (no queue). kind: info|success|warn|error|persistent
     toast_enabled = true,          -- route all script OSD through the modernx toast
+    toast_animation = true,      -- fade + rise on show, fade on hide
     toast_font_size = 20,          -- toast text size
     toast_max_width = 900,         -- max toast pill width (playres units)
     toast_top_margin = 80,         -- fixed distance from top edge (ignores OSC)
@@ -1104,7 +1111,8 @@ local state = {
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Track dropdown menu (click cy_video/cy_audio/cy_sub to pick with the mouse)
-    track_menu = nil, -- { ttype, items, header, width, offset, pressed } or nil
+    track_menu = nil, -- { ttype, items, header, width, offset, pressed, born } or nil
+    track_menu_fading = nil, -- closing snapshot { m, g, t0 } for the fade-out
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     -- >>> CUSTOM desuka: unified toast (single slot, preemptive, no queue) <<<
@@ -1112,9 +1120,12 @@ local state = {
     toast_kind = "info",    -- info|success|warn|error|persistent
     toast_source = "",      -- sender id for source-aware clear
     toast_hide_timer = nil, ---@type mp.Timer?
+    toast_fade_timer = nil, -- one-shot kickstarter: re-arms ticks into the fade-out window
     toast_head = nil,       -- flag row head (empty since markers were removed), escaped
     toast_tail = nil,       -- flag row tail, escaped
     toast_flag_lang = nil,  -- flag row language for vector flag
+    toast_birth = nil,      -- mp.get_time() when shown (fade+rise entrance)
+    toast_expiry = nil,     -- mp.get_time() when it hides (fade exit)
     -- <<< CUSTOM desuka >>>
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -1963,13 +1974,13 @@ end
 -- Builds the ASS events for a vector flag from scaled geometry (coordinates
 -- already carry the requested size, always drawn with \p1); one event per
 -- colour (libass cancels a multi-path override and repeating \p advances the pen).
-local function render_flag_geometry(asset, x, y)
+local function render_flag_geometry(asset, x, y, alpha)
     local flag_ass = mp.assdraw.ass_new()
     for _, part in ipairs(asset.d) do
         flag_ass:new_event()
         flag_ass:pos(x, y)
         flag_ass:an(7)
-        flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H00&}")
+        flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H" .. (alpha or "00") .. "&}")
         flag_ass:append(part)
     end
     return flag_ass
@@ -3302,12 +3313,34 @@ function show_toast(text, kind, source, duration)
     state.toast_head = nil
     state.toast_tail = nil
     state.toast_flag_lang = nil
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Animate the entrance only: content swaps on a visible toast keep the
+    -- original birth (no re-fade flicker while cycling); only expiry moves.
+    local now = mp.get_time()
+    if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled()) then
+        state.toast_birth = now
+    end
+    state.toast_expiry = now + (duration or 2)
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
     state.toast_hide_timer:kill()
     state.toast_hide_timer.timeout = duration
     state.toast_hide_timer:resume()
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Kickstart ticks into the fade-out window: the exit fade only renders
+    -- if something ticks during its last 200 ms (nothing does when paused).
+    -- Fires inside the fade window (left < 0.25) so the chain takes over.
+    if not state.toast_fade_timer then
+        state.toast_fade_timer = mp.add_timeout(0, function() request_tick() end)
+    end
+    state.toast_fade_timer:kill()
+    if duration < 3600 then -- persistent toasts never fade out: don't arm
+        state.toast_fade_timer.timeout = math.max(0, duration - 0.2)
+        state.toast_fade_timer:resume()
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     request_tick()
 end
 
@@ -3342,12 +3375,33 @@ function show_toast_row(row, kind, source, duration)
     local tail = tostring(row.tail or ""):gsub("^%s+", ""):gsub("%s+$", "")
     state.toast_tail = (tail ~= "") and escape_toast_text(tail) or nil
     state.toast_flag_lang = row.flag_lang
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Same no-refade rule as show_toast (see above).
+    local now = mp.get_time()
+    if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled()) then
+        state.toast_birth = now
+    end
+    state.toast_expiry = now + (duration or 2)
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
     state.toast_hide_timer:kill()
     state.toast_hide_timer.timeout = duration
     state.toast_hide_timer:resume()
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Kickstart ticks into the fade-out window: the exit fade only renders
+    -- if something ticks during its last 200 ms (nothing does when paused).
+    -- Fires inside the fade window (left < 0.25) so the chain takes over.
+    if not state.toast_fade_timer then
+        state.toast_fade_timer = mp.add_timeout(0, function() request_tick() end)
+    end
+    state.toast_fade_timer:kill()
+    if duration < 3600 then -- persistent toasts never fade out: don't arm
+        state.toast_fade_timer.timeout = math.max(0, duration - 0.2)
+        state.toast_fade_timer:resume()
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     request_tick()
 end
 
@@ -3361,7 +3415,10 @@ function clear_toast(source, force)
     state.toast_head = nil
     state.toast_tail = nil
     state.toast_flag_lang = nil
+    state.toast_birth = nil
+    state.toast_expiry = nil
     if state.toast_hide_timer then state.toast_hide_timer:kill() end
+    if state.toast_fade_timer then state.toast_fade_timer:kill() end
     request_tick()
 end
 
@@ -3384,15 +3441,41 @@ end
 local function render_toast(ass)
     if not user_opts.toast_enabled then return end
     if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled() and state.toast_text) then
-        if state.toast_text ~= nil then
+            if state.toast_text ~= nil then
             state.toast_text = nil
             state.toast_head = nil
             state.toast_tail = nil
             state.toast_flag_lang = nil
+            state.toast_birth = nil
+            state.toast_expiry = nil
+            if state.toast_fade_timer then state.toast_fade_timer:kill() end
             state.toast_kind = "info"
             state.toast_source = ""
         end
         return
+    end
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Entrance (fade + rise) and exit fade. Ticks after the first frame come
+    -- from re-requesting while fading; a one-shot kickstarter covers the
+    -- fade-out window when nothing else ticks (e.g. paused video).
+    local now = mp.get_time()
+    local fade, slide = 1, 0
+    if user_opts.toast_animation and state.toast_birth then
+        local age = now - state.toast_birth
+        if age < 0 then age = 0 end
+        local left = state.toast_expiry and (state.toast_expiry - now) or 1
+        if left < 0 then left = 0 end
+        fade = math.min(math.min(1, age / 0.15), math.min(1, left / 0.25))
+        if fade < 1 then
+            local t = math.min(1, age / 0.15)
+            slide = (1 - t) * (1 - t) * (1 - t) * 14 -- ease-out rise, px
+            request_tick()
+        end
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    local fade_aa = "00" -- fully opaque; eased alpha while fading
+    if fade < 1 then
+        fade_aa = string.format("%02X", math.floor((1 - fade) * 255 + 0.5))
     end
     local fontsize = tonumber(user_opts.toast_font_size) or 20
     local gap = tonumber(user_opts.track_flag_gap) or 2
@@ -3472,6 +3555,10 @@ local function render_toast(ass)
     local cy_box = cy + pad_b / 2
     -- text (and bar) vertical center, optical nudge included
     local tcy = cy + text_dy
+    if slide > 0 then -- entrance rise: start below, settle at rest position
+        cy_box = cy_box + slide
+        tcy = tcy + slide
+    end
     local x0 = cx - pill_w / 2
     local x1 = cx + pill_w / 2
     local y0 = cy_box - pill_h / 2
@@ -3492,12 +3579,12 @@ local function render_toast(ass)
     -- inset 1px under the bg so rasterization seams stay hidden.
     local bg_op = tonumber(user_opts.toast_bg_opacity)
     if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
-    local bg_aa = string.format("%02X", math.floor((1 - bg_op) * 255 + 0.5))
+    local bg_aa = string.format("%02X", math.floor((1 - bg_op * fade) * 255 + 0.5))
     local bg_bb = tonumber(user_opts.toast_bg_border_size) or 0
     if bg_bb < 0 then bg_bb = 0 end
     local bb_op = tonumber(user_opts.toast_bg_border_opacity)
     if bb_op == nil or bb_op < 0 or bb_op > 1 then bb_op = 1 end
-    local bb_aa = string.format("%02X", math.floor((1 - bb_op) * 255 + 0.5))
+    local bb_aa = string.format("%02X", math.floor((1 - bb_op * fade) * 255 + 0.5))
     local kind_col = toast_accent(state.toast_kind)
     local bb_col = kind_col
     if not user_opts.toast_bg_border_kind_colors then
@@ -3538,6 +3625,9 @@ local function render_toast(ass)
         .. "&\\3c&H"
         .. osc_color_convert(sanitize_hex_color(user_opts.toast_text_border_color, "#000000"))
         .. "&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}"
+    if fade < 1 then -- entrance/exit fade: uniform alpha (opaque when full)
+        text_style = text_style .. "{\\alpha&H" .. fade_aa .. "&}"
+    end
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Accent bar shared by plain and flag toasts (the flag branch returns
     -- before the plain text below, so it calls this explicitly). Uses the
@@ -3567,7 +3657,7 @@ local function render_toast(ass)
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&}")
+    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&\\alpha&H" .. fade_aa .. "&}")
     ass:draw_start()
     -- plain pills are shortened by 10px (x1-10): center on the visual middle.
     -- flag pills keep full width, centered on cx.
@@ -3602,7 +3692,7 @@ local function render_toast(ass)
             ass:append(text_style .. (state.toast_head or ""))
         end
         -- flag (an=7 top-left, vertically centered)
-        local flag_ass = render_flag_geometry(asset, sx + head_w + head_gap, tcy - flag_h / 2)
+        local flag_ass = render_flag_geometry(asset, sx + head_w + head_gap, tcy - flag_h / 2, fade_aa)
         if flag_ass then
             ass:new_event()
             ass:merge(flag_ass)
@@ -3791,7 +3881,8 @@ function open_track_menu(ttype)
     local sel_idx = cur + 1
     local offset = 0
     if sel_idx > max_rows then offset = math.min(sel_idx - max_rows, math.max(0, #items - max_rows)) end
-    state.track_menu = { ttype = ttype, header = header, items = items, width = width, offset = offset, pressed = nil }
+    state.track_menu = { ttype = ttype, header = header, items = items, width = width, offset = offset, pressed = nil, born = mp.get_time() }
+    state.track_menu_fading = nil -- a fresh open replaces any closing fade
     reset_timeout()
     show_osc()
     mp.add_forced_key_binding("ESC", "modernx-track-menu-close", close_track_menu)
@@ -3800,6 +3891,14 @@ end
 
 function close_track_menu()
     if state.track_menu == nil then return end
+    if user_opts.track_menu_animation and state.osc_visible then
+        -- Closing fade snapshot; render_track_menu() only runs while the OSC
+        -- is visible, so skip it when already hidden (nothing to paint over).
+        local g = track_menu_geometry()
+        if g then state.track_menu_fading = { m = state.track_menu, g = g, t0 = mp.get_time() } end
+    else
+        state.track_menu_fading = nil
+    end
     state.track_menu = nil
     mp.remove_key_binding("modernx-track-menu-close")
     request_tick()
@@ -3911,32 +4010,49 @@ function track_menu_geometry()
         scrollable = scrollable, rows = rows, sb = sb }
 end
 
-function render_track_menu(ass)
-    local m = state.track_menu
-    if not m then return end
-    local g = track_menu_geometry()
-    if not g then return end
+local function render_track_menu_one(ass, m, g, fade, dy, allow_hover)
     local mx, my = get_virt_mouse_pos()
+    if not allow_hover then mx, my = -9999, -9999 end -- fading snapshot: no hover
     local gap = user_opts.track_flag_gap or 2
     local row_r = math.max(0, user_opts.track_menu_radius or 5) -- >>> EDIT AlwaysBorderRadius <<< -- rounded rows/scrollbar
+    local bg_col = osc_color_convert(sanitize_hex_color(user_opts.track_menu_bg_color, "#141414"))
+    local bg_op = tonumber(user_opts.track_menu_bg_opacity)
+    if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
+    local bd_col = osc_color_convert(sanitize_hex_color(user_opts.track_menu_border_color, "#999999"))
+    local bd_w = tonumber(user_opts.track_menu_border_size)
+    if bd_w == nil or bd_w < 0 then bd_w = 1 end
+    -- NOTE: the border plate stays opaque even with a translucent bg
+    -- (glass look); only the entrance/exit fade touches its alpha.
+    local fa = string.format("%02X", math.floor((1 - fade) * 255 + 0.5)) -- element alpha
+    local bg_aa = string.format("%02X", math.floor((1 - bg_op * fade) * 255 + 0.5))
+    -- border plate, then background plate (reliable at any width, unlike \bordN on \p shapes)
+    if bd_w > 0 then
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&H" .. bd_col .. "\\alpha&H" .. fa .. "&}")
+        ass:draw_start()
+        ass:round_rect_cw(g.x0 - bd_w, g.y0 + dy - bd_w, g.x1 + bd_w, g.y1 + dy + bd_w, 6 + bd_w)
+        ass:draw_stop()
+    end
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord1\\1c&H141414&\\3c&H999999&}")
+    ass:append("{\\blur0\\bord0\\1c&H" .. bg_col .. "\\alpha&H" .. bg_aa .. "&}")
     ass:draw_start()
-    ass:round_rect_cw(g.x0, g.y0, g.x1, g.y1, 6)
+    ass:round_rect_cw(g.x0, g.y0 + dy, g.x1, g.y1 + dy, 6)
     ass:draw_stop()
     ass:new_event()
-    ass:pos(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h / 2)
+    ass:pos(g.x0 + g.pad_x, g.y0 + dy + g.pad_y + g.header_h / 2)
     ass:an(4)
-    ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}")
+    ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "\\alpha&H" .. fa .. "&}")
     ass:append(m.header)
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord0\\1c&H999999&}")
+    ass:append("{\\blur0\\bord0\\1c&H999999&\\alpha&H" .. fa .. "&}")
     ass:draw_start()
-    ass:rect_cw(g.x0 + g.pad_x, g.y0 + g.pad_y + g.header_h, g.x1 - g.pad_x, g.y0 + g.pad_y + g.header_h + 1)
+    ass:rect_cw(g.x0 + g.pad_x, g.y0 + dy + g.pad_y + g.header_h, g.x1 - g.pad_x, g.y0 + dy + g.pad_y + g.header_h + 1)
     ass:draw_stop()
     for _, r in ipairs(g.rows) do
         local item = m.items[r.index]
@@ -3947,24 +4063,24 @@ function render_track_menu(ass)
                 ass:new_event()
                 ass:pos(0, 0)
                 ass:an(7)
-                ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "&}")
+                ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "\\alpha&H" .. fa .. "&}")
                 ass:draw_start()
-                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                ass:round_rect_cw(r.x0 + 3, r.y0 + dy + 1, r.x1 - 3, r.y1 + dy - 1,
                     math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
                 ass:draw_stop()
             elseif hovered then
                 ass:new_event()
                 ass:pos(0, 0)
                 ass:an(7)
-                ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+                ass:append("{\\blur0\\bord0\\1c&H3A3A3A&\\alpha&H" .. fa .. "&}")
                 ass:draw_start()
-                ass:round_rect_cw(r.x0 + 3, r.y0 + 1, r.x1 - 3, r.y1 - 1,
+                ass:round_rect_cw(r.x0 + 3, r.y0 + dy + 1, r.x1 - 3, r.y1 + dy - 1,
                     math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
                 ass:draw_stop()
             end
-            local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "}"
+            local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "\\alpha&H" .. fa .. "&}"
             local tx = g.x0 + g.pad_x
-            local ty = (r.y0 + r.y1) / 2
+            local ty = (r.y0 + r.y1) / 2 + dy
             local avail = r.x1 - tx - 4 -- text must stay inside the rounded box
             local asset, flag_w, flag_h = nil, 0, 0
             if item.flag_lang then asset, flag_w, flag_h = get_flag_geometry(item.flag_lang) end
@@ -3987,7 +4103,7 @@ function render_track_menu(ass)
                         ass:append(style)
                         ass:append(head)
                     end
-                    local flag_ass = render_flag_geometry(asset, tx + head_w + head_gap, ty - flag_h / 2)
+                    local flag_ass = render_flag_geometry(asset, tx + head_w + head_gap, ty - flag_h / 2, fa)
                     if flag_ass then
                         ass:new_event()
                         ass:merge(flag_ass)
@@ -4012,12 +4128,12 @@ function render_track_menu(ass)
         end
     end
     if g.scrollable and g.sb then
-        local top, bottom, sb_x0 = g.sb.top, g.sb.bottom, g.sb.x0
+        local top, bottom, sb_x0 = g.sb.top + dy, g.sb.bottom + dy, g.sb.x0
         local sb_w = g.sb.w
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
-        ass:append("{\\blur0\\bord0\\1c&H3A3A3A&}")
+        ass:append("{\\blur0\\bord0\\1c&H3A3A3A&\\alpha&H" .. fa .. "&}")
         ass:draw_start()
         ass:round_rect_cw(sb_x0, top, sb_x0 + sb_w, bottom, math.min(row_r, sb_w / 2))
         ass:draw_stop()
@@ -4027,11 +4143,50 @@ function render_track_menu(ass)
         ass:new_event()
         ass:pos(0, 0)
         ass:an(7)
-        ass:append("{\\blur0\\bord0\\1c&HFFFFFF&}")
+        ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\alpha&H" .. fa .. "&}")
         ass:draw_start()
         ass:round_rect_cw(sb_x0, y, sb_x0 + sb_w, y + h, math.max(0, math.min(row_r, sb_w / 2, h / 2)))
         ass:draw_stop()
     end
+end
+
+-- >>> CUSTOM AlwaysBorderRadius <<<
+-- Dropdown open/close animation (fade + rise on open, fade on close) and
+-- closing fade-out snapshot. Ticks are requested only while animating.
+function render_track_menu(ass)
+    local now = mp.get_time()
+    local anim = user_opts.track_menu_animation
+    local f = state.track_menu_fading
+    if f then
+        local age = now - f.t0
+        if (not anim) or age >= 0.15 or not f.g then
+            state.track_menu_fading = nil
+        else
+            -- fade out sinking toward the button (mirror of the rise on open);
+            -- honors track_menu_animation_distance (0 = fade only)
+            local k = age / 0.15
+            local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
+            render_track_menu_one(ass, f.m, f.g, 1 - k, k * k * dist, false)
+            request_tick()
+        end
+    end
+    local m = state.track_menu
+    if not m then return end
+    local g = track_menu_geometry()
+    if not g then return end
+    local fade, dy = 1, 0
+    if anim then
+        local age = now - (m.born or now)
+        if age < 0 then age = 0 end
+        if age < 0.15 then
+            local k = age / 0.15
+            fade = k
+            local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
+            dy = ((1 - k) * (1 - k) * (1 - k)) * dist -- rise from below, ease-out
+            request_tick()
+        end
+    end
+    render_track_menu_one(ass, m, g, fade, dy, true)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -5427,11 +5582,42 @@ function validate_user_opts()
         mp.msg.warn("track_menu_radius must be a non-negative number. Using 5.")
         user_opts.track_menu_radius = 5
     end
+    if type(user_opts.track_menu_bg_opacity) ~= "number"
+        or user_opts.track_menu_bg_opacity < 0 or user_opts.track_menu_bg_opacity > 1 then
+        mp.msg.warn("track_menu_bg_opacity must be 0-1. Using 1.")
+        user_opts.track_menu_bg_opacity = 1
+    end
+    if type(user_opts.track_menu_border_size) ~= "number"
+        or user_opts.track_menu_border_size < 0 or user_opts.track_menu_border_size > 8 then
+        mp.msg.warn("track_menu_border_size must be 0-8. Using 1.")
+        user_opts.track_menu_border_size = 1
+    end
+    if type(user_opts.track_menu_animation) ~= "boolean" then
+        mp.msg.warn("track_menu_animation must be boolean. Using true.")
+        user_opts.track_menu_animation = true
+    end
+    if type(user_opts.track_menu_animation_distance) ~= "number" or user_opts.track_menu_animation_distance < 0 then
+        mp.msg.warn("track_menu_animation_distance must be a non-negative number. Using 12.")
+        user_opts.track_menu_animation_distance = 12
+    end
+    if sanitize_hex_color(user_opts.track_menu_bg_color, nil) == nil then
+        mp.msg.warn('track_menu_bg_color must be hex ("#141414"). Using #141414.')
+        user_opts.track_menu_bg_color = "#141414"
+    end
+    if sanitize_hex_color(user_opts.track_menu_border_color, nil) == nil then
+        mp.msg.warn('track_menu_border_color must be hex ("#999999"). Using #999999.')
+        user_opts.track_menu_border_color = "#999999"
+    end
+    -- colors are sanitized with fallback at paint time (see toast opts)
 
     -- >>> CUSTOM desuka: toast opts <<<
     if type(user_opts.toast_enabled) ~= "boolean" then
         mp.msg.warn("toast_enabled must be boolean. Using true.")
         user_opts.toast_enabled = true
+    end
+    if type(user_opts.toast_animation) ~= "boolean" then
+        mp.msg.warn("toast_animation must be boolean. Using true.")
+        user_opts.toast_animation = true
     end
     if type(user_opts.toast_font_size) ~= "number" or user_opts.toast_font_size <= 0 then
         mp.msg.warn("toast_font_size must be a positive number. Using 20.")
