@@ -1109,7 +1109,7 @@ local state = {
     toast_kind = "info",    -- info|success|warn|error|persistent
     toast_source = "",      -- sender id for source-aware clear
     toast_hide_timer = nil, ---@type mp.Timer?
-    toast_head = nil,       -- flag row head (selected + index), escaped
+    toast_head = nil,       -- flag row head (empty since markers were removed), escaped
     toast_tail = nil,       -- flag row tail, escaped
     toast_flag_lang = nil,  -- flag row language for vector flag
     -- <<< CUSTOM desuka >>>
@@ -1464,7 +1464,7 @@ function get_tracklist(ttype)
         local mode = user_opts.track_language_mode or "code"
         for n = 1, #tracks_osc[ttype] do
             local track = tracks_osc[ttype][n]
-            local lang, title, selected = 'unknown', '', '○'
+            local lang, title = 'unknown', ''
             if not (track.lang == nil) then lang = track.lang end
             if not (track.title == nil) then
                 title = track.title
@@ -1476,9 +1476,6 @@ function get_tracklist(ttype)
                 title = ""
             end
             title = title:gsub("[\r\n]+", " ")
-            if (track.id == tonumber(mp.get_property(ttype))) then
-                selected = '●'
-            end
             local label, lang_label
             local drew_flag = false
             if lang ~= nil and lang ~= 'unknown' and lang ~= '' then
@@ -1505,11 +1502,11 @@ function get_tracklist(ttype)
             else
                 label = title
             end
-            local full = selected .. ' ' .. n .. ': ' .. label
+            local full = (label ~= "" and label or texts.na)
             message = message .. '\n' .. full
             local row = { full = full }
             if drew_flag then
-                row.head = selected .. ' ' .. n .. ':'
+                row.head = ""
                 if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
                     row.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
                     if row.tail == "" then row.tail = nil end
@@ -3396,9 +3393,10 @@ local function render_toast(ass)
     local fontsize = tonumber(user_opts.toast_font_size) or 20
     local gap = tonumber(user_opts.track_flag_gap) or 2
     local cap = tonumber(user_opts.toast_max_width) or 900
-    -- flag row (track cycle): head + vector flag + tail, centered
+    -- flag row (track cycle): head + vector flag + tail, centered.
+    -- An empty head still counts (rows no longer carry markers/numbers).
     local asset, flag_w, flag_h = nil, 0, 0
-    if state.toast_flag_lang and state.toast_head and state.toast_head ~= "" then
+    if state.toast_flag_lang and state.toast_head ~= nil then
         asset, flag_w, flag_h = get_flag_geometry(state.toast_flag_lang)
         if not asset then
             asset, flag_w, flag_h = nil, 0, 0
@@ -3419,8 +3417,9 @@ local function render_toast(ass)
     local lines = nil
     if asset then
         head_w = toast_measure(state.toast_head, fontsize)
+        local head_gap = (head_w > 0) and gap or 0 -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
         if state.toast_tail then
-            local budget = content_max - head_w - gap - flag_w - gap
+            local budget = content_max - head_w - head_gap - flag_w - gap
             if toast_measure(state.toast_tail, fontsize) > budget then
                 if budget > 30 then
                     state.toast_tail = truncate_to_fit(state.toast_tail, budget, fontsize)
@@ -3432,7 +3431,7 @@ local function render_toast(ass)
         else
             tail_w = 0
         end
-        local total = head_w + gap + flag_w
+        local total = head_w + head_gap + flag_w
         if state.toast_tail then total = total + gap + tail_w end
         pill_w = math.min(total + pad_x * 2 + 10, cap)
         pill_h = math.max(fontsize * 1.35, flag_h) + pad_y * 2 + pad_b
@@ -3535,16 +3534,18 @@ local function render_toast(ass)
         .. osc_color_convert(sanitize_hex_color(user_opts.toast_text_border_color, "#000000"))
         .. "&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}"
     if asset then
-        local total = head_w + gap + flag_w
+        local total = head_w + head_gap + flag_w
         if state.toast_tail then total = total + gap + tail_w end
         local sx = cx - total / 2
-        -- head
-        ass:new_event()
-        ass:pos(sx + head_w / 2, tcy)
-        ass:an(5)
-        ass:append(text_style .. (state.toast_head or ""))
+        -- head (skipped when empty: flag leads)
+        if (state.toast_head or "") ~= "" then
+            ass:new_event()
+            ass:pos(sx + head_w / 2, tcy)
+            ass:an(5)
+            ass:append(text_style .. (state.toast_head or ""))
+        end
         -- flag (an=7 top-left, vertically centered)
-        local flag_ass = render_flag_geometry(asset, sx + head_w + gap, tcy - flag_h / 2)
+        local flag_ass = render_flag_geometry(asset, sx + head_w + head_gap, tcy - flag_h / 2)
         if flag_ass then
             ass:new_event()
             ass:merge(flag_ass)
@@ -3552,7 +3553,7 @@ local function render_toast(ass)
         -- tail
         if state.toast_tail then
             ass:new_event()
-            ass:pos(sx + head_w + gap + flag_w + gap + tail_w / 2, tcy)
+            ass:pos(sx + head_w + head_gap + flag_w + gap + tail_w / 2, tcy)
             ass:an(5)
             ass:append(text_style .. state.toast_tail)
         end
@@ -3664,7 +3665,8 @@ local function track_menu_item_width(item, fontsize, gap)
     if item.head and item.flag_lang then
         local asset, flag_w = get_flag_geometry(item.flag_lang)
         if asset then
-            local w = text_width(item.head:gsub("%s+$", ""), fontsize) + gap + flag_w
+            local head_w = text_width(item.head:gsub("%s+$", ""), fontsize)
+            local w = head_w + flag_w + ((head_w > 0) and gap or 0) -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
             if item.tail and item.tail ~= "" then
                 w = w + gap + text_width(item.tail:gsub("^%s+", ""), fontsize)
             end
@@ -3691,8 +3693,7 @@ end
 local function track_menu_build(ttype)
     update_tracklist()
     local cur = get_track(ttype)
-    local marker_off = (cur == 0) and '● ' or '○ '
-    local items = { { osc_id = 0, selected = (cur == 0), full = marker_off .. texts.off } }
+    local items = { { osc_id = 0, selected = (cur == 0), full = texts.off } }
     local name_map = get_track_name_map()
     local mode = user_opts.track_language_mode or "code"
     for n = 1, #tracks_osc[ttype] do
@@ -3724,9 +3725,9 @@ local function track_menu_build(ttype)
         else
             label = title
         end
-        item.full = (item.selected and '● ' or '○ ') .. n .. ': ' .. label
+        item.full = (label ~= "" and label or texts.na)
         if drew_flag then
-            item.head = (item.selected and '● ' or '○ ') .. n .. ':'
+            item.head = ""
             if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
                 item.tail = label:sub(#lang_label + 1):gsub("^%s+", "")
                 if item.tail == "" then item.tail = nil end
@@ -3954,7 +3955,8 @@ function render_track_menu(ass)
             if item.head and asset then
                 local head = item.head:gsub("%s+$", "")
                 local head_w = text_width(head, g.fontsize)
-                if head_w + gap + flag_w > avail then
+                local head_gap = (head_w > 0) and gap or 0 -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
+                if head_w + head_gap + flag_w > avail then
                     -- no room for the vector flag: fitted plain row instead
                     ass:new_event()
                     ass:pos(tx, ty)
@@ -3962,21 +3964,23 @@ function render_track_menu(ass)
                     ass:append(style)
                     ass:append(track_menu_fit(item.full, avail, g.fontsize))
                 else
-                    ass:new_event()
-                    ass:pos(tx, ty)
-                    ass:an(4)
-                    ass:append(style)
-                    ass:append(head)
-                    local flag_ass = render_flag_geometry(asset, tx + head_w + gap, ty - flag_h / 2)
+                    if head ~= "" then
+                        ass:new_event()
+                        ass:pos(tx, ty)
+                        ass:an(4)
+                        ass:append(style)
+                        ass:append(head)
+                    end
+                    local flag_ass = render_flag_geometry(asset, tx + head_w + head_gap, ty - flag_h / 2)
                     if flag_ass then
                         ass:new_event()
                         ass:merge(flag_ass)
                     end
                     if item.tail and item.tail ~= "" then
                         local tail = track_menu_fit(item.tail:gsub("^%s+", ""),
-                            avail - head_w - gap - flag_w - gap, g.fontsize)
+                            avail - head_w - head_gap - flag_w - gap, g.fontsize)
                         ass:new_event()
-                        ass:pos(tx + head_w + gap + flag_w + gap, ty)
+                        ass:pos(tx + head_w + head_gap + flag_w + gap, ty)
                         ass:an(4)
                         ass:append(style)
                         ass:append(tail)
@@ -4442,7 +4446,8 @@ local function message_row_width(row, fontsize, gap)
     if row.flag_lang then
         local asset, flag_w = get_flag_geometry(row.flag_lang)
         if asset then
-            local w = text_width(head, fontsize) + gap + flag_w
+            local head_w = text_width(head, fontsize)
+            local w = head_w + flag_w + ((head_w > 0) and gap or 0) -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
             if tail and tail ~= "" then
                 w = w + gap + text_width(tail, fontsize)
             end
@@ -4467,13 +4472,16 @@ local function render_message_row(ass, row, x, y, fontsize, style, gap)
         ass:append(style)
         ass:append(row.full or row.text or "")
     else
-        ass:new_event()
-        ass:pos(x, y)
-        ass:an(7)
-        ass:append(style)
-        ass:append(head)
+        if head ~= "" then
+            ass:new_event()
+            ass:pos(x, y)
+            ass:an(7)
+            ass:append(style)
+            ass:append(head)
+        end
 
-        local flag_x = x + text_width(head, fontsize) + gap
+        local head_w = text_width(head, fontsize)
+        local flag_x = x + head_w + ((head_w > 0) and gap or 0)
         local flag_ass = render_flag_geometry(asset, flag_x,
             y + (fontsize - flag_h) / 2)
         if flag_ass then
@@ -5818,7 +5826,7 @@ local function osc_init()
         local track_id = get_track("video")
         if track_id ~= 0 then
             local total = #tracks_osc.video
-            local message = string.format("%s (%d ∕ %d)", texts.video, track_id, total)
+            local message = string.format("%s (%d ∕ %d):", texts.video, track_id, total)
             local prop_lang = mp.get_property("current-tracks/video/lang")
             local prop_title = mp.get_property("current-tracks/video/title")
             return tooltip_parts(message, prop_lang, prop_title)
@@ -5872,7 +5880,7 @@ local function osc_init()
         local track_id = get_track("audio")
         if track_id ~= 0 then
             local total = #tracks_osc.audio
-            local message = string.format("%s (%d ∕ %d)", texts.audio, track_id, total)
+            local message = string.format("%s (%d ∕ %d):", texts.audio, track_id, total)
             local prop_lang = mp.get_property("current-tracks/audio/lang")
             local prop_title = mp.get_property("current-tracks/audio/title")
             return tooltip_parts(message, prop_lang, prop_title)
@@ -5923,7 +5931,7 @@ local function osc_init()
         if sub_id == 0 then
             return texts.off, ""
         end
-        local message = string.format("%s (%d ∕ %d)", texts.subtitle, sub_id, #tracks_osc.sub)
+        local message = string.format("%s (%d ∕ %d):", texts.subtitle, sub_id, #tracks_osc.sub)
         local lang = mp.get_property("current-tracks/sub/lang")
         local title = mp.get_property("current-tracks/sub/title")
         -- subtitles carry the title even when the slot is a text label, so the
