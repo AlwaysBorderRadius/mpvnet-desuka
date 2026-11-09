@@ -2324,7 +2324,8 @@ function render_elements(master_ass)
                 local halo_col = hoverstyle:match("\\c&H(%x+)&")
                 if halo_col then
                     local hb = element.hitbox
-                    local halo_aa = string.format("%02X", math.floor((1 - he) * 255 + 0.5))
+                    -- capped at ~45% opacity: a halo, not a second button
+                    local halo_aa = string.format("%02X", math.floor((1 - 0.45 * he) * 255 + 0.5))
                     elem_ass:new_event()
                     elem_ass:pos(0, 0)
                     elem_ass:an(7)
