@@ -4120,7 +4120,7 @@ local function render_track_menu_one(ass, m, g, fade, dy, allow_hover)
 end
 
 -- >>> CUSTOM AlwaysBorderRadius <<<
--- Dropdown open/close animation (fade + drop on open, fade on close) and
+-- Dropdown open/close animation (fade + rise on open, fade on close) and
 -- closing fade-out snapshot. Ticks are requested only while animating.
 function render_track_menu(ass)
     local now = mp.get_time()
@@ -4146,7 +4146,7 @@ function render_track_menu(ass)
         if age < 0.15 then
             local k = age / 0.15
             fade = k
-            dy = -((1 - k) * (1 - k) * (1 - k)) * 6
+            dy = ((1 - k) * (1 - k) * (1 - k)) * 6 -- rise from below, ease-out
             request_tick()
         end
     end
