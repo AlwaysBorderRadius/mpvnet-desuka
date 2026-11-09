@@ -344,5 +344,7 @@ end
 mp.register_event("file-loaded", init)
 mp.register_event("end-file", reset_on_unload)
 -- Forced binding wins over input.conf 's' (native shot); Ctrl+s stays native.
-mp.add_forced_key_binding(options.screenshot_key, "screenshotfolder-shot", screenshot_done)
+-- >>> CUSTOM AlwaysBorderRadius <<< -- key owned by input.conf (s), no forced override
+-- mp.add_forced_key_binding(options.screenshot_key, "screenshotfolder-shot", screenshot_done)
+-- <<< CUSTOM AlwaysBorderRadius >>>
 mp.register_script_message("screenshotfolder-shot", screenshot_done)

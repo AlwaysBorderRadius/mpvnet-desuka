@@ -89,7 +89,9 @@ if options.active then
 	mp.register_event("file-loaded", start)
 end
 
-mp.add_key_binding(options.key, "toggle-discord", function()
+-- >>> CUSTOM AlwaysBorderRadius <<< -- key owned by input.conf (d), keep unbound
+mp.add_key_binding(nil, "toggle-discord", function()
+-- <<< CUSTOM AlwaysBorderRadius >>>
 	if cmd ~= nil then
 		stop()
 	else

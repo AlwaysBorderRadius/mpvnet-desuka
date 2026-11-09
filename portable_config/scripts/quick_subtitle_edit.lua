@@ -2669,12 +2669,14 @@ local function edit_subtitle(mode)
     end)
 end
 
-mp.add_key_binding("Ctrl+z", "edit-subtitle", function()
+-- >>> CUSTOM AlwaysBorderRadius <<< -- keys owned by input.conf (Ctrl+z/Ctrl+Shift+z), keep unbound
+mp.add_key_binding(nil, "edit-subtitle", function()
     edit_subtitle("screen")
 end)
-mp.add_key_binding("Ctrl+Z", "edit-subtitle-osd", function()
+mp.add_key_binding(nil, "edit-subtitle-osd", function()
     edit_subtitle("osd")
 end)
+-- <<< CUSTOM AlwaysBorderRadius >>>
 
 -- Al cerrar mpv se restaura osd-fonts-dir y se borra TODO el directorio de
 -- sesión (incluida la cache de fuentes fonts/). Si mpv se mata por la fuerza

@@ -42,4 +42,6 @@ end
 
 
 -- Register the custom action to a key binding (e.g., "Ctrl+Shift+C")
-mp.add_key_binding("Ctrl+j", "show_animejanai_stats", show_animejanai_stats)
+-- >>> CUSTOM AlwaysBorderRadius <<< -- key owned by input.conf (Ctrl+j), keep unbound for upstream diff
+mp.add_key_binding(nil, "show_animejanai_stats", show_animejanai_stats)
+-- <<< CUSTOM AlwaysBorderRadius >>>
