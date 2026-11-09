@@ -175,7 +175,8 @@ local user_opts = {
     track_menu_bg_opacity = 1,      -- dropdown background opacity 0-1
     track_menu_border_color = "#999999", -- dropdown border plate
     track_menu_border_size = 1,     -- dropdown border width in playres px (0 = none)
-    track_menu_animation = true,    -- fade+drop on open, fade on close
+    track_menu_animation = true,    -- fade+rise on open, fade on close
+    track_menu_animation_distance = 12, -- rise travel in playres px (0 = fade only)
     -- <<< CUSTOM AlwaysBorderRadius >>>
 
     volume_control = true,          -- show mute button and volume slider
@@ -4146,7 +4147,8 @@ function render_track_menu(ass)
         if age < 0.15 then
             local k = age / 0.15
             fade = k
-            dy = ((1 - k) * (1 - k) * (1 - k)) * 6 -- rise from below, ease-out
+            local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
+            dy = ((1 - k) * (1 - k) * (1 - k)) * dist -- rise from below, ease-out
             request_tick()
         end
     end
@@ -5559,6 +5561,10 @@ function validate_user_opts()
     if type(user_opts.track_menu_animation) ~= "boolean" then
         mp.msg.warn("track_menu_animation must be boolean. Using true.")
         user_opts.track_menu_animation = true
+    end
+    if type(user_opts.track_menu_animation_distance) ~= "number" or user_opts.track_menu_animation_distance < 0 then
+        mp.msg.warn("track_menu_animation_distance must be a non-negative number. Using 12.")
+        user_opts.track_menu_animation_distance = 12
     end
     if sanitize_hex_color(user_opts.track_menu_bg_color, nil) == nil then
         mp.msg.warn('track_menu_bg_color must be hex ("#141414"). Using #141414.')
