@@ -860,6 +860,9 @@ local function tooltip_parts(prefix, lang, title)
         end
         if label then
             if title_ok then
+                if mode == "name" then
+                    return prefix .. " " .. label, " — " .. title
+                end
                 return prefix .. " " .. label .. " ", title
             end
             return prefix .. " " .. label, ""
@@ -1491,8 +1494,9 @@ function get_tracklist(ttype)
                     lang_label = format_track_label(lang, mode, name_map)
                 end
                 if lang_label ~= nil then
+                    local sep = (mode == "name") and " — " or " "
                     if title ~= "" then
-                        label = lang_label .. " — " .. title
+                        label = lang_label .. sep .. title
                     else
                         label = lang_label
                     end
@@ -3435,6 +3439,7 @@ local function render_toast(ass)
         if state.toast_tail then total = total + gap + tail_w end
         pill_w = math.min(total + pad_x * 2 + 10, cap)
         pill_h = math.max(fontsize * 1.35, flag_h) + pad_y * 2 + pad_b
+        content_w, content_h = total, math.max(fontsize * 1.35, flag_h)
     else
         lines = {}
         for line in (state.toast_text .. "\\N"):gmatch("(.-)\\N") do lines[#lines + 1] = line end
@@ -3533,32 +3538,11 @@ local function render_toast(ass)
         .. "&\\3c&H"
         .. osc_color_convert(sanitize_hex_color(user_opts.toast_text_border_color, "#000000"))
         .. "&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}"
-    if asset then
-        local total = head_w + head_gap + flag_w
-        if state.toast_tail then total = total + gap + tail_w end
-        local sx = cx - total / 2
-        -- head (skipped when empty: flag leads)
-        if (state.toast_head or "") ~= "" then
-            ass:new_event()
-            ass:pos(sx + head_w / 2, tcy)
-            ass:an(5)
-            ass:append(text_style .. (state.toast_head or ""))
-        end
-        -- flag (an=7 top-left, vertically centered)
-        local flag_ass = render_flag_geometry(asset, sx + head_w + head_gap, tcy - flag_h / 2)
-        if flag_ass then
-            ass:new_event()
-            ass:merge(flag_ass)
-        end
-        -- tail
-        if state.toast_tail then
-            ass:new_event()
-            ass:pos(sx + head_w + head_gap + flag_w + gap + tail_w / 2, tcy)
-            ass:an(5)
-            ass:append(text_style .. state.toast_tail)
-        end
-        return
-    end
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Accent bar shared by plain and flag toasts (the flag branch returns
+    -- before the plain text below, so it calls this explicitly). Uses the
+    -- enclosing render ass directly.
+    local function render_toast_bar()
     -- accent bar: auto = left on corners, top when centered.
     -- The bar belongs to the pill (box-anchored); the text moves freely
     -- with text_dy. That decouples both: nudge the text, bar stays put.
@@ -3585,8 +3569,9 @@ local function render_toast(ass)
     ass:an(7)
     ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&}")
     ass:draw_start()
-    -- plain pills are shortened by 10px (x1-10): center on the visual middle
-    local vcx = cx - 5
+    -- plain pills are shortened by 10px (x1-10): center on the visual middle.
+    -- flag pills keep full width, centered on cx.
+    local vcx = asset and cx or (cx - 5)
     if bar_pos == "top" or bar_pos == "bottom" then
         local bw = content_w * bar_len
         local bx0, bx1 = vcx - bw / 2, vcx + bw / 2
@@ -3603,6 +3588,36 @@ local function render_toast(ass)
         ass:round_rect_cw(bar_x, cy_box - bar_h / 2, bar_x + bar_w, cy_box + bar_h / 2, 2)
     end
     ass:draw_stop()
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    if asset then
+        local total = head_w + head_gap + flag_w
+        if state.toast_tail then total = total + gap + tail_w end
+        local sx = cx - total / 2
+        -- head (skipped when empty: flag leads)
+        if (state.toast_head or "") ~= "" then
+            ass:new_event()
+            ass:pos(sx + head_w / 2, tcy)
+            ass:an(5)
+            ass:append(text_style .. (state.toast_head or ""))
+        end
+        -- flag (an=7 top-left, vertically centered)
+        local flag_ass = render_flag_geometry(asset, sx + head_w + head_gap, tcy - flag_h / 2)
+        if flag_ass then
+            ass:new_event()
+            ass:merge(flag_ass)
+        end
+        -- tail
+        if state.toast_tail then
+            ass:new_event()
+            ass:pos(sx + head_w + head_gap + flag_w + gap + tail_w / 2, tcy)
+            ass:an(5)
+            ass:append(text_style .. state.toast_tail)
+        end
+        render_toast_bar()
+        return
+    end
+    render_toast_bar()
     -- text (centered, multiline via \N)
     local body = table.concat(lines, "\\N")
     ass:new_event()
@@ -3721,7 +3736,8 @@ local function track_menu_build(ttype)
         end
         local label
         if lang_label ~= nil then
-            label = (title ~= "") and (lang_label .. " — " .. title) or lang_label
+            local sep = (mode == "name") and " — " or " "
+            label = (title ~= "") and (lang_label .. sep .. title) or lang_label
         else
             label = title
         end
