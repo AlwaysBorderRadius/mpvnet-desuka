@@ -1120,6 +1120,7 @@ local state = {
     toast_kind = "info",    -- info|success|warn|error|persistent
     toast_source = "",      -- sender id for source-aware clear
     toast_hide_timer = nil, ---@type mp.Timer?
+    toast_fade_timer = nil, -- one-shot kickstarter: re-arms ticks into the fade-out window
     toast_head = nil,       -- flag row head (empty since markers were removed), escaped
     toast_tail = nil,       -- flag row tail, escaped
     toast_flag_lang = nil,  -- flag row language for vector flag
@@ -3327,6 +3328,19 @@ function show_toast(text, kind, source, duration)
     state.toast_hide_timer:kill()
     state.toast_hide_timer.timeout = duration
     state.toast_hide_timer:resume()
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Kickstart ticks into the fade-out window: the exit fade only renders
+    -- if something ticks during its last 200 ms (nothing does when paused).
+    -- Fires inside the fade window (left < 0.25) so the chain takes over.
+    if not state.toast_fade_timer then
+        state.toast_fade_timer = mp.add_timeout(0, function() request_tick() end)
+    end
+    state.toast_fade_timer:kill()
+    if duration < 3600 then -- persistent toasts never fade out: don't arm
+        state.toast_fade_timer.timeout = math.max(0, duration - 0.2)
+        state.toast_fade_timer:resume()
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     request_tick()
 end
 
@@ -3375,6 +3389,19 @@ function show_toast_row(row, kind, source, duration)
     state.toast_hide_timer:kill()
     state.toast_hide_timer.timeout = duration
     state.toast_hide_timer:resume()
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Kickstart ticks into the fade-out window: the exit fade only renders
+    -- if something ticks during its last 200 ms (nothing does when paused).
+    -- Fires inside the fade window (left < 0.25) so the chain takes over.
+    if not state.toast_fade_timer then
+        state.toast_fade_timer = mp.add_timeout(0, function() request_tick() end)
+    end
+    state.toast_fade_timer:kill()
+    if duration < 3600 then -- persistent toasts never fade out: don't arm
+        state.toast_fade_timer.timeout = math.max(0, duration - 0.2)
+        state.toast_fade_timer:resume()
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     request_tick()
 end
 
@@ -3391,6 +3418,7 @@ function clear_toast(source, force)
     state.toast_birth = nil
     state.toast_expiry = nil
     if state.toast_hide_timer then state.toast_hide_timer:kill() end
+    if state.toast_fade_timer then state.toast_fade_timer:kill() end
     request_tick()
 end
 
@@ -3420,14 +3448,16 @@ local function render_toast(ass)
             state.toast_flag_lang = nil
             state.toast_birth = nil
             state.toast_expiry = nil
+            if state.toast_fade_timer then state.toast_fade_timer:kill() end
             state.toast_kind = "info"
             state.toast_source = ""
         end
         return
     end
     -- >>> CUSTOM AlwaysBorderRadius <<<
-    -- Entrance (fade + rise) and exit fade. Reuses render ticks only: while
-    -- fading, request another tick instead of arming a separate timer.
+    -- Entrance (fade + rise) and exit fade. Ticks after the first frame come
+    -- from re-requesting while fading; a one-shot kickstarter covers the
+    -- fade-out window when nothing else ticks (e.g. paused video).
     local now = mp.get_time()
     local fade, slide = 1, 0
     if user_opts.toast_animation and state.toast_birth then
@@ -4132,7 +4162,11 @@ function render_track_menu(ass)
         if (not anim) or age >= 0.15 or not f.g then
             state.track_menu_fading = nil
         else
-            render_track_menu_one(ass, f.m, f.g, 1 - age / 0.15, 0, false)
+            -- fade out sinking toward the button (mirror of the rise on open);
+            -- honors track_menu_animation_distance (0 = fade only)
+            local k = age / 0.15
+            local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
+            render_track_menu_one(ass, f.m, f.g, 1 - k, k * k * dist, false)
             request_tick()
         end
     end
