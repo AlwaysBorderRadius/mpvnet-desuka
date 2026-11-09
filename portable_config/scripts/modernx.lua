@@ -3305,8 +3305,15 @@ function show_toast(text, kind, source, duration)
     state.toast_head = nil
     state.toast_tail = nil
     state.toast_flag_lang = nil
-    state.toast_birth = mp.get_time()
-    state.toast_expiry = state.toast_birth + (duration or 2)
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Animate the entrance only: content swaps on a visible toast keep the
+    -- original birth (no re-fade flicker while cycling); only expiry moves.
+    local now = mp.get_time()
+    if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled()) then
+        state.toast_birth = now
+    end
+    state.toast_expiry = now + (duration or 2)
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
@@ -3347,8 +3354,14 @@ function show_toast_row(row, kind, source, duration)
     local tail = tostring(row.tail or ""):gsub("^%s+", ""):gsub("%s+$", "")
     state.toast_tail = (tail ~= "") and escape_toast_text(tail) or nil
     state.toast_flag_lang = row.flag_lang
-    state.toast_birth = mp.get_time()
-    state.toast_expiry = state.toast_birth + (duration or 2)
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Same no-refade rule as show_toast (see above).
+    local now = mp.get_time()
+    if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled()) then
+        state.toast_birth = now
+    end
+    state.toast_expiry = now + (duration or 2)
+    -- <<< CUSTOM AlwaysBorderRadius >>>
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
