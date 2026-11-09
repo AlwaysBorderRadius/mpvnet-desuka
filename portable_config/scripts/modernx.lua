@@ -290,6 +290,7 @@ local user_opts = {
     -- >>> CUSTOM desuka: unified toast channel (replaces native OSD) <<<
     -- Single visible toast, preemptive (no queue). kind: info|success|warn|error|persistent
     toast_enabled = true,          -- route all script OSD through the modernx toast
+    toast_animation = true,      -- fade + rise on show, fade on hide
     toast_font_size = 20,          -- toast text size
     toast_max_width = 900,         -- max toast pill width (playres units)
     toast_top_margin = 80,         -- fixed distance from top edge (ignores OSC)
@@ -1115,6 +1116,8 @@ local state = {
     toast_head = nil,       -- flag row head (empty since markers were removed), escaped
     toast_tail = nil,       -- flag row tail, escaped
     toast_flag_lang = nil,  -- flag row language for vector flag
+    toast_birth = nil,      -- mp.get_time() when shown (fade+rise entrance)
+    toast_expiry = nil,     -- mp.get_time() when it hides (fade exit)
     -- <<< CUSTOM desuka >>>
 
     -- >>> CUSTOM AlwaysBorderRadius <<<
@@ -1963,13 +1966,13 @@ end
 -- Builds the ASS events for a vector flag from scaled geometry (coordinates
 -- already carry the requested size, always drawn with \p1); one event per
 -- colour (libass cancels a multi-path override and repeating \p advances the pen).
-local function render_flag_geometry(asset, x, y)
+local function render_flag_geometry(asset, x, y, alpha)
     local flag_ass = mp.assdraw.ass_new()
     for _, part in ipairs(asset.d) do
         flag_ass:new_event()
         flag_ass:pos(x, y)
         flag_ass:an(7)
-        flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H00&}")
+        flag_ass:append("{\\bord0\\shad0\\blur0\\alpha&H" .. (alpha or "00") .. "&}")
         flag_ass:append(part)
     end
     return flag_ass
@@ -3302,6 +3305,8 @@ function show_toast(text, kind, source, duration)
     state.toast_head = nil
     state.toast_tail = nil
     state.toast_flag_lang = nil
+    state.toast_birth = mp.get_time()
+    state.toast_expiry = state.toast_birth + (duration or 2)
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
@@ -3342,6 +3347,8 @@ function show_toast_row(row, kind, source, duration)
     local tail = tostring(row.tail or ""):gsub("^%s+", ""):gsub("%s+$", "")
     state.toast_tail = (tail ~= "") and escape_toast_text(tail) or nil
     state.toast_flag_lang = row.flag_lang
+    state.toast_birth = mp.get_time()
+    state.toast_expiry = state.toast_birth + (duration or 2)
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
@@ -3361,6 +3368,8 @@ function clear_toast(source, force)
     state.toast_head = nil
     state.toast_tail = nil
     state.toast_flag_lang = nil
+    state.toast_birth = nil
+    state.toast_expiry = nil
     if state.toast_hide_timer then state.toast_hide_timer:kill() end
     request_tick()
 end
@@ -3384,15 +3393,39 @@ end
 local function render_toast(ass)
     if not user_opts.toast_enabled then return end
     if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled() and state.toast_text) then
-        if state.toast_text ~= nil then
+            if state.toast_text ~= nil then
             state.toast_text = nil
             state.toast_head = nil
             state.toast_tail = nil
             state.toast_flag_lang = nil
+            state.toast_birth = nil
+            state.toast_expiry = nil
             state.toast_kind = "info"
             state.toast_source = ""
         end
         return
+    end
+    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- Entrance (fade + rise) and exit fade. Reuses render ticks only: while
+    -- fading, request another tick instead of arming a separate timer.
+    local now = mp.get_time()
+    local fade, slide = 1, 0
+    if user_opts.toast_animation and state.toast_birth then
+        local age = now - state.toast_birth
+        if age < 0 then age = 0 end
+        local left = state.toast_expiry and (state.toast_expiry - now) or 1
+        if left < 0 then left = 0 end
+        fade = math.min(math.min(1, age / 0.15), math.min(1, left / 0.25))
+        if fade < 1 then
+            local t = math.min(1, age / 0.15)
+            slide = (1 - t) * (1 - t) * (1 - t) * 14 -- ease-out rise, px
+            request_tick()
+        end
+    end
+    -- <<< CUSTOM AlwaysBorderRadius >>>
+    local fade_aa = "00" -- fully opaque; eased alpha while fading
+    if fade < 1 then
+        fade_aa = string.format("%02X", math.floor((1 - fade) * 255 + 0.5))
     end
     local fontsize = tonumber(user_opts.toast_font_size) or 20
     local gap = tonumber(user_opts.track_flag_gap) or 2
@@ -3472,6 +3505,10 @@ local function render_toast(ass)
     local cy_box = cy + pad_b / 2
     -- text (and bar) vertical center, optical nudge included
     local tcy = cy + text_dy
+    if slide > 0 then -- entrance rise: start below, settle at rest position
+        cy_box = cy_box + slide
+        tcy = tcy + slide
+    end
     local x0 = cx - pill_w / 2
     local x1 = cx + pill_w / 2
     local y0 = cy_box - pill_h / 2
@@ -3492,12 +3529,12 @@ local function render_toast(ass)
     -- inset 1px under the bg so rasterization seams stay hidden.
     local bg_op = tonumber(user_opts.toast_bg_opacity)
     if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
-    local bg_aa = string.format("%02X", math.floor((1 - bg_op) * 255 + 0.5))
+    local bg_aa = string.format("%02X", math.floor((1 - bg_op * fade) * 255 + 0.5))
     local bg_bb = tonumber(user_opts.toast_bg_border_size) or 0
     if bg_bb < 0 then bg_bb = 0 end
     local bb_op = tonumber(user_opts.toast_bg_border_opacity)
     if bb_op == nil or bb_op < 0 or bb_op > 1 then bb_op = 1 end
-    local bb_aa = string.format("%02X", math.floor((1 - bb_op) * 255 + 0.5))
+    local bb_aa = string.format("%02X", math.floor((1 - bb_op * fade) * 255 + 0.5))
     local kind_col = toast_accent(state.toast_kind)
     local bb_col = kind_col
     if not user_opts.toast_bg_border_kind_colors then
@@ -3538,6 +3575,9 @@ local function render_toast(ass)
         .. "&\\3c&H"
         .. osc_color_convert(sanitize_hex_color(user_opts.toast_text_border_color, "#000000"))
         .. "&\\fs" .. fontsize .. "\\q2\\fn" .. user_opts.font .. "}"
+    if fade < 1 then -- entrance/exit fade: uniform alpha (opaque when full)
+        text_style = text_style .. "{\\alpha&H" .. fade_aa .. "&}"
+    end
     -- >>> CUSTOM AlwaysBorderRadius <<<
     -- Accent bar shared by plain and flag toasts (the flag branch returns
     -- before the plain text below, so it calls this explicitly). Uses the
@@ -3567,7 +3607,7 @@ local function render_toast(ass)
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
-    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&}")
+    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(bar_col) .. "&\\alpha&H" .. fade_aa .. "&}")
     ass:draw_start()
     -- plain pills are shortened by 10px (x1-10): center on the visual middle.
     -- flag pills keep full width, centered on cx.
@@ -3602,7 +3642,7 @@ local function render_toast(ass)
             ass:append(text_style .. (state.toast_head or ""))
         end
         -- flag (an=7 top-left, vertically centered)
-        local flag_ass = render_flag_geometry(asset, sx + head_w + head_gap, tcy - flag_h / 2)
+        local flag_ass = render_flag_geometry(asset, sx + head_w + head_gap, tcy - flag_h / 2, fade_aa)
         if flag_ass then
             ass:new_event()
             ass:merge(flag_ass)
@@ -5432,6 +5472,10 @@ function validate_user_opts()
     if type(user_opts.toast_enabled) ~= "boolean" then
         mp.msg.warn("toast_enabled must be boolean. Using true.")
         user_opts.toast_enabled = true
+    end
+    if type(user_opts.toast_animation) ~= "boolean" then
+        mp.msg.warn("toast_animation must be boolean. Using true.")
+        user_opts.toast_animation = true
     end
     if type(user_opts.toast_font_size) ~= "number" or user_opts.toast_font_size <= 0 then
         mp.msg.warn("toast_font_size must be a positive number. Using 20.")
