@@ -6300,12 +6300,12 @@ local function osc_init()
     ne.eventresponder["wheel_up_press"] =
         function()
             if (state.mute) then mp.commandv('cycle', 'mute') end
-            mp.commandv("osd-auto", "add", "volume", 5)
+            mp.commandv("no-osd", "add", "volume", 5)
         end
     ne.eventresponder["wheel_down_press"] =
         function()
             if (state.mute) then mp.commandv('cycle', 'mute') end
-            mp.commandv("osd-auto", "add", "volume", -5)
+            mp.commandv("no-osd", "add", "volume", -5)
         end
     ne.eventresponder['shift+mbtn_left_down'] =
         function()
@@ -6598,17 +6598,17 @@ local function osc_init()
             local pos = get_slider_value(element)
             local setvol = set_volume(pos)
             if element.state.lastseek == nil or element.state.lastseek ~= setvol then
-                mp.commandv("osd-msg", "set", "volume", setvol)
+                mp.commandv("no-osd", "set", "volume", setvol)
                 element.state.lastseek = setvol
             end
         end
         ne.eventresponder["mbtn_left_down"] = function(element)
             local pos = get_slider_value(element)
-            mp.commandv("osd-msg", "set", "volume", set_volume(pos))
+            mp.commandv("no-osd", "set", "volume", set_volume(pos))
         end
         ne.eventresponder["reset"] = function(element) element.state.lastseek = nil end
-        ne.eventresponder["wheel_up_press"] = function() mp.commandv("osd-msg", "add", "volume", 5) end
-        ne.eventresponder["wheel_down_press"] = function() mp.commandv("osd-msg", "add", "volume", -5) end
+        ne.eventresponder["wheel_up_press"] = function() mp.commandv("no-osd", "add", "volume", 5) end
+        ne.eventresponder["wheel_down_press"] = function() mp.commandv("no-osd", "add", "volume", -5) end
     end
 
     --persistent seekbar
