@@ -41,6 +41,14 @@ opciones, keybinds) + tooling en `.tools/`.
 - No usar `type`/`next` como parámetro o local en Lua: eclipsan a los builtins
   `type()`/`next()` (upstream lo hace en varias funciones; ya nos rompió
   `get_tracklist` una vez).
+- No añadir `local` a nivel de chunk en `modernx.lua`: el chunk principal
+  está en el límite de 200 locales de Lua 5.1 (rompe la carga del script);
+  usar globales de script como `track_menu_*`.
+- Botón menú (`menu_button`): abre el menú avanzado propio (dropdown ASS
+  con filas parseadas de `#menu:` en `input.conf` en cada apertura; usa
+  estilo/sección `menu-controls` y comparte visual `track_menu_*`).
+  El `show-menu` nativo de mpvnet no sirve aquí: lo suprime cerca de
+  los bordes (zonas muertas 10% laterales/superior, 22% inferior).
 - Los `.conf` de `portable_config/` se commitean en cada rama como parte del
   estado portable (incluidos `mpv.conf`, `discord.conf` y `update-checker.conf`
   con sus ajustes locales).
