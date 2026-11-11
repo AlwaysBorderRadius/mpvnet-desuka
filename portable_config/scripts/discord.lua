@@ -22,6 +22,20 @@ local options = {
 }
 opts.read_options(options, "discord")
 
+-- >>> CUSTOM Desuka: portable path (~~/) support for binary/socket <<<
+local function expand_portable(path)
+    if type(path) ~= "string" or path == "" then return path end
+    if path:sub(1, 2) ~= "~~" then return path end
+    local ok, expanded = pcall(mp.command_native, { "expand-path", path })
+    if ok and type(expanded) == "string" and expanded ~= "" then
+        return expanded
+    end
+    return path
+end
+options.binary_path = expand_portable(options.binary_path)
+options.socket_path = expand_portable(options.socket_path)
+-- <<< CUSTOM Desuka >>>
+
 if options.binary_path == "" then
 	msg.fatal("Missing binary path in config file.")
 	os.exit(1)
