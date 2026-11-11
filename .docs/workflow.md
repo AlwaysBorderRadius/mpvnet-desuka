@@ -13,8 +13,11 @@
   `commit + push` a `dev` automáticamente, sin pedir permiso.
 - A `main` SOLO por merge cuando el usuario lo diga explícito. Nunca commit
   directo a `main`.
-- Tag anotado en cada paso a estable: `vN` / `beta-N`
-  (`git tag -a <tag> -m "..."` + `git push origin main <tag>`).
+- Merge a `main` con versión en el mensaje: `[vN] merge dev: <resumen>`
+  + cuerpo con los subjects de `git log --no-merges main..dev`.
+- Tag anotado sobre ese mismo commit (`git tag -a vN` + push junto con
+  `main`). Versión y tag suben siempre juntos: cada merge a `main` es
+  candidato a release; la release pública se declara aparte, sin renumerar.
 - Rollback: en `dev`, `reset --hard` al commit bueno; en `main`, `revert`
   del merge (`reset` al tag con `--force` solo en emergencia).
 

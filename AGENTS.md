@@ -50,7 +50,8 @@ opciones, keybinds) + tooling en `.tools/`.
 Ciclo por tarea: **plan → build → review**. Tras cada build: verificación +
 `/review` (subagente `reviewer`, read-only). Ramas: `main` estable,
 `dev` trabajo diario. Tras build verificado: commit + push a `dev`
-automático. A `main` solo por merge explícito + tag anotado `vN`/`beta-N`.
+automático. A `main` solo por merge explícito `[vN] merge dev` + tag anotado
+`vN` en lockstep (versión y tag siempre juntos).
 
 ## Versionado (qué sube a git)
 
