@@ -17,7 +17,7 @@ local options = {
 	active = true,
 	client_id = "737663962677510245",
 	binary_path = "",
-	socket_path = (detect_platform() ~= "windows" and "/tmp/" or "") .. "mpvsocket",
+	socket_path = (detect_platform() ~= "windows" and "/tmp/" or "") .. "mpvsocket-{pid}",
 	autohide_threshold = 0,
 }
 opts.read_options(options, "discord")
@@ -33,7 +33,11 @@ local function expand_portable(path)
     return path
 end
 options.binary_path = expand_portable(options.binary_path)
-options.socket_path = expand_portable(options.socket_path)
+-- Socket is a pipe name, not a file: never expand ~~ on Windows (absolute
+-- paths are invalid pipe names). Unix sockets accept paths, keep it there.
+if detect_platform() ~= "windows" then
+	options.socket_path = expand_portable(options.socket_path)
+end
 -- <<< CUSTOM Desuka >>>
 
 if options.binary_path == "" then
