@@ -12,9 +12,27 @@
 !portable_config/scripts/**
 !portable_config/fonts/
 !portable_config/fonts/**
+!portable_config/shaders/
+!portable_config/shaders/**
+!animejanai/
+!animejanai/animejanai.conf
+!animejanai/onnx/
+!animejanai/onnx/**
+!mpv-discord.exe
 !README.md
 !.opencode/
 !.opencode/**
+
+# Upstream AJN runtime (updater-owned, never edit): base de distribucion, fuera de git
+portable_config/scripts/animejanai_*.lua
+portable_config/mpv-animejanai.conf
+portable_config/input-animejanai.conf
+
+# Generado / machine-local: nunca commitear
+*.engine
+*.timing.cache
+*.timing.cache.lock
+*.engine.build.log
 !AGENTS.md
-!docs/
-!docs/**
+!.docs/
+!.docs/**

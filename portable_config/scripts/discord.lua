@@ -17,10 +17,28 @@ local options = {
 	active = true,
 	client_id = "737663962677510245",
 	binary_path = "",
-	socket_path = (detect_platform() ~= "windows" and "/tmp/" or "") .. "mpvsocket",
+	socket_path = (detect_platform() ~= "windows" and "/tmp/" or "") .. "mpvsocket-{pid}",
 	autohide_threshold = 0,
 }
 opts.read_options(options, "discord")
+
+-- >>> CUSTOM Desuka: portable path (~~/) support for binary/socket <<<
+local function expand_portable(path)
+    if type(path) ~= "string" or path == "" then return path end
+    if path:sub(1, 2) ~= "~~" then return path end
+    local ok, expanded = pcall(mp.command_native, { "expand-path", path })
+    if ok and type(expanded) == "string" and expanded ~= "" then
+        return expanded
+    end
+    return path
+end
+options.binary_path = expand_portable(options.binary_path)
+-- Socket is a pipe name, not a file: never expand ~~ on Windows (absolute
+-- paths are invalid pipe names). Unix sockets accept paths, keep it there.
+if detect_platform() ~= "windows" then
+	options.socket_path = expand_portable(options.socket_path)
+end
+-- <<< CUSTOM Desuka >>>
 
 if options.binary_path == "" then
 	msg.fatal("Missing binary path in config file.")
@@ -56,11 +74,11 @@ mp.set_property("input-ipc-server", socket_path)
 
 local cmd = nil
 
--- >>> CUSTOM desuka: route through modernx toast (single slot, preemptive) <<<
+-- >>> CUSTOM Desuka: route through modernx toast (single slot, preemptive) <<<
 local function notify(kind, text)
     mp.commandv("script-message-to", "modernx", "modernx-toast", kind, "discord", text)
 end
--- <<< CUSTOM desuka >>>
+-- <<< CUSTOM Desuka >>>
 
 local function start()
 	if cmd == nil then
@@ -89,7 +107,9 @@ if options.active then
 	mp.register_event("file-loaded", start)
 end
 
-mp.add_key_binding(options.key, "toggle-discord", function()
+-- >>> CUSTOM Desuka <<< -- key owned by input.conf (d), keep unbound
+mp.add_key_binding(nil, "toggle-discord", function()
+-- <<< CUSTOM Desuka >>>
 	if cmd ~= nil then
 		stop()
 	else

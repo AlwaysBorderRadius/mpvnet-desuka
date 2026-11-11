@@ -2669,10 +2669,11 @@ local function edit_subtitle(mode)
     end)
 end
 
-mp.add_key_binding("Ctrl+z", "edit-subtitle", function()
+-- keys owned by input.conf (Ctrl+z/Ctrl+Shift+z), keep unbound
+mp.add_key_binding(nil, "edit-subtitle", function()
     edit_subtitle("screen")
 end)
-mp.add_key_binding("Ctrl+Z", "edit-subtitle-osd", function()
+mp.add_key_binding(nil, "edit-subtitle-osd", function()
     edit_subtitle("osd")
 end)
 

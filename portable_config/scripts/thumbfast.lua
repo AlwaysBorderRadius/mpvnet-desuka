@@ -141,12 +141,12 @@ local force_disabled = false
 local spawn_waiting = false
 local spawn_working = false
 local script_written = false
--- >>> CUSTOM AlwaysBorderRadius: spawn timing instrumentation state <<<
+-- >>> CUSTOM Desuka: spawn timing instrumentation state <<<
 local spawn_seq = 0
 local spawn_start = 0
 local pipe_logged = false
 local last_error_toast = -10
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 local dirty = false
 
@@ -306,7 +306,7 @@ if mpv_path == "mpv" and os_name == "darwin" and unique then
         end
     end
 end
--- >>> CUSTOM AlwaysBorderRadius: log resolved backend binary <<<
+-- >>> CUSTOM Desuka: log resolved backend binary <<<
 do
     local backend_exists = "n/a"
     if mpv_path ~= "mpv" then
@@ -315,7 +315,7 @@ do
     end
     mp.msg.warn(string.format("thumbfast: backend mpv_path=%s frontend=%s exists=%s", tostring(mpv_path), tostring(frontend_path), backend_exists))
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 local function vo_tone_mapping()
     local passes = mp.get_property_native("vo-passes")
@@ -452,7 +452,7 @@ local activity_timer
 local function spawn(time)
     if disabled then return end
 
-    -- EDIT AlwaysBorderRadius: late-resolve frontend exe (startup race)
+    -- EDIT Desuka: late-resolve frontend exe (startup race)
     if mpv_path == "mpv" and os_name == "windows" then
         local late_path = mp.get_property_native("user-data/frontend/process-path")
         local late_info = late_path and mp.utils.file_info(late_path)
@@ -533,33 +533,33 @@ local function spawn(time)
     table.insert(args, path)
 
     spawned = true
-    -- EDIT AlwaysBorderRadius: capture overlap before overwriting spawn_waiting
+    -- EDIT Desuka: capture overlap before overwriting spawn_waiting
     local overlapped = spawn_waiting
     spawn_waiting = true
-    -- >>> CUSTOM AlwaysBorderRadius: spawn timing instrumentation <<<
+    -- >>> CUSTOM Desuka: spawn timing instrumentation <<<
     spawn_seq = spawn_seq + 1
     local this_seq = spawn_seq
     local this_start = mp.get_time()
     spawn_start = this_start
     pipe_logged = false
     mp.msg.warn(string.format("thumbfast: spawn #%d start seek=%s overlapped=%s path=%s", this_seq, tostring(time), tostring(overlapped), tostring(path)))
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     subprocess(args, true,
         function(success, result)
-            -- >>> CUSTOM AlwaysBorderRadius: spawn exit instrumentation <<<
+            -- >>> CUSTOM Desuka: spawn exit instrumentation <<<
             local exit_status = result and result.status or nil
             mp.msg.warn(string.format("thumbfast: spawn #%d exit elapsed=%.3fs success=%s status=%s waiting=%s working=%s", this_seq, mp.get_time() - this_start, tostring(success), tostring(exit_status), tostring(spawn_waiting), tostring(spawn_working)))
-            -- <<< CUSTOM AlwaysBorderRadius >>>
+            -- <<< CUSTOM Desuka >>>
             if spawn_waiting and (success == false or (result.status ~= 0 and result.status ~= -2)) then
                 spawned = false
                 spawn_waiting = false
                 options.tone_mapping = "no"
                 mp.msg.error("mpv subprocess create failed")
                 if not spawn_working then -- notify users of required configuration
-                    -- >>> CUSTOM AlwaysBorderRadius: errors go to the unified toast (no native OSD overlap) <<<
+                    -- >>> CUSTOM Desuka: errors go to the unified toast (no native OSD overlap) <<<
                     local function toast_err(text)
-                        -- EDIT AlwaysBorderRadius: throttle error toasts
+                        -- EDIT Desuka: throttle error toasts
                         local now = mp.get_time()
                         if now - last_error_toast < 10 then return false end
                         last_error_toast = now
@@ -581,13 +581,13 @@ local function spawn(time)
                                 end
                             end
                         else
-                            -- EDIT AlwaysBorderRadius: hint at missing binary when no frontend path
+                            -- EDIT Desuka: hint at missing binary when no frontend path
                             if frontend_path == nil then
                                 toast_err("thumbfast: mpv not found, set mpv_path in thumbfast.conf")
                             else
                                 toast_err("thumbfast: ERROR! cannot create mpv subprocess")
                             end
-                            -- NOTE AlwaysBorderRadius: no mpvnet show-text here, the toast is the only channel
+                            -- NOTE Desuka: no mpvnet show-text here, the toast is the only channel
                         end
                     else
                         -- found ImPlay but not defined in config
@@ -595,7 +595,7 @@ local function spawn(time)
                             mp.commandv("script-message-to", "implay", "show-message", "thumbfast", "Set mpv_path=PATH_TO_ImPlay in thumbfast config:\n" .. string.gsub(mp.command_native({"expand-path", "~~/script-opts/thumbfast.conf"}), "[/\\]", path_separator).."\nand restart ImPlay")
                         end
                     end
-                    -- <<< CUSTOM AlwaysBorderRadius >>>
+                    -- <<< CUSTOM Desuka >>>
                 end
             elseif success == true and (result.status == 0 or result.status == -2) then
                 if not spawn_working and properties["current-vo"] == "libmpv" and options.mpv_path ~= mpv_path then
@@ -633,7 +633,7 @@ local function run(command)
         end
         if not file then
             file = io.open("\\\\.\\pipe\\"..options.socket, "r+b")
-            -- EDIT AlwaysBorderRadius: log first pipe miss while waiting
+            -- EDIT Desuka: log first pipe miss while waiting
             if not file and spawn_waiting and not pipe_logged then
                 pipe_logged = true
                 mp.msg.warn(string.format("thumbfast: spawn #%d pipe not ready elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
@@ -746,14 +746,14 @@ local function check_new_thumb()
     move_file(options.thumbnail, tmp)
     local finfo = mp.utils.file_info(tmp)
     if not finfo then return false end
-    -- EDIT AlwaysBorderRadius: capture first-thumb transition before clearing flag
+    -- EDIT Desuka: capture first-thumb transition before clearing flag
     local was_waiting = spawn_waiting
     spawn_waiting = false
-    -- >>> CUSTOM AlwaysBorderRadius: first thumbnail timing <<<
+    -- >>> CUSTOM Desuka: first thumbnail timing <<<
     if was_waiting then
         mp.msg.warn(string.format("thumbfast: spawn #%d first-thumb elapsed=%.3fs size=%s", spawn_seq, mp.get_time() - spawn_start, tostring(finfo.size)))
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     local w, h = real_res(effective_w, effective_h, finfo.size)
     if w then -- only accept valid thumbnails
         move_file(tmp, options.thumbnail..".bgra")
@@ -876,7 +876,7 @@ local function watch_changes()
     if spawned then
         if resized then
             -- mpv doesn't allow us to change output size
-            -- EDIT AlwaysBorderRadius: log respawn overlap while waiting
+            -- EDIT Desuka: log respawn overlap while waiting
             if spawn_waiting then
                 mp.msg.warn(string.format("thumbfast: respawn overlap #%d elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
             end
@@ -960,13 +960,13 @@ local function sync_changes(prop, val)
 end
 
 local function file_load()
-    -- EDIT AlwaysBorderRadius: log abandoned spawn on file load
+    -- EDIT Desuka: log abandoned spawn on file load
     if spawn_waiting then
         mp.msg.warn(string.format("thumbfast: file-load abandoned spawn #%d elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
     end
-    -- EDIT AlwaysBorderRadius: never keep thumbs disabled across files
+    -- EDIT Desuka: never keep thumbs disabled across files
     force_disabled = false
-    -- EDIT AlwaysBorderRadius: drop stale spawn state from previous file
+    -- EDIT Desuka: drop stale spawn state from previous file
     spawn_waiting = false
     pipe_logged = false
     last_error_toast = -10
