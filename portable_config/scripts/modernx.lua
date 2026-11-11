@@ -1053,7 +1053,12 @@ local state = {
     fullscreen = false,
     tick_timer = nil, ---@type mp.Timer?
     tick_last_time = 0, -- when the last tick() was run
-    hide_timer = nil, ---@type mp.Timer?
+    -- >>> CUSTOM Desuka <<<
+    -- Dedicated autohide timer (no reliance on future ticks): with no
+    -- ticks (paused, no playback-time, and on mpvnet no mouse_move
+    -- either) the OSC could stay up forever without this evaluation.
+    autohide_timer = nil, ---@type mp.Timer?
+    -- <<< CUSTOM Desuka >>>
     cache_state = nil,
     buffering = false,
     idle = false,
@@ -5641,6 +5646,14 @@ end
 
 -- Validate string type user options
 function validate_user_opts()
+    -- >>> CUSTOM Desuka <<<
+    -- The autohide timer does arithmetic on this; a garbage string from
+    -- the conf would break both the old render path and the new timer.
+    if type(user_opts.hide_timeout) ~= "number" then
+        mp.msg.warn("hide_timeout must be a number. Using 1500.")
+        user_opts.hide_timeout = 1500
+    end
+    -- <<< CUSTOM Desuka >>>
     if user_opts.window_top_bar ~= "auto" and
         user_opts.window_top_bar ~= "yes" and
         user_opts.window_top_bar ~= "no" then
@@ -6769,6 +6782,93 @@ local function osc_init()
     prepare_elements()
 end
 
+-- >>> CUSTOM Desuka <<<
+-- Dedicated autohide timer. render() used to be the only place evaluating
+-- autohide, so with no ticks (paused, no playback-time, and on mpvnet no
+-- mouse_move either) the OSC could stay up forever. This one-shot
+-- guarantees the evaluation.
+-- NOTE: script-global namespace (not a chunk local): the main chunk is
+-- at Lua's 200-locals-per-function limit; like show_osc()/tick() this
+-- lives in script globals.
+autohide = {}
+
+-- Hit-test only (no binding side effects): is the cursor over the OSC?
+autohide.compute_mouse_over_osc = function()
+    local mouse_over_osc = false
+    local menu_hovered = false
+    if user_opts.osc_keep_with_cursor and osc_param.areas then
+        local input_areas = osc_param.areas['input']
+        if input_areas then
+            for _, cords in ipairs(input_areas) do
+                if mouse_hit_coords(cords.x1, cords.y1, cords.x2, cords.y2) then
+                    mouse_over_osc = true
+                    break
+                end
+            end
+        end
+        local wc_areas = osc_param.areas['window-controls']
+        if not mouse_over_osc and wc_areas and wc_areas[1] then
+            for _, cords in ipairs(wc_areas) do
+                if mouse_hit_coords(cords.x1, cords.y1, cords.x2, cords.y2) then
+                    mouse_over_osc = true
+                    break
+                end
+            end
+        end
+    end
+    if state.track_menu and state.osc_visible then
+        local mg = track_menu_geometry()
+        if mg and mouse_hit_coords(mg.x0, mg.y0, mg.x1, mg.y1) then
+            mouse_over_osc = true
+            menu_hovered = true
+        end
+    end
+    return mouse_over_osc, menu_hovered
+end
+
+-- Shared autohide evaluation (render ticks and the timer use same rules).
+autohide.eval_autohide = function(mouse_over_osc, menu_hovered)
+    if state.showtime == nil or get_hide_timeout() < 0 then return end
+    local timeout = state.showtime + (get_hide_timeout() / 1000) - mp.get_time()
+    if timeout > 0 then
+        autohide.arm(timeout)
+        return
+    end
+    if (state.active_element == nil) and (user_opts.bottom_hover) or (not mouse_over_osc) then
+        if (not (state.paused and user_opts.keep_on_pause)) and not menu_hovered then
+            hide_osc()
+        else
+            -- blocked for now (menu open / keep on pause): re-check later
+            autohide.arm(0.5)
+        end
+    else
+        -- hide overdue but cursor still on OSC: re-check soon
+        autohide.arm(1 / 30)
+    end
+end
+
+autohide.arm = function(delay)
+    if get_hide_timeout() < 0 or state.showtime == nil then
+        if state.autohide_timer then state.autohide_timer:kill() end
+        return
+    end
+    if not state.autohide_timer then
+        state.autohide_timer = mp.add_timeout(0, function()
+            mp.msg.trace('autohide timer fire')
+            local mouse_over_osc, menu_hovered = autohide.compute_mouse_over_osc()
+            autohide.eval_autohide(mouse_over_osc, menu_hovered)
+        end)
+    end
+    local wait = delay
+    if wait == nil then
+        wait = math.max(state.showtime + (get_hide_timeout() / 1000) - mp.get_time(), 0)
+    end
+    state.autohide_timer.timeout = wait
+    state.autohide_timer:kill()
+    state.autohide_timer:resume()
+end
+-- <<< CUSTOM Desuka >>>
+
 --
 -- Other important stuff
 --
@@ -6785,6 +6885,10 @@ function show_osc()
     if (user_opts.fade_duration > 0) then
         state.anitype = nil
     end
+    -- >>> CUSTOM Desuka <<<
+    -- Guarantee autohide evaluation even with no future ticks (paused).
+    autohide.arm()
+    -- <<< CUSTOM Desuka >>>
 end
 
 function hide_osc()
@@ -6792,6 +6896,8 @@ function hide_osc()
     -- >>> CUSTOM Desuka <<<
     -- Track dropdown never outlives the OSC.
     close_track_menu()
+    -- Hidden now: nothing overdue until the next show/reset re-arms.
+    if state.autohide_timer then state.autohide_timer:kill() end
     -- <<< CUSTOM Desuka >>>
     if not state.enabled then
         -- typically hide happens at render() from tick(), but now tick() is
@@ -7060,33 +7166,11 @@ local function render()
     end
     -- <<< CUSTOM Desuka >>>
 
-    -- autohide
+    -- autohide (single evaluator: render ticks and the dedicated timer)
     if not (state.showtime == nil) and (get_hide_timeout() >= 0) then
         local timeout = state.showtime + (get_hide_timeout() / 1000) - now
         if timeout <= 0 then
-            if (state.active_element == nil) and (user_opts.bottom_hover) or (not mouse_over_osc) then
-                -- >>> CUSTOM Desuka <<<
-                if (not (state.paused and user_opts.keep_on_pause)) and not menu_hovered then
-                    hide_osc()
-                end
-                -- <<< CUSTOM Desuka >>>
-            else
-            -- the timer is only used to recheck the state and to possibly run
-            -- the code above again
-            if not state.hide_timer then
-                state.hide_timer = mp.add_timeout(0, tick)
-            end
-            -- >>> CUSTOM Desuka <<<
-            -- Never re-arm sooner than 1/30: timeout<=0 here means
-            -- "hide overdue but cursor still on OSC", and an immediate tick
-            -- re-arms itself every render (hot loop that starved input
-            -- draining -> 'Too many events queued'). Re-check at 30Hz.
-            state.hide_timer.timeout = math.max(timeout, 1 / 30)
-            -- <<< CUSTOM Desuka >>>
-            -- re-arm
-            state.hide_timer:kill()
-            state.hide_timer:resume()
-            end
+            autohide.eval_autohide(mouse_over_osc, menu_hovered) -- >>> EDIT Desuka <<< -- single evaluator
         end
     end
 
@@ -7814,6 +7898,10 @@ mp.enable_key_bindings('window-controls')
 
 function reset_timeout()
     state.showtime = mp.get_time()
+    -- >>> CUSTOM Desuka <<<
+    -- Clicks/seeks refresh the deadline too: guarantee its evaluation.
+    autohide.arm()
+    -- <<< CUSTOM Desuka >>>
 end
 
 -- mode can be auto/always/never/cycle
