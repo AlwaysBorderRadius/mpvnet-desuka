@@ -329,9 +329,8 @@ local function screenshot_done()
         local dir = mp.get_property("screenshot-directory") or state.dir or ""
         toast_msg = "Screenshot saved to: " .. dir:gsub("\\", "/")
     end
-    -- >>> CUSTOM desuka: unified toast (replaces native OSD) <<<
+    -- unified toast via modernx (replaces native OSD)
     mp.commandv("script-message-to", "modernx", "modernx-toast", "success", "screenshot", toast_msg)
-    -- <<< CUSTOM desuka >>>
 end
 
 local function reset_on_unload()
@@ -344,7 +343,6 @@ end
 mp.register_event("file-loaded", init)
 mp.register_event("end-file", reset_on_unload)
 -- Forced binding wins over input.conf 's' (native shot); Ctrl+s stays native.
--- >>> CUSTOM AlwaysBorderRadius <<< -- key owned by input.conf (s), no forced override
+-- key owned by input.conf (s), no forced override
 -- mp.add_forced_key_binding(options.screenshot_key, "screenshotfolder-shot", screenshot_done)
--- <<< CUSTOM AlwaysBorderRadius >>>
 mp.register_script_message("screenshotfolder-shot", screenshot_done)

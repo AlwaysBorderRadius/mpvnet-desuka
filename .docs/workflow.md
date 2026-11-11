@@ -18,7 +18,12 @@
 - Rollback: en `dev`, `reset --hard` al commit bueno; en `main`, `revert`
   del merge (`reset` al tag con `--force` solo en emergencia).
 
+## Tras update AJN (el updater pisa scripts/, shaders/, managed y onnx/)
+
+- Copia externa de los V2 ANTES de `Ctrl+U` (irrecuperables si el overlay los borra).
+- Después: `git status` → diff en `scripts/` + `shaders/` + `onnx/` + bloque managed de `input.conf` → re-aplicar bloques `CUSTOM Desuka` → smoke test (Ctrl+E, Ctrl+J, slots) → commit en `dev`.
+
 ## Docs y skills
 
-- Al cambiar estructura/stack/workflow: actualizar `AGENTS.md` y `docs/`.
+- Al cambiar estructura/stack/workflow: actualizar `AGENTS.md` y `.docs/`.
 - Patrón repetido 3 veces → extraer a skill/comando.

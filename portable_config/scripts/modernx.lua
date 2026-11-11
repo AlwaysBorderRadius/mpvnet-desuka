@@ -1,5 +1,5 @@
 --[[
-    modernx.lua v2.0 by AlwaysBorderRadius
+    modernx.lua v2.0 by AlwaysBorderRadius 
     (based on ModernX v0.4.7 by zydezu, https://github.com/zydezu/ModernX)
 
     This script is a result of the original mpv-osc-modern by maoiscat
@@ -114,9 +114,9 @@ local user_opts = {
     title_font_size = 28,          -- font size of the title text (above seekbar)
     dynamic_title = true,          -- change title if {media-title} and {filename} differ (eg: when playing URLs or audio)
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     title_hide_extension = false,  -- hide the file extension in the OSC title
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     show_chapter_title = true,     -- show chapter title alongside timestamp (below seekbar)
     chapter_fmt = "%s",            -- format for chapter display on seekbar hover (set to "no" to disable)
@@ -163,7 +163,7 @@ local user_opts = {
     chapter_softrepeat = false,     -- enable continuous skipping when holding down chapter skip buttons
     track_nextprev_buttons = true,  -- show next/previous playlist track buttons
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Track tooltip/menu display for cy_audio/cy_video/cy_sub
     track_language_mode = "code",  -- "code" | "name" | "flag"
     track_flag_size = 16,         -- height of the flag vector in playres units (exact, aspect preserved)
@@ -177,7 +177,7 @@ local user_opts = {
     track_menu_border_size = 1,     -- dropdown border width in playres px (0 = none)
     track_menu_animation = true,    -- fade+rise on open, fade on close
     track_menu_animation_distance = 12, -- rise travel in playres px (0 = fade only)
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     volume_control = true,          -- show mute button and volume slider
     volume_control_type = "linear", -- volume scale type: "linear" or "logarithmic"
@@ -285,15 +285,15 @@ local user_opts = {
     comments_path = "~/Pictures/mpv/comments", -- EXPERIMENTAL - the download path for the comment JSON file
     FORCE_fix_not_ontop = true,                -- EXPERIMENTAL - try and mitigate https://github.com/zydezu/ModernX/issues/30, https://github.com/akiirui/mpv-handler/issues/48
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Temporary volume & seek bars (position/orientation)
     volume_bar_orientation = "vertical", -- "horizontal", "vertical"
     volume_bar_position = "left",        -- "center", "top", "bottom", "left", "right"
     seek_bar_orientation = "horizontal", -- "horizontal", "vertical"
     seek_bar_position = "bottom",        -- "center", "top", "bottom", "left", "right"
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
-    -- >>> CUSTOM desuka: unified toast channel (replaces native OSD) <<<
+    -- >>> CUSTOM Desuka: unified toast channel (replaces native OSD) <<<
     -- Single visible toast, preemptive (no queue). kind: info|success|warn|error|persistent
     toast_enabled = true,          -- route all script OSD through the modernx toast
     toast_animation = true,      -- fade + rise on show, fade on hide
@@ -326,7 +326,7 @@ local user_opts = {
     toast_bg_border_kind_colors = false, -- bar + bg border follow kind accent
     toast_bg_border_opacity = 1.0,   -- border opacity 0-1 (independent)
     toast_bg_radius = 12,            -- background corner radius
-    -- <<< CUSTOM desuka >>>
+    -- <<< CUSTOM Desuka >>>
 }
 -- read options from config and command-line
 require("mp.options").read_options(user_opts, 'modernx', function(list) update_options(list) end)
@@ -351,9 +351,9 @@ local icons = {
     forward = "\238\152\135",
 
     audio = "\238\175\139",
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     video = "\243\176\128\186", -- video tracks icon (mpv-osd-symbols)
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     subtitle = "\238\175\141",
 
     volume = {
@@ -413,9 +413,9 @@ local language = {
         subtitle = 'Subtitle',
         nosub = 'No subtitles available',
         noaudio = 'No audio tracks available',
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         novideo = 'No video tracks available',
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
         -- used by track_header(): "%s tracks:" / "Pista de %s:"
         tracks_header = '%s tracks:',
         playlist = 'Playlist',
@@ -435,7 +435,7 @@ local language = {
         downloaded = "Already downloaded",
     },
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Spanish translation
     ['es'] = {
         welcome = 'Arrastra archivos o URLs aquí para reproducir',
@@ -466,11 +466,11 @@ local language = {
         downloading = "Descargando",
         downloaded = "Ya descargado",
     }
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 }
 local texts = language[user_opts.language] or language["en"]
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Track name mappings for tooltips/menus
 local track_names = {}
 track_names["en"] = {
@@ -515,9 +515,9 @@ local function get_track_name_map()
     local ui = user_opts.language or "en"
     return track_names[ui] or track_names["en"] or {}
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Flag engine: explicit lang -> country code table (emoji kept as a visual reference), flag-assets.lua loader, geometry, labels and flag_drawn().
 local lang_to_cc = {
     ["es"] = "ES", -- 🇪🇸
@@ -752,9 +752,9 @@ local function flag_drawn(lang)
     end
     return get_flag_asset(lang) ~= nil
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Font size the advance table below was measured at. Anything else is scaled.
 local ADVANCE_FS = 20
 
@@ -842,9 +842,9 @@ local function fit_text_to_width(s, max_w, fontsize)
     end
     return s .. ell
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Splits a track tooltip around the language slot so the flag lands where [es] was.
 -- The title always follows the slot, in every mode.
 local function tooltip_parts(prefix, lang, title)
@@ -881,7 +881,7 @@ local function tooltip_parts(prefix, lang, title)
     end
     return prefix, ""
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 local function contains(list, item)
     local t = {}
@@ -908,7 +908,7 @@ local thumbfast = {
     available = false
 }
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- True while a thumbfast thumbnail is on screen; the per-frame "clear"
 -- below only fires on the hover -> no-hover transition instead of 60/s.
 local thumb_hovering = false
@@ -922,7 +922,7 @@ local function thumb_clear()
     thumb_last_key = nil
     mp.commandv("script-message-to", "thumbfast", "clear")
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 local sponsorblock_color_map = {
     sponsor = user_opts.sponsorblock_sponsor_color,
@@ -955,7 +955,7 @@ local function osc_color_convert(color)
     return color:sub(6, 7) .. color:sub(4, 5) .. color:sub(2, 3)
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Hides the file extension in the title: reads from the end and removes
 -- everything up to the first dot found (the extension dot).
 local function strip_file_extension(title)
@@ -968,7 +968,7 @@ local function strip_file_extension(title)
     end
     return title
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 local playpause_size = user_opts.playpause_size or 30
 local midbuttons_size = user_opts.midbuttons_size or 24
@@ -1017,7 +1017,7 @@ local osc_styles = {
     volumebar_bg = "{\\blur0\\bord0\\1c&H999999&}",
     volumebar_fg = "{\\blur1\\bord1\\1c&H" .. osc_color_convert(user_opts.side_buttons_color) .. "&}",
     window_control = "{\\blur1\\bord0.5\\1c&H" ..
-        osc_color_convert(user_opts.window_controls_color) .. "&\\3c&H0&\\fs22\\fnmpv-osd-symbols}", -- >>> EDIT AlwaysBorderRadius <<< -- larger window-controls font size
+        osc_color_convert(user_opts.window_controls_color) .. "&\\3c&H0&\\fs22\\fnmpv-osd-symbols}", -- >>> EDIT Desuka <<< -- larger window-controls font size
     window_title = "{\\blur1\\bord0.5\\1c&H" ..
         osc_color_convert(user_opts.window_title_color) .. "&\\3c&H0&\\fs19\\q2\\fn" .. user_opts.font .. "}",
     description = '{\\blur1\\bord0.5\\1c&HFFFFFF&\\3c&H000000&\\fs' ..
@@ -1060,7 +1060,7 @@ local state = {
     enabled = true,
     input_enabled = true,
     showhide_enabled = false,
-    wc_enabled = true, -- >>> EDIT AlwaysBorderRadius <<< -- window-controls bindings start enabled (see bottom)
+    wc_enabled = true, -- >>> EDIT Desuka <<< -- window-controls bindings start enabled (see bottom)
 
     border = true,
     title_bar = true,
@@ -1109,13 +1109,13 @@ local state = {
     message_hide_timer = nil, ---@type mp.Timer?
     message_meta = nil, -- structured track list rows for render_message_block
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Track dropdown menu (click cy_video/cy_audio/cy_sub to pick with the mouse)
     track_menu = nil, -- { ttype, items, header, width, offset, pressed, born } or nil
     track_menu_fading = nil, -- closing snapshot { m, g, t0 } for the fade-out
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
-    -- >>> CUSTOM desuka: unified toast (single slot, preemptive, no queue) <<<
+    -- >>> CUSTOM Desuka: unified toast (single slot, preemptive, no queue) <<<
     toast_text = nil,       -- plain text with \N linebreaks (no ASS)
     toast_kind = "info",    -- info|success|warn|error|persistent
     toast_source = "",      -- sender id for source-aware clear
@@ -1126,9 +1126,9 @@ local state = {
     toast_flag_lang = nil,  -- flag row language for vector flag
     toast_birth = nil,      -- mp.get_time() when shown (fade+rise entrance)
     toast_expiry = nil,     -- mp.get_time() when it hides (fade exit)
-    -- <<< CUSTOM desuka >>>
+    -- <<< CUSTOM Desuka >>>
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- State for the temporary volume and seek bars
     show_volume_time = nil,  -- time until the volume bar stops showing
     current_volume = mp.get_property_number("volume", 0),
@@ -1142,7 +1142,7 @@ local state = {
     show_seek_time = nil,  -- time until the seek bar stops showing
     seek_display_time = nil,  -- time until icon/text shows (independent of the bar)
     seek_hide_timer = nil,  -- timer that forces the seek bar to hide
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 }
 
 local logo_lines = {
@@ -1203,12 +1203,12 @@ local function get_virt_scale_factor()
 end
 
 -- return mouse position in virtual ASS coordinates (playresx/y)
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Per-render cache: dozens of hit-tests per tick share a single read.
 -- Only valid while render() runs (set/cleared there); process_event
 -- clears it on entry so input paths always read live coordinates.
 local virt_mouse_cache = nil
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 local function get_virt_mouse_pos()
     if virt_mouse_cache then return virt_mouse_cache[1], virt_mouse_cache[2] end
     if state.mouse_in_window then
@@ -1222,7 +1222,7 @@ end
 
 local function set_virt_mouse_area(x0, y0, x1, y1, name)
     local sx, sy = get_virt_scale_factor()
-    if not (sx > 0 and sy > 0) then -- >>> EDIT AlwaysBorderRadius <<< -- no finite OSD size: clear instead of NaN
+    if not (sx > 0 and sy > 0) then -- >>> EDIT Desuka <<< -- no finite OSD size: clear instead of NaN
         mp.set_mouse_area(0, 0, 0, 0, name)
         return
     end
@@ -1360,7 +1360,7 @@ local function ass_draw_rr_h_cw(ass, x0, y0, x1, y1, r1, hexagon, r2)
     end
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Generates a rounded-pill ASS vector clip tag. The mask is used as a clip so
 -- that the progress never overflows the rounded background edges (absolute 1:1 playres coords).
 local function pill_clip_tag(x0, y0, x1, y1, r)
@@ -1371,7 +1371,7 @@ local function pill_clip_tag(x0, y0, x1, y1, r)
     m:draw_stop()
     return "{\\clip(" .. m.text:gsub("^{\\p1}", ""):gsub("{\\p0}$", "") .. ")}"
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 local function get_hide_timeout()
     if user_opts.visibility == "always" then
@@ -1426,7 +1426,7 @@ end
 local valid_types = { video = texts.video, audio = texts.audio, sub = texts.subtitle }
 local tracks_osc, tracks_mpv
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Dropdown/legacy header: "Pista de subtítulos:" (es) / "Subtitle tracks:" (en).
 local function track_header(ttype)
     local label = valid_types[ttype] or ""
@@ -1434,7 +1434,7 @@ local function track_header(ttype)
     if (user_opts.language or "en") == "es" then label = label:lower() end
     return string.format(texts.tracks_header, label)
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 -- updates the OSC internal playlists, should be run each time the track-layout changes
 function update_tracklist()
@@ -1464,7 +1464,7 @@ end
 
 -- return a nice list of tracks of the given type (video, audio, sub);
 -- the second return value carries rows for render_message_block (positioned lines + flags)
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Build the track menu text and the positioned rows (flag head/tail split).
 function get_tracklist(ttype)
     update_tracklist()
@@ -1533,7 +1533,7 @@ function get_tracklist(ttype)
     end
     return message, meta
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 -- relatively change the track of given <ttype> by <step> tracks
 --(+1 -> next, -1 -> previous)
@@ -1687,7 +1687,7 @@ function get_chapter(possec)
     end
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Gradual hover: ease-out entrance (~100 ms), quicker fade-out (~80 ms).
 -- Single linear progress 0..1 with direction; the displayed value always
 -- eases through it, so leave/re-enter mid-flight never jumps. Ticks only
@@ -1730,7 +1730,7 @@ local function hover_k(element, hovered)
     request_tick()
     return hover_ease(p)
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 local function draw_seekbar_handle(element, elem_ass, override_alpha)
     local pos = element.slider.posF()
@@ -1743,7 +1743,7 @@ local function draw_seekbar_handle(element, elem_ass, override_alpha)
     local xp = get_slider_ele_pos_for(element, pos)                                  -- handle position
     local handle_hovered = mouse_hit_coords(element.hitbox.x1 + xp - rh, element.hitbox.y1 + elem_geo.h / 2 - rh,
         element.hitbox.x1 + xp + rh, element.hitbox.y1 + elem_geo.h / 2 + rh) and element.enabled
-        and not state.track_menu -- >>> EDIT AlwaysBorderRadius <<< -- no handle hover while the menu is open
+        and not state.track_menu -- >>> EDIT Desuka <<< -- no handle hover while the menu is open
 
     if display_handle then
         -- Apply size hover_effect only if hovering over the handle.
@@ -2021,7 +2021,7 @@ local function draw_sponsorblock_ranges(element, elem_ass, xp, rh)
     end
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Builds the ASS events for a vector flag from scaled geometry (coordinates
 -- already carry the requested size, always drawn with \p1); one event per
 -- colour (libass cancels a multi-path override and repeating \p advances the pen).
@@ -2036,7 +2036,7 @@ local function render_flag_geometry(asset, x, y, alpha)
     end
     return flag_ass
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 function render_elements(master_ass)
     -- when the slider is dragged or hovered and we have a target chapter name
@@ -2069,10 +2069,10 @@ function render_elements(master_ass)
 
     for n = 1, #elements do
         local element = elements[n]
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- flag built apart from elem_ass so it shares no event stream with the glyphs
         local flag_ass = nil
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
         local style_ass = mp.assdraw.ass_new()
         style_ass:merge(element.style_ass)
         ass_append_alpha(style_ass, element.layout.alpha, 0)
@@ -2126,11 +2126,11 @@ function render_elements(master_ass)
 
                 -- add tooltip
                 if element.slider.tooltipF ~= nil and element.enabled then
-                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- >>> CUSTOM Desuka <<<
                     -- No slider tooltip/thumbfast while the track menu is
                     -- open (modal), anywhere on screen.
                     if mouse_hit(element) and not state.track_menu then
-                    -- <<< CUSTOM AlwaysBorderRadius >>>
+                    -- <<< CUSTOM Desuka >>>
                         local sliderpos = get_slider_value(element)
                         local tooltiplabel = element.slider.tooltipF(sliderpos)
                         local an = slider_lo.tooltip_an
@@ -2209,7 +2209,7 @@ function render_elements(master_ass)
                                     tx = (thumbX + thumbfast.width / 2) * r_w
                                     an = 2
 
-                                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                                    -- >>> CUSTOM Desuka <<<
                                     -- Request only on hover start or when the hovered second
                                     -- or thumb box changes; parked cursor must not re-request.
                                     local thumb_key = math.floor(hover_sec) .. "x" .. thumbX .. "y" .. thumbY
@@ -2217,8 +2217,8 @@ function render_elements(master_ass)
                                         thumb_last_key = thumb_key
                                         mp.commandv("script-message-to", "thumbfast", "thumb", hover_sec, thumbX, thumbY)
                                     end
-                                    -- <<< CUSTOM AlwaysBorderRadius >>>
-                                    thumb_hovering = true -- >>> EDIT AlwaysBorderRadius <<< -- clear only on transition
+                                    -- <<< CUSTOM Desuka >>>
+                                    thumb_hovering = true -- >>> EDIT Desuka <<< -- clear only on transition
                                 end
 
 
@@ -2249,9 +2249,9 @@ function render_elements(master_ass)
                         ass_append_alpha(elem_ass, slider_lo.alpha, 0)
                         elem_ass:append(tooltiplabel)
                     elseif element.thumbnailable and (thumbfast.available or thumb_hovering) then
-                        -- >>> CUSTOM AlwaysBorderRadius <<<
+                        -- >>> CUSTOM Desuka <<<
                         thumb_clear() -- one clear on leaving hover, not one per frame
-                        -- <<< CUSTOM AlwaysBorderRadius >>>
+                        -- <<< CUSTOM Desuka >>>
                     end
                 end
             end
@@ -2284,7 +2284,7 @@ function render_elements(master_ass)
                 element.eventresponder["mbtn_left_down"] ~= nil or
                 element.eventresponder["mbtn_left_up"] ~= nil
             )
-            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- >>> CUSTOM Desuka <<<
             -- No hover styling while the track menu is open (modal), except
             -- the other track buttons (still clickable to toggle menus).
             local cy_button = element.name == "cy_video" or element.name == "cy_audio" or element.name == "cy_sub"
@@ -2296,9 +2296,9 @@ function render_elements(master_ass)
             if contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "glow") then
                 he = hover_k(element, hovered)
             end
-            -- <<< CUSTOM AlwaysBorderRadius >>>
+            -- <<< CUSTOM Desuka >>>
 
-            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- >>> CUSTOM Desuka <<<
             -- Unscaled fade-out glow (no big-text flash) + glow on top, as
             -- upstream: the blur itself masks sub-pixel doubling, and an
             -- underlay exposed a ghost copy.
@@ -2315,7 +2315,7 @@ function render_elements(master_ass)
                 hoverstyle = hoverstyle:gsub("\\fscx%d+%.?%d*\\fscy%d+%.?%d*", string.format("\\fscx%f\\fscy%f", s, s))
             end
 
-            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- >>> CUSTOM Desuka <<<
             -- Window buttons: soft background halo in their own hover color.
             -- Plain blurred rect (no text), so no doubling risk; under the
             -- icon, fading in and out with the same ease as the hover.
@@ -2339,7 +2339,7 @@ function render_elements(master_ass)
                     elem_ass:merge(style_ass)
                 end
             end
-            -- <<< CUSTOM AlwaysBorderRadius >>>
+            -- <<< CUSTOM Desuka >>>
 
             if hovered and (contains(user_opts.hover_effect, "size") or contains(user_opts.hover_effect, "color")) then
                 elem_ass:append(hoverstyle .. buttontext)
@@ -2356,16 +2356,16 @@ function render_elements(master_ass)
                 shadow_ass:append("{\\blur" .. string.format("%.2f", glow) .. "}" .. hoverstyle .. buttontext)
                 elem_ass:merge(shadow_ass)
             end
-            -- <<< CUSTOM AlwaysBorderRadius >>>
+            -- <<< CUSTOM Desuka >>>
 
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
-                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- >>> CUSTOM Desuka <<<
                 -- No tooltip while the track menu is open (modal). No cy_*
                 -- exception here on purpose: it would paint underneath the
                 -- open menu (wasted render, invisible).
                 if mouse_hit(element) and not state.track_menu then
-                -- <<< CUSTOM AlwaysBorderRadius >>>
+                -- <<< CUSTOM Desuka >>>
                     local an = 1
                     local ty = element.hitbox.y1
 
@@ -2374,7 +2374,7 @@ function render_elements(master_ass)
                         an = 7
                     end
 
-                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- >>> CUSTOM Desuka <<<
                     -- tooltip label, split around the language slot so the flag lands where [es] was
                     local head, tail = "", ""
                     if element.enabled then
@@ -2420,7 +2420,7 @@ function render_elements(master_ass)
                         total_w = total_w + gap + gap + flag_w
                     end
 
-                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- >>> CUSTOM Desuka <<<
                     -- Clamp long labels inside the screen (both segments).
                     local max_text = osc_param.playresx - 8
                     if total_w > max_text then
@@ -2439,9 +2439,9 @@ function render_elements(master_ass)
                             total_w = total_w + gap + gap + flag_w
                         end
                     end
-                    -- <<< CUSTOM AlwaysBorderRadius >>>
+                    -- <<< CUSTOM Desuka >>>
 
-                    -- >>> CUSTOM AlwaysBorderRadius <<<
+                    -- >>> CUSTOM Desuka <<<
                     -- Fixed tooltip anchored to the button (not the cursor):
                     -- left-side buttons grow right from their left edge,
                     -- right-side buttons end at their right edge, clamped
@@ -2454,7 +2454,7 @@ function render_elements(master_ass)
                         tx = element.hitbox.x2 - total_w
                     end
                     tx = math.min(math.max(tx, 4), math.max(4, osc_param.playresx - total_w - 4))
-                    -- <<< CUSTOM AlwaysBorderRadius >>>
+                    -- <<< CUSTOM Desuka >>>
 
                     local flag_x
                     if flag_lang ~= nil then
@@ -2479,19 +2479,19 @@ function render_elements(master_ass)
                         elem_ass:append(element.tooltip_style)
                         elem_ass:append(tail_text)
                     end
-                    -- <<< CUSTOM AlwaysBorderRadius >>>
+                    -- <<< CUSTOM Desuka >>>
                 end
             end
         end
 
         master_ass:merge(elem_ass)
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- Merge the flag's own event stream.
         if flag_ass ~= nil then
             master_ass:new_event()
             master_ass:merge(flag_ass)
         end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
     end
 end
 
@@ -2556,7 +2556,7 @@ end
 
 local function set_tick_delay(_, display_fps)
     -- may be nil if unavailable or 0 fps is reported
-    if not display_fps or display_fps <= 0 then -- >>> EDIT AlwaysBorderRadius <<< -- 1/0 would freeze ticks forever
+    if not display_fps or display_fps <= 0 then -- >>> EDIT Desuka <<< -- 1/0 would freeze ticks forever
         return
     end
     tick_delay = 1 / display_fps
@@ -2564,10 +2564,10 @@ end
 
 local function newfilereset()
     request_init()
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     close_track_menu() -- new file, stale dropdown
     thumb_clear() -- new file, stale thumbnail
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     state.downloaded_once = false
     state.videoDescription = "Loading description..."
     state.file_size_normalized = "Approximating size..."
@@ -3289,7 +3289,7 @@ local function make_sponsorblock_segments()
     print("Added SponsorBlock segments")
 end
 
-function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
+function show_message(text, duration, meta) -- >>> EDIT Desuka <<<
     if state.showingDescription then
         destroy_scrolling_keys()
     end
@@ -3304,7 +3304,7 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
     -- replace actual linebreaks with ASS linebreaks
     text = string.gsub(text, '\n', '\\N')
     text = "\\N" .. text
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Carry structured rows to the block renderer.
     state.message_text = text
     state.message_meta = meta
@@ -3312,7 +3312,7 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
         -- render_message only takes the block path while both still match
         meta.render_text = text
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     if not state.message_hide_timer then
         state.message_hide_timer = mp.add_timeout(0, request_tick)
@@ -3323,7 +3323,7 @@ function show_message(text, duration, meta) -- >>> EDIT AlwaysBorderRadius <<<
     request_tick()
 end
 
--- >>> CUSTOM desuka: unified toast channel <<<
+-- >>> CUSTOM Desuka: unified toast channel <<<
 -- Central OSD replacement: one visible toast, new toast kills the previous
 -- one (no queue). Toast is a separate slot from the modal message
 -- (tracklist/description): toast renders fixed at the top (position opt),
@@ -3412,7 +3412,7 @@ function show_toast(text, kind, source, duration)
     state.toast_head = nil
     state.toast_tail = nil
     state.toast_flag_lang = nil
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Animate the entrance only: content swaps on a visible toast keep the
     -- original birth (no re-fade flicker while cycling); only expiry moves.
     local now = mp.get_time()
@@ -3420,14 +3420,14 @@ function show_toast(text, kind, source, duration)
         state.toast_birth = now
     end
     state.toast_expiry = now + (duration or 2)
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
     state.toast_hide_timer:kill()
     state.toast_hide_timer.timeout = duration
     state.toast_hide_timer:resume()
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Kickstart ticks into the fade-out window: the exit fade only renders
     -- if something ticks during its last 200 ms (nothing does when paused).
     -- Fires inside the fade window (left < 0.25) so the chain takes over.
@@ -3439,7 +3439,7 @@ function show_toast(text, kind, source, duration)
         state.toast_fade_timer.timeout = math.max(0, duration - 0.2)
         state.toast_fade_timer:resume()
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     request_tick()
 end
 
@@ -3474,21 +3474,21 @@ function show_toast_row(row, kind, source, duration)
     local tail = tostring(row.tail or ""):gsub("^%s+", ""):gsub("%s+$", "")
     state.toast_tail = (tail ~= "") and escape_toast_text(tail) or nil
     state.toast_flag_lang = row.flag_lang
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Same no-refade rule as show_toast (see above).
     local now = mp.get_time()
     if not (state.toast_hide_timer and state.toast_hide_timer:is_enabled()) then
         state.toast_birth = now
     end
     state.toast_expiry = now + (duration or 2)
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     if not state.toast_hide_timer then
         state.toast_hide_timer = mp.add_timeout(0, request_tick)
     end
     state.toast_hide_timer:kill()
     state.toast_hide_timer.timeout = duration
     state.toast_hide_timer:resume()
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Kickstart ticks into the fade-out window: the exit fade only renders
     -- if something ticks during its last 200 ms (nothing does when paused).
     -- Fires inside the fade window (left < 0.25) so the chain takes over.
@@ -3500,7 +3500,7 @@ function show_toast_row(row, kind, source, duration)
         state.toast_fade_timer.timeout = math.max(0, duration - 0.2)
         state.toast_fade_timer:resume()
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     request_tick()
 end
 
@@ -3553,7 +3553,7 @@ local function render_toast(ass)
         end
         return
     end
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Entrance (fade + rise) and exit fade. Ticks after the first frame come
     -- from re-requesting while fading; a one-shot kickstarter covers the
     -- fade-out window when nothing else ticks (e.g. paused video).
@@ -3571,7 +3571,7 @@ local function render_toast(ass)
             request_tick()
         end
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     local fade_aa = "00" -- fully opaque; eased alpha while fading
     if fade < 1 then
         fade_aa = string.format("%02X", math.floor((1 - fade) * 255 + 0.5))
@@ -3603,7 +3603,7 @@ local function render_toast(ass)
     local lines = nil
     if asset then
         head_w = toast_measure(state.toast_head, fontsize)
-        head_gap = ((head_w or 0) > 0) and gap or 0 -- >>> EDIT AlwaysBorderRadius <<< -- function scope: also used by the paint block below
+        head_gap = ((head_w or 0) > 0) and gap or 0 -- >>> EDIT Desuka <<< -- function scope: also used by the paint block below
         if state.toast_tail then
             local budget = content_max - head_w - head_gap - flag_w - gap
             if toast_measure(state.toast_tail, fontsize) > budget then
@@ -3727,7 +3727,7 @@ local function render_toast(ass)
     if fade < 1 then -- entrance/exit fade: uniform alpha (opaque when full)
         text_style = text_style .. "{\\alpha&H" .. fade_aa .. "&}"
     end
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Accent bar shared by plain and flag toasts (the flag branch returns
     -- before the plain text below, so it calls this explicitly). Uses the
     -- enclosing render ass directly.
@@ -3778,7 +3778,7 @@ local function render_toast(ass)
     end
     ass:draw_stop()
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     if asset then
         local total = head_w + head_gap + flag_w
         if state.toast_tail then total = total + gap + tail_w end
@@ -3814,18 +3814,18 @@ local function render_toast(ass)
     ass:an(5)
     ass:append(text_style .. body)
 end
--- <<< CUSTOM desuka >>>
+-- <<< CUSTOM Desuka >>>
 
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- show the track list of <ttype> in the positioned block layout (with flags when rows are available)
 function show_tracklist(ttype)
     local message, meta = get_tracklist(ttype)
     show_message(message, nil, meta)
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Cycle feedback as toast (single row, flag preserved); the full list
 -- button keeps the modal block layout.
 function show_selected_track_row(ttype)
@@ -3853,9 +3853,9 @@ mp.register_script_message("cycle-sub-down", function()
     mp.commandv("no-osd", "cycle", "sub", "down")
     show_selected_track_row("sub")
 end)
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Track dropdown menu: click cy_video/cy_audio/cy_sub to pick with the mouse.
 -- Anchored above the button, scrollable with the wheel, closes on
 -- selection / outside click / right-click / ESC / OSC hide.
@@ -3870,7 +3870,7 @@ local function track_menu_item_width(item, fontsize, gap)
         local asset, flag_w = get_flag_geometry(item.flag_lang)
         if asset then
             local head_w = text_width(item.head:gsub("%s+$", ""), fontsize)
-            local w = head_w + flag_w + ((head_w > 0) and gap or 0) -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
+            local w = head_w + flag_w + ((head_w > 0) and gap or 0) -- >>> EDIT Desuka <<< -- no leading gap when head is empty
             if item.tail and item.tail ~= "" then
                 w = w + gap + text_width(item.tail:gsub("^%s+", ""), fontsize)
             end
@@ -4071,12 +4071,12 @@ function track_menu_geometry()
     local total = #m.items
     local visible = math.min(total, max_rows)
     local scrollable = total > max_rows
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Scrollbar air: rows end sb_gap before the bar, the bar sits sb_right
     -- from the right edge (mirrors the rows' left inset), and the first
     -- row clears the header separator by top_gap.
     local sb_w, sb_right, sb_gap, top_gap = 6, 3, 0, 6
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     local sb_reserve = scrollable and (sb_gap + sb_w + sb_right) or 0
     local menu_w = m.width + pad_x * 2 + sb_reserve
     local max_w = osc_param.playresx - 8
@@ -4113,7 +4113,7 @@ local function render_track_menu_one(ass, m, g, fade, dy, allow_hover)
     local mx, my = get_virt_mouse_pos()
     if not allow_hover then mx, my = -9999, -9999 end -- fading snapshot: no hover
     local gap = user_opts.track_flag_gap or 2
-    local row_r = math.max(0, user_opts.track_menu_radius or 5) -- >>> EDIT AlwaysBorderRadius <<< -- rounded rows/scrollbar
+    local row_r = math.max(0, user_opts.track_menu_radius or 5) -- >>> EDIT Desuka <<< -- rounded rows/scrollbar
     local bg_col = osc_color_convert(sanitize_hex_color(user_opts.track_menu_bg_color, "#141414"))
     local bg_op = tonumber(user_opts.track_menu_bg_opacity)
     if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
@@ -4186,7 +4186,7 @@ local function render_track_menu_one(ass, m, g, fade, dy, allow_hover)
             if item.head and asset then
                 local head = item.head:gsub("%s+$", "")
                 local head_w = text_width(head, g.fontsize)
-                local head_gap = (head_w > 0) and gap or 0 -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
+                local head_gap = (head_w > 0) and gap or 0 -- >>> EDIT Desuka <<< -- no leading gap when head is empty
                 if head_w + head_gap + flag_w > avail then
                     -- no room for the vector flag: fitted plain row instead
                     ass:new_event()
@@ -4249,7 +4249,7 @@ local function render_track_menu_one(ass, m, g, fade, dy, allow_hover)
     end
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Dropdown open/close animation (fade + rise on open, fade on close) and
 -- closing fade-out snapshot. Ticks are requested only while animating.
 function render_track_menu(ass)
@@ -4288,7 +4288,7 @@ function render_track_menu(ass)
     render_track_menu_one(ass, m, g, fade, dy, true)
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Release a stranded OSC press without firing it. The menu swallows the
 -- release (up) of gestures that started underneath it, so the element's
 -- reset (seekbar/volumebar drag state) would otherwise never run.
@@ -4306,7 +4306,7 @@ local function track_menu_drop_gesture()
     state.active_element = nil
     state.mouse_down_counter = 0
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 -- True while the cursor is over another track button, so it can toggle its
 -- own dropdown instead of being swallowed as an outside dismiss click.
@@ -4407,7 +4407,7 @@ mp.register_script_message("open-track-menu", function(tt)
     end
 end)
 mp.register_script_message("close-track-menu", function() close_track_menu() end)
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 function bind_keys(keys, name, func, opts)
     if not keys then
@@ -4678,10 +4678,10 @@ function show_description(text)
     state.descriptionBaseText = text
     text = "\\N" .. apply_link_highlight(text)
     state.message_text = text
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Plain descriptions carry no block rows.
     state.message_meta = nil
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     if not state.message_hide_timer then
         state.message_hide_timer = mp.add_timeout(0, request_tick)
@@ -4696,7 +4696,7 @@ function reset_desc_timer()
     state.message_hide_timer:resume()
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Pen metrics for the positioned block (row 1 lands where full-size implicit
 -- text does; show_message prepends an empty line). BLOCK_PITCH trades density
 -- for breathing room between rows.
@@ -4717,7 +4717,7 @@ local function message_row_width(row, fontsize, gap)
         local asset, flag_w = get_flag_geometry(row.flag_lang)
         if asset then
             local head_w = text_width(head, fontsize)
-            local w = head_w + flag_w + ((head_w > 0) and gap or 0) -- >>> EDIT AlwaysBorderRadius <<< -- no leading gap when head is empty
+            local w = head_w + flag_w + ((head_w > 0) and gap or 0) -- >>> EDIT Desuka <<< -- no leading gap when head is empty
             if tail and tail ~= "" then
                 w = w + gap + text_width(tail, fontsize)
             end
@@ -4813,7 +4813,7 @@ local function render_message_block(ass, meta, fontsize, outline)
         idx = last + 1
     end
 end
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 function render_message(ass)
     if state.message_hide_timer and state.message_hide_timer:is_enabled() and state.message_text then
@@ -4840,7 +4840,7 @@ function render_message(ass)
             ass:new_event()
         end
 
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- Positioned block first, at full size: columns absorb long lists,
         -- so track rows are never shrunk to fit.
         local meta = state.message_meta
@@ -4848,7 +4848,7 @@ function render_message(ass)
             render_message_block(ass, meta, fontsize, outline)
             return
         end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
 
         -- plain-text path keeps the legacy shrink for long messages
         -- (descriptions keep their unshrunk *0.85 size as before)
@@ -4865,12 +4865,12 @@ function render_message(ass)
             ass:pos(20, state.scrolledlines)
         end
     else
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- Clear the text/rows when the message timer ends.
         state.message_text = nil
         state.message_meta = nil
         if state.showingDescription then destroy_scrolling_keys() end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
     end
 end
 
@@ -5094,9 +5094,9 @@ layouts["original"] = function()
     new_element('seekbarbg', 'box')
     lo = add_layout('seekbarbg')
     if user_opts.seekbar_between_timers then
-        lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = user_opts.seekbar_height } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = user_opts.seekbar_height } -- >>> EDIT Desuka <<<
     else
-        lo.geometry = { x = refX, y = refY - 110, an = 5, w = osc_geo.w - 50, h = user_opts.seekbar_height } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = refX, y = refY - 110, an = 5, w = osc_geo.w - 50, h = user_opts.seekbar_height } -- >>> EDIT Desuka <<<
     end
     lo.layer = 13
     lo.style = osc_styles.seekbar_bg
@@ -5108,9 +5108,9 @@ layouts["original"] = function()
 
     lo = add_layout('seekbar')
     if user_opts.seekbar_between_timers then
-        lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = user_opts.progress_bar_height } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = user_opts.progress_bar_height } -- >>> EDIT Desuka <<<
     else
-        lo.geometry = { x = refX, y = refY - 110, an = 5, w = osc_geo.w - 50, h = user_opts.progress_bar_height } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = refX, y = refY - 110, an = 5, w = osc_geo.w - 50, h = user_opts.progress_bar_height } -- >>> EDIT Desuka <<<
     end
     lo.style = osc_styles.seekbar_fg
     lo.slider.gap = 7
@@ -5143,7 +5143,7 @@ layouts["original"] = function()
     local outeroffset = (chapter_skip_buttons and 0 or 100) + (jump_buttons and 0 or 100)
 
     -- Title
-    -- >>> EDIT AlwaysBorderRadius <<<
+    -- >>> EDIT Desuka <<<
     geo = {
         x = 25,
         y = refY - 127 +
@@ -5153,7 +5153,7 @@ layouts["original"] = function()
         w = osc_geo.w - 50,
         h = 35
     }
-    -- <<< EDIT AlwaysBorderRadius >>>
+    -- <<< EDIT Desuka >>>
     lo = add_layout("title")
     lo.geometry = geo
     lo.style = string.format("%s{\\clip(0,%f,%f,%f)}", osc_styles.title,
@@ -5163,7 +5163,7 @@ layouts["original"] = function()
 
     -- Description
     if (state.localDescription ~= nil or state.is_URL) and user_opts.show_description then
-        geo = { x = 25, y = refY - 127 + (user_opts.seekbar_between_timers and 25 or 0), an = 1, w = osc_geo.w - 50, h = 19 } -- >>> EDIT AlwaysBorderRadius <<<
+        geo = { x = 25, y = refY - 127 + (user_opts.seekbar_between_timers and 25 or 0), an = 1, w = osc_geo.w - 50, h = 19 } -- >>> EDIT Desuka <<<
         lo = add_layout("description")
         lo.geometry = geo
 
@@ -5179,13 +5179,13 @@ layouts["original"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<<
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<<
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -5243,7 +5243,7 @@ layouts["original"] = function()
 
     local show_hours = possec >= 3600 or user_opts.time_format ~= "dynamic"
     lo = add_layout("tc_left")
-    lo.geometry = { x = 25, y = refY - 94, an = 7, w = 35 + (state.tc_ms and 30 or 0) + (show_hours and 20 or 0), h = 20 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 25, y = refY - 94, an = 7, w = 35 + (state.tc_ms and 30 or 0) + (show_hours and 20 or 0), h = 20 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.time
 
     local show_remhours = (state.tc_right_rem and remsec >= 3600) or (not state.tc_right_rem and dur >= 3600) or
@@ -5251,7 +5251,7 @@ layouts["original"] = function()
     lo = add_layout("tc_right")
     lo.geometry = {
         x = osc_geo.w - 25,
-        y = refY - 94, -- >>> EDIT AlwaysBorderRadius <<<
+        y = refY - 94, -- >>> EDIT Desuka <<<
         an = 9,
         w = 35 + (state.tc_ms and 30 or 0) +
             (show_remhours and 25 or 0),
@@ -5262,11 +5262,11 @@ layouts["original"] = function()
     -- Chapter Title (next to timestamp)
     if user_opts.show_chapter_title then
         lo = add_layout("separator")
-        lo.geometry = { x = 72 + (state.tc_ms and 25 or 0) + (show_hours and 16 or 0), y = refY - 94, an = 7, w = 30, h = 20 } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = 72 + (state.tc_ms and 25 or 0) + (show_hours and 16 or 0), y = refY - 94, an = 7, w = 30, h = 20 } -- >>> EDIT Desuka <<<
         lo.style = osc_styles.time
 
         lo = add_layout("chapter_title")
-        -- >>> EDIT AlwaysBorderRadius <<<
+        -- >>> EDIT Desuka <<<
         lo.geometry = {
             x = 90 + (state.tc_ms and 25 or 0) + (show_hours and 16 or 0),
             y = refY - 94,
@@ -5275,30 +5275,30 @@ layouts["original"] = function()
                 .w - 200 - ((show_hours or state.tc_ms) and 60 or 0),
             h = 20
         }
-        -- <<< EDIT AlwaysBorderRadius >>>
+        -- <<< EDIT Desuka >>>
         lo.style = osc_styles.chapter_title
     end
 
     -- Video/Audio/Subtitle/Volume buttons
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     lo = add_layout('cy_video')
     lo.geometry = { x = 37, y = refY - 40, an = 5, w = 24, h = 24 }
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 500 - outeroffset)
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     lo = add_layout('cy_audio')
-    lo.geometry = { x = 82, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 82, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.control_3
-    lo.visible = (osc_param.playresx >= 550 - outeroffset) -- >>> EDIT AlwaysBorderRadius <<<
+    lo.visible = (osc_param.playresx >= 550 - outeroffset) -- >>> EDIT Desuka <<<
 
     lo = add_layout('cy_sub')
-    lo.geometry = { x = 127, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 127, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 600 - outeroffset)
 
     lo = add_layout('vol_ctrl')
-    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 700 - outeroffset)
 
@@ -5408,7 +5408,7 @@ layouts["reduced"] = function()
     -- Seekbar
     new_element('seekbarbg', 'box')
     lo = add_layout('seekbarbg')
-    lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = 2 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = 2 } -- >>> EDIT Desuka <<<
     lo.layer = 13
     lo.style = osc_styles.seekbar_bg
     lo.alpha[1] = 128
@@ -5418,7 +5418,7 @@ layouts["reduced"] = function()
     elements['seekbarbg'].visible = not (user_opts.show_chapter_markers and user_opts.chapter_marker_style == "gap")
 
     lo = add_layout('seekbar')
-    lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = 16 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = refX, y = refY - 85, an = 5, w = osc_geo.w - 200, h = 16 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.seekbar_fg
     lo.slider.gap = 7
     lo.slider.tooltip_style = osc_styles.tooltip
@@ -5449,7 +5449,7 @@ layouts["reduced"] = function()
     local outeroffset = (chapter_skip_buttons and 0 or 100) + (jump_buttons and 0 or 100)
 
     -- Title
-    geo = { x = 25, y = refY - 107, an = 1, w = osc_geo.w - 170, h = 35 } -- >>> EDIT AlwaysBorderRadius <<<
+    geo = { x = 25, y = refY - 107, an = 1, w = osc_geo.w - 170, h = 35 } -- >>> EDIT Desuka <<<
     lo = add_layout("title")
     lo.geometry = geo
     lo.style = string.format("%s{\\clip(0,%f,%f,%f)}", osc_styles.title,
@@ -5459,7 +5459,7 @@ layouts["reduced"] = function()
 
     -- Description
     if (state.localDescription ~= nil or state.is_URL) and user_opts.show_description then
-        geo = { x = osc_geo.w - 25, y = refY - 125, an = 9, w = 120, h = 19 } -- >>> EDIT AlwaysBorderRadius <<<
+        geo = { x = osc_geo.w - 25, y = refY - 125, an = 9, w = 120, h = 19 } -- >>> EDIT Desuka <<<
         lo = add_layout("description")
         lo.geometry = geo
         lo.style = string.format("%s{\\clip(0,%f,%f,%f)}", osc_styles.description,
@@ -5473,13 +5473,13 @@ layouts["reduced"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<<
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<<
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -5537,7 +5537,7 @@ layouts["reduced"] = function()
 
     local show_hours = possec >= 3600 or user_opts.time_format ~= "dynamic"
     lo = add_layout("tc_left")
-    lo.geometry = { x = 25, y = refY - 94, an = 7, w = 35 + (state.tc_ms and 30 or 0) + (show_hours and 20 or 0), h = 20 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 25, y = refY - 94, an = 7, w = 35 + (state.tc_ms and 30 or 0) + (show_hours and 20 or 0), h = 20 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.time
 
     local show_remhours = (state.tc_right_rem and remsec >= 3600) or (not state.tc_right_rem and dur >= 3600) or
@@ -5545,7 +5545,7 @@ layouts["reduced"] = function()
     lo = add_layout("tc_right")
     lo.geometry = {
         x = osc_geo.w - 25,
-        y = refY - 94, -- >>> EDIT AlwaysBorderRadius <<<
+        y = refY - 94, -- >>> EDIT Desuka <<<
         an = 9,
         w = 35 + (state.tc_ms and 30 or 0) +
             (show_remhours and 25 or 0),
@@ -5556,30 +5556,30 @@ layouts["reduced"] = function()
     -- Chapter Title (next to timestamp)
     if user_opts.show_chapter_title then
         lo = add_layout("chapter_title")
-        lo.geometry = { x = 25, y = refY - 135, an = 1, w = 120, h = 19 } -- >>> EDIT AlwaysBorderRadius <<<
+        lo.geometry = { x = 25, y = refY - 135, an = 1, w = 120, h = 19 } -- >>> EDIT Desuka <<<
         lo.style = osc_styles.chapter_title
     end
 
     -- Audio/Subtitle/Video/Volume buttons
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     lo = add_layout('cy_video')
     lo.geometry = { x = 37, y = refY - 40, an = 5, w = 24, h = 24 }
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 500 - outeroffset)
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     lo = add_layout('cy_audio')
-    lo.geometry = { x = 82, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 82, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.control_3
-    lo.visible = (osc_param.playresx >= 550 - outeroffset) -- >>> EDIT AlwaysBorderRadius <<<
+    lo.visible = (osc_param.playresx >= 550 - outeroffset) -- >>> EDIT Desuka <<<
 
     lo = add_layout('cy_sub')
-    lo.geometry = { x = 127, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 127, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 600 - outeroffset)
 
     lo = add_layout('vol_ctrl')
-    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT AlwaysBorderRadius <<<
+    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 700 - outeroffset)
 
@@ -5709,7 +5709,7 @@ function validate_user_opts()
     end
     -- colors are sanitized with fallback at paint time (see toast opts)
 
-    -- >>> CUSTOM desuka: toast opts <<<
+    -- >>> CUSTOM Desuka: toast opts <<<
     if type(user_opts.toast_enabled) ~= "boolean" then
         mp.msg.warn("toast_enabled must be boolean. Using true.")
         user_opts.toast_enabled = true
@@ -5849,7 +5849,7 @@ function validate_user_opts()
         mp.msg.warn("toast_bg_radius must be a non-negative number. Using 12.")
         user_opts.toast_bg_radius = 12
     end
-    -- <<< CUSTOM desuka >>>
+    -- <<< CUSTOM Desuka >>>
 end
 
 function update_options(_)
@@ -5914,9 +5914,9 @@ local function osc_init()
     ne.content = function()
         local title = state.forced_title or
             mp.command_native({ "expand-text", user_opts.title })
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         title = strip_file_extension(title) -- hide the title extension
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
         -- escape ASS, and strip newlines and trailing slashes
         title = title:gsub("\\n", " "):gsub("\\$", ""):gsub("{", "\\{")
         return not (title == "") and title or "mpv"
@@ -6112,7 +6112,7 @@ local function osc_init()
     --
     update_tracklist()
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- video tracks button
     ne = new_element('cy_video', 'button')
     ne.enabled = (#tracks_osc.video > 0)
@@ -6147,11 +6147,11 @@ local function osc_init()
         function()
             track_menu_cycle('video', -1)
         end
-    ne.eventresponder['wheel_up_press'] = -- >>> EDIT AlwaysBorderRadius <<< -- wheel parity with cy_audio/cy_sub
+    ne.eventresponder['wheel_up_press'] = -- >>> EDIT Desuka <<< -- wheel parity with cy_audio/cy_sub
         function()
             track_menu_cycle('video', 1)
         end
-    ne.eventresponder['wheel_down_press'] = -- >>> EDIT AlwaysBorderRadius <<< -- wheel parity with cy_audio/cy_sub
+    ne.eventresponder['wheel_down_press'] = -- >>> EDIT Desuka <<< -- wheel parity with cy_audio/cy_sub
         function()
             track_menu_cycle('video', -1)
         end
@@ -6163,9 +6163,9 @@ local function osc_init()
         function()
             toggle_track_menu('video')
         end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Audio track button (tooltip flag + shift/wheel bindings).
     -- audio
     ne = new_element('cy_audio', 'button')
@@ -6213,9 +6213,9 @@ local function osc_init()
         function() mp.commandv("script-binding", "select/select-aid") end
     ne.eventresponder['shift+mbtn_right_down'] =
         function() mp.commandv("script-binding", "loadaudiotracks/ask_for_audio_track") end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Subtitle track button (tooltip flag + shift/wheel bindings).
     -- subtitles
     ne = new_element('cy_sub', 'button')
@@ -6268,7 +6268,7 @@ local function osc_init()
         function()
             track_menu_cycle('sub', 1)
         end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     -- volume slider
     ne = new_element("vol_ctrl", "button")
@@ -6720,14 +6720,14 @@ local function osc_init()
         elseif state.buffering ~= nil and state.buffering then
             return "Buffering..." .. " " .. (mp.get_property("cache-buffering-state") or "0") .. "%"
         else
-            local chapter_index = mp.get_property_number("chapter", -1) -- >>> EDIT AlwaysBorderRadius <<< -- fresh per frame, no re-init needed
+            local chapter_index = mp.get_property_number("chapter", -1) -- >>> EDIT Desuka <<< -- fresh per frame, no re-init needed
             if user_opts.chapter_fmt ~= "no" and chapter_index >= 0 then
-                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- >>> CUSTOM Desuka <<<
                 -- No request_init() here: content() already re-reads the
                 -- chapter list every frame; asking for re-init from render
                 -- rebuilds the whole OSC on every tick (hot loop on
                 -- videos with chapters) and wipes in-flight clicks.
-                -- <<< CUSTOM AlwaysBorderRadius >>>
+                -- <<< CUSTOM Desuka >>>
                 local chapters = mp.get_property_native("chapter-list", {})
                 local chapter_title = (chapters[chapter_index + 1] and chapters[chapter_index + 1].title ~= "") and
                     chapters[chapter_index + 1].title
@@ -6789,10 +6789,10 @@ end
 
 function hide_osc()
     mp.msg.trace('hide_osc')
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Track dropdown never outlives the OSC.
     close_track_menu()
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     if not state.enabled then
         -- typically hide happens at render() from tick(), but now tick() is
         -- no-op and won't render again to remove the osc, so do that manually.
@@ -6807,7 +6807,7 @@ function hide_osc()
     else
         osc_visible(false)
     end
-    thumb_clear() -- >>> EDIT AlwaysBorderRadius <<< -- one-shot, flag-guarded
+    thumb_clear() -- >>> EDIT Desuka <<< -- one-shot, flag-guarded
 end
 
 function osc_visible(visible)
@@ -6891,13 +6891,13 @@ local function enable_osc(enable)
             mp.disable_key_bindings('showhide_wc')
         end
         state.showhide_enabled = false
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         if state.wc_enabled then -- no render() will run to sync it
             mp.disable_key_bindings('window-controls')
             state.wc_enabled = false
             set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
         end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
     end
 end
 
@@ -6905,7 +6905,7 @@ local function render()
     mp.msg.trace('rendering')
     local current_screen_sizeX, current_screen_sizeY, _ = mp.get_osd_size()
     local mouseX, mouseY = get_virt_mouse_pos()
-    virt_mouse_cache = { mouseX, mouseY } -- >>> EDIT AlwaysBorderRadius <<< -- freeze coords for this frame
+    virt_mouse_cache = { mouseX, mouseY } -- >>> EDIT Desuka <<< -- freeze coords for this frame
     local now = mp.get_time()
 
     -- check if display changed, if so request reinit
@@ -6978,7 +6978,7 @@ local function render()
 
     -- mouse input area
     local mouse_over_osc = false
-    local menu_hovered = false -- track dropdown hover (autohide guard) -- >>> EDIT AlwaysBorderRadius <<<
+    local menu_hovered = false -- track dropdown hover (autohide guard) -- >>> EDIT Desuka <<<
 
     for _, cords in ipairs(osc_param.areas['input']) do
         if state.osc_visible then -- activate only when OSC is actually visible
@@ -6998,29 +6998,29 @@ local function render()
         end
     end
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Nil/empty-safe area lookup; bindings toggle on transition only.
     local wc_areas = osc_param.areas['window-controls']
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     if wc_areas and wc_areas[1] then
         for _, cords in ipairs(wc_areas) do
             if state.osc_visible then -- activate only when OSC is actually visible
                 set_virt_mouse_area(cords.x1, cords.y1, cords.x2, cords.y2, 'window-controls')
-                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- >>> CUSTOM Desuka <<<
                 -- Toggle bindings on transition only, not 60x/s.
                 if not state.wc_enabled then
                     mp.enable_key_bindings('window-controls')
                     state.wc_enabled = true
                 end
-                -- <<< CUSTOM AlwaysBorderRadius >>>
+                -- <<< CUSTOM Desuka >>>
             else
-                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- >>> CUSTOM Desuka <<<
                 if state.wc_enabled then
                     mp.disable_key_bindings('window-controls')
                     state.wc_enabled = false
                     set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
                 end
-                -- <<< CUSTOM AlwaysBorderRadius >>>
+                -- <<< CUSTOM Desuka >>>
             end
 
             if (mouse_hit_coords(cords.x1, cords.y1, cords.x2, cords.y2) and user_opts.osc_keep_with_cursor) then
@@ -7028,28 +7028,28 @@ local function render()
             end
         end
     else
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- Area gone (osc_init while top bar off): don't leak bindings on.
         if state.wc_enabled then
             mp.disable_key_bindings('window-controls')
             state.wc_enabled = false
             set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
         end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
     end
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Track dropdown open: clicks anywhere (even on bare video) must reach
     -- the script so outside clicks dismiss it; see fullscreen area below.
     if state.track_menu and state.osc_visible then
         local mg = track_menu_geometry()
         if mg then
-            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- >>> CUSTOM Desuka <<<
             -- While the dropdown is open, every click must reach the script
             -- (the video area has no click binding of its own): fullscreen
             -- input area, the menu handler dismisses outside clicks itself.
             set_virt_mouse_area(0, 0, osc_param.playresx, osc_param.playresy, 'input')
-            -- <<< CUSTOM AlwaysBorderRadius >>>
+            -- <<< CUSTOM Desuka >>>
             if mouse_hit_coords(mg.x0, mg.y0, mg.x1, mg.y1) then
                 mouse_over_osc = true
                 menu_hovered = true
@@ -7058,31 +7058,31 @@ local function render()
             close_track_menu()
         end
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     -- autohide
     if not (state.showtime == nil) and (get_hide_timeout() >= 0) then
         local timeout = state.showtime + (get_hide_timeout() / 1000) - now
         if timeout <= 0 then
             if (state.active_element == nil) and (user_opts.bottom_hover) or (not mouse_over_osc) then
-                -- >>> CUSTOM AlwaysBorderRadius <<<
+                -- >>> CUSTOM Desuka <<<
                 if (not (state.paused and user_opts.keep_on_pause)) and not menu_hovered then
                     hide_osc()
                 end
-                -- <<< CUSTOM AlwaysBorderRadius >>>
+                -- <<< CUSTOM Desuka >>>
             else
             -- the timer is only used to recheck the state and to possibly run
             -- the code above again
             if not state.hide_timer then
                 state.hide_timer = mp.add_timeout(0, tick)
             end
-            -- >>> CUSTOM AlwaysBorderRadius <<<
+            -- >>> CUSTOM Desuka <<<
             -- Never re-arm sooner than 1/30: timeout<=0 here means
             -- "hide overdue but cursor still on OSC", and an immediate tick
             -- re-arms itself every render (hot loop that starved input
             -- draining -> 'Too many events queued'). Re-check at 30Hz.
             state.hide_timer.timeout = math.max(timeout, 1 / 30)
-            -- <<< CUSTOM AlwaysBorderRadius >>>
+            -- <<< CUSTOM Desuka >>>
             -- re-arm
             state.hide_timer:kill()
             state.hide_timer:resume()
@@ -7101,17 +7101,17 @@ local function render()
     -- actual OSC
     if state.osc_visible then
         render_elements(ass)
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- Track dropdown renders on top of the OSC elements.
         render_track_menu(ass)
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
     end
 
     if state.persistent_progresstoggle then
         render_persistent_progressbar(ass)
     end
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Temporary volume and seek bars
     -- Temporary volume bar (shown when the volume changes or on mute)
     if state.show_volume_time and mp.get_time() < state.show_volume_time then
@@ -7286,10 +7286,10 @@ local function render()
             ass:append("{\\fs20\\1c&HFFFFFF&\\bord1\\3c&H000000&}" .. seek_text)
         end
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     -- submit
-    virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- end of frame: drop frozen coords
+    virt_mouse_cache = nil -- >>> EDIT Desuka <<< -- end of frame: drop frozen coords
     set_osd(osc_param.playresy * osc_param.display_aspect, osc_param.playresy, ass.text)
 end
 
@@ -7302,7 +7302,7 @@ local function element_has_action(element, action)
         element.eventresponder[action]
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Adaptive input backpressure: count mouse moves; engage shedding as soon as
 -- the trip count is hit. A 5s timer (below) rolls the window and releases on
 -- quiet windows with hysteresis. Shed moves never update last_mouse*, so slow
@@ -7312,14 +7312,14 @@ local flood_shedding = false
 local FLOOD_TRIP_COUNT = 750 -- engage above this many moves/window
 local FLOOD_RELEASE_COUNT = 500 -- disengage below this many moves/window
 local FLOOD_MIN_MOVE = 3 -- px: smaller moves are shed while engaged
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Loop-health report at warn level (visible without debug spam):
 -- input events per 5s window + slowest tick in the window.
 local watch_events = 0
-local watch_mouse = 0 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health mouse share
-local watch_ticks = 0 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health tick count
+local watch_mouse = 0 -- >>> EDIT Desuka <<< -- loop-health mouse share
+local watch_ticks = 0 -- >>> EDIT Desuka <<< -- loop-health tick count
 local watch_max_tick = 0
 local function watch_report()
     if watch_max_tick > 0.25 or watch_events > 750 then
@@ -7343,9 +7343,9 @@ local storm_active = false
 local storm_limit = 240
 -- Independent reporter: if ticks themselves stall, the in-tick report would
 -- never fire, so report on a separate timer to tell flood from dead loop.
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Single 5s cadence shared by the flood window and the loop-health report
 -- above, so both always cover the same window.
 mp.add_periodic_timer(5, function()
@@ -7355,25 +7355,25 @@ mp.add_periodic_timer(5, function()
     flood_moves = 0
     watch_report()
 end)
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 
 function process_event(source, what)
-    virt_mouse_cache = nil -- >>> EDIT AlwaysBorderRadius <<< -- input always reads live coords
-    watch_events = watch_events + 1 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health input rate
-    if source == 'mouse_move' then -- >>> EDIT AlwaysBorderRadius <<< -- arrival rate (pre-shed): what fills the queue
+    virt_mouse_cache = nil -- >>> EDIT Desuka <<< -- input always reads live coords
+    watch_events = watch_events + 1 -- >>> EDIT Desuka <<< -- loop-health input rate
+    if source == 'mouse_move' then -- >>> EDIT Desuka <<< -- arrival rate (pre-shed): what fills the queue
         flood_moves = flood_moves + 1
-        watch_mouse = watch_mouse + 1 -- >>> EDIT AlwaysBorderRadius <<< -- loop-health
+        watch_mouse = watch_mouse + 1 -- >>> EDIT Desuka <<< -- loop-health
         if flood_moves > FLOOD_TRIP_COUNT and not flood_shedding then
             flood_shedding = true
         end
     end
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Track dropdown gets first pick of mouse events while open.
     if state.track_menu and track_menu_handle_event(source, what) then
         request_tick()
         return
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
     local action = string.format('%s%s', source,
         what and ('_' .. what) or '')
 
@@ -7418,7 +7418,7 @@ function process_event(source, what)
 
         local mouseX, mouseY = get_virt_mouse_pos()
 
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- Adaptive shed (engaged above): drop sub-threshold moves only when
         -- idle (no drag) and menu closed. Never consumes the movement budget.
         if flood_shedding and state.active_element == nil and not state.track_menu then
@@ -7428,7 +7428,7 @@ function process_event(source, what)
                 return -- shed: no show_osc, no drag handling, no tick
             end
         end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
 
         if (user_opts.min_mouse_move == 0) or
             (not ((state.last_mouseX == nil) or (state.last_mouseY == nil)) and
@@ -7463,8 +7463,8 @@ end
 -- called by mpv on every frame
 function tick()
     if not state.enabled then return end
-    watch_ticks = watch_ticks + 1 -- >>> EDIT AlwaysBorderRadius <<< -- storm-breaker tick count
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    watch_ticks = watch_ticks + 1 -- >>> EDIT Desuka <<< -- storm-breaker tick count
+    -- >>> CUSTOM Desuka <<<
     -- Circuit breaker: shed renders above the storm limit so the loop can
     -- drain input. The limit scales with the display rate (legit ticks/s
     -- ~= display-fps; a storm is orders of magnitude above that).
@@ -7492,18 +7492,18 @@ function tick()
         state.tick_last_time = storm_now
         return
     end
-    -- <<< CUSTOM AlwaysBorderRadius >>>
-    local wt0 = mp.get_time() -- >>> EDIT AlwaysBorderRadius <<< -- loop-health tick duration
+    -- <<< CUSTOM Desuka >>>
+    local wt0 = mp.get_time() -- >>> EDIT Desuka <<< -- loop-health tick duration
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         thumb_clear() -- no stuck thumbnail into idle
         if state.wc_enabled then -- idle never reaches render() to sync it
             mp.disable_key_bindings('window-controls')
             state.wc_enabled = false
             set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
         end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
         -- render idle message
         mp.msg.trace('idle message')
         local _, _, display_aspect = mp.get_osd_size()
@@ -7553,17 +7553,17 @@ function tick()
         render()
     else
         -- Flush OSD
-        thumb_clear() -- >>> EDIT AlwaysBorderRadius <<< -- no stuck thumbnail when OSC off
+        thumb_clear() -- >>> EDIT Desuka <<< -- no stuck thumbnail when OSC off
         render_wipe()
     end
 
     state.tick_last_time = mp.get_time()
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     local wdt = mp.get_time() - wt0
     if wdt > watch_max_tick then watch_max_tick = wdt end
     -- reporting runs on its own timer, so a dead tick loop still shows up
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     if state.anitype ~= nil then
         -- state.anistart can be nil - animation should now start, or it can
@@ -7583,12 +7583,12 @@ end
 mp.register_event('start-file', newfilereset)
 mp.register_event("file-loaded", startupevents)
 mp.observe_property('track-list', nil, request_init)
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Keep the open dropdown in sync with external track changes.
 mp.observe_property('track-list', nil, function()
     if state.track_menu then track_menu_refresh() end
 end)
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 mp.observe_property('playlist', nil, request_init)
 mp.observe_property("chapter-list", "native", function(_, list) -- chapter list changes
     list = list or {}                                           -- safety, shouldn't return nil
@@ -7636,23 +7636,23 @@ if user_opts.key_bindings then
     end);
 
     -- extra key bindings
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Cycle audio tracks key binding.
     mp.add_key_binding("z", "cycleaudiotracks", function()
         track_menu_cycle("audio", 1)
     end);
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     mp.add_key_binding("Z", "selectaudiotrack", function()
         mp.commandv("script-binding", "select/select-aid")
     end);
 
-    -- >>> CUSTOM AlwaysBorderRadius <<<
+    -- >>> CUSTOM Desuka <<<
     -- Cycle captions key binding.
     mp.add_key_binding("c", "cyclecaptions", function()
         track_menu_cycle("sub", 1)
     end);
-    -- <<< CUSTOM AlwaysBorderRadius >>>
+    -- <<< CUSTOM Desuka >>>
 
     mp.add_key_binding("C", "selectsubtitletrack", function()
         mp.commandv("script-binding", "select/select-sid")
@@ -7797,7 +7797,7 @@ mp.set_key_bindings({
         function(_) process_event("shift+mbtn_left", "down") end },
     { "wheel_up",            function(_) process_event("wheel_up", "press") end },
     { "wheel_down",          function(_) process_event("wheel_down", "press") end },
-    { "mbtn_left_dbl", function(_) -- >>> EDIT AlwaysBorderRadius <<< -- mpv.net reports fast double presses as dbl-only (constituents swallowed): act as one click
+    { "mbtn_left_dbl", function(_) -- >>> EDIT Desuka <<< -- mpv.net reports fast double presses as dbl-only (constituents swallowed): act as one click
             process_event("mbtn_left", "down")
             process_event("mbtn_left", "up")
         end },
@@ -7829,8 +7829,8 @@ function visibility_mode(mode)
     mp.disable_key_bindings("input")
     mp.disable_key_bindings("window-controls")
     state.input_enabled = false
-    state.wc_enabled = false -- >>> EDIT AlwaysBorderRadius <<< -- keep transition guard in sync
-    set_virt_mouse_area(0, 0, 0, 0, "window-controls") -- >>> EDIT AlwaysBorderRadius <<< -- no render() in never mode
+    state.wc_enabled = false -- >>> EDIT Desuka <<< -- keep transition guard in sync
+    set_virt_mouse_area(0, 0, 0, 0, "window-controls") -- >>> EDIT Desuka <<< -- no render() in never mode
     request_tick()
 end
 
@@ -7839,7 +7839,7 @@ mp.register_script_message("thumbfast-info", function(json)
     if type(data) ~= "table" or not data.width or not data.height then
         mp.msg.error("thumbfast-info: received json didn't produce a table with thumbnail information")
     else
-        -- >>> CUSTOM AlwaysBorderRadius <<<
+        -- >>> CUSTOM Desuka <<<
         -- Whitelist merge, don't replace: foreign senders may omit
         -- available/disabled, and nils would desync show/clear.
         local w, h = tonumber(data.width), tonumber(data.height)
@@ -7853,13 +7853,13 @@ mp.register_script_message("thumbfast-info", function(json)
         if thumbfast.available == nil then thumbfast.available = true end
         thumbfast.disabled = data.disabled
         if thumbfast.disabled == nil then thumbfast.disabled = false end
-        -- <<< CUSTOM AlwaysBorderRadius >>>
+        -- <<< CUSTOM Desuka >>>
     end
 end)
 
 mp.register_script_message("sponsorblock-done", make_sponsorblock_segments)
 
--- >>> CUSTOM desuka: unified toast inbox (all scripts -> modernx) <<<
+-- >>> CUSTOM Desuka: unified toast inbox (all scripts -> modernx) <<<
 -- Usage from Lua: mp.commandv("script-message-to","modernx","modernx-toast","info","my-source","text","2500")
 --   1 arg: text (info) | 2 args: kind + text | 3 args: kind + source + text | 4 args: + duration_ms
 -- Usage from input.conf: script-message-to modernx modernx-toast info "text here"
@@ -7885,13 +7885,13 @@ end)
 mp.register_script_message("modernx-toast-clear", function(source)
     clear_toast(source, source == nil or source == "")
 end)
--- <<< CUSTOM desuka >>>
+-- <<< CUSTOM Desuka >>>
 
 set_virt_mouse_area(0, 0, 0, 0, 'input')
 set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
 mp.set_property("title", "mpv")
 
--- >>> CUSTOM AlwaysBorderRadius <<<
+-- >>> CUSTOM Desuka <<<
 -- Force the bars to disappear even if playback-time stops emitting changes
 -- (pause, buffering, eof), scheduling a render that clears the OSD.
 local function volume_bar_expire()
@@ -7993,4 +7993,4 @@ mp.observe_property("playback-time", "number", function(name, val)
     end  -- no else: keep the previous delta during the display time
     state.previous_time = val
 end)
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>

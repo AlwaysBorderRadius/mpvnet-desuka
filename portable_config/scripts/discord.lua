@@ -56,11 +56,11 @@ mp.set_property("input-ipc-server", socket_path)
 
 local cmd = nil
 
--- >>> CUSTOM desuka: route through modernx toast (single slot, preemptive) <<<
+-- >>> CUSTOM Desuka: route through modernx toast (single slot, preemptive) <<<
 local function notify(kind, text)
     mp.commandv("script-message-to", "modernx", "modernx-toast", kind, "discord", text)
 end
--- <<< CUSTOM desuka >>>
+-- <<< CUSTOM Desuka >>>
 
 local function start()
 	if cmd == nil then
@@ -89,9 +89,9 @@ if options.active then
 	mp.register_event("file-loaded", start)
 end
 
--- >>> CUSTOM AlwaysBorderRadius <<< -- key owned by input.conf (d), keep unbound
+-- >>> CUSTOM Desuka <<< -- key owned by input.conf (d), keep unbound
 mp.add_key_binding(nil, "toggle-discord", function()
--- <<< CUSTOM AlwaysBorderRadius >>>
+-- <<< CUSTOM Desuka >>>
 	if cmd ~= nil then
 		stop()
 	else
