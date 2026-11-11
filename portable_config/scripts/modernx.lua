@@ -4454,12 +4454,41 @@ mp.register_script_message("close-track-menu", function() close_track_menu() end
 -- hints may differ from effective binds when keys were rebound without
 -- updating #menu: (same as native); dynamic submenus (Recent/Titles/
 -- Chapters/Track/Profile) are skipped, separators collapsed.
-function adv_menu_load_items()
-    local items, seen = {}, {}
+function adv_menu_tree()
+    -- node: { name, kids = {}, index = {}, order = {} }
+    -- order entries: { kind = "group", node } | { kind = "leaf", label, cmd } | { kind = "sep" }
+    local root = { name = nil, kids = {}, index = {}, order = {} }
+    local function node_for(parent, name)
+        local n = parent.index[name]
+        if not n then
+            n = { name = name, kids = {}, index = {}, order = {} }
+            parent.index[name] = n
+            parent.order[#parent.order + 1] = { kind = "group", node = n }
+        end
+        return n
+    end
+    local function split_path(menupath)
+        local segs, pos = {}, 1
+        while true do
+            local a, b = menupath:find(">", pos, true)
+            if not a then
+                segs[#segs + 1] = menupath:sub(pos):match("^%s*(.-)%s*$")
+                break
+            end
+            segs[#segs + 1] = menupath:sub(pos, a - 1):match("^%s*(.-)%s*$")
+            pos = b + 1
+        end
+        -- drop empty segments from malformed "A >> B" paths
+        local clean = {}
+        for _, s in ipairs(segs) do
+            if s ~= "" then clean[#clean + 1] = s end
+        end
+        return clean
+    end
     local ok, path = pcall(mp.command_native, { "expand-path", "~~/input.conf" })
-    if not ok or type(path) ~= "string" or path == "" then return items end
+    if not ok or type(path) ~= "string" or path == "" then return root end
     local f = io.open(path, "r")
-    if not f then return items end
+    if not f then return root end
     for line in f:lines() do
         local s = line:match("^%s*(.-)%s*$")
         if s ~= "" and s:sub(1, 1) ~= "#" then
@@ -4471,38 +4500,86 @@ function adv_menu_load_items()
                 if mi then
                     local cmd = rest:sub(1, mi - 1):match("^%s*(.-)%s*$")
                     local menupath = rest:sub(mi + 6):match("^%s*(.-)%s*$")
-                    local leaf = menupath:match(">%s*([^>]-)%s*$") or menupath
-                    if leaf == "-" then
-                        -- separator, positional; collapse runs and trim edges
-                        if #items > 0 and not items[#items].sep then
-                            items[#items + 1] = { sep = true }
+                    local segs = split_path(menupath)
+                    if #segs == 0 then segs = nil end -- malformed empty path: skip row
+                    if segs then
+                        local parent = root
+                        for i = 1, #segs - 1 do parent = node_for(parent, segs[i]) end
+                        local leaf = segs[#segs]
+                        if leaf == "-" then
+                            parent.order[#parent.order + 1] = { kind = "sep" }
+                        elseif cmd ~= "" and cmd ~= "ignore" then
+                            local label = segs[#segs]
+                            if key ~= "_" then label = label .. "   [" .. key .. "]" end
+                            -- later #menu: entries win (like mpv bindings)
+                            local at = parent.index["_leaf:" .. leaf]
+                            if at == nil then
+                                at = #parent.order + 1
+                                parent.order[at] = { kind = "leaf" }
+                                parent.index["_leaf:" .. leaf] = at
+                            end
+                            parent.order[at].label = label
+                            parent.order[at].cmd = cmd
                         end
-                    elseif cmd ~= "" and cmd ~= "ignore" then
-                        local label = menupath
-                        if key ~= "_" then label = label .. "   [" .. key .. "]" end
-                        if seen[menupath] then
-                            items[seen[menupath]] = { label = label, cmd = cmd }
-                        else
-                            seen[menupath] = #items + 1
-                            items[#items + 1] = { label = label, cmd = cmd }
-                        end
+                        -- ignore-rows (dynamic submenu spacers): skipped
                     end
-                    -- ignore-rows (dynamic submenu spacers): skipped
                 end
             end
         end
     end
     f:close()
-    while #items > 0 and items[#items].sep do items[#items] = nil end -- trim trailing dividers
-    return items
+    -- prune groups with no actionable descendant
+    local function has_action(n)
+        for _, e in ipairs(n.order) do
+            if e.kind == "leaf" then return true end
+            if e.kind == "group" and has_action(e.node) then return true end
+        end
+        return false
+    end
+    local function prune(n)
+        local kept = {}
+        for _, e in ipairs(n.order) do
+            if e.kind == "group" then
+                prune(e.node)
+                if has_action(e.node) then kept[#kept + 1] = e end
+            else
+                kept[#kept + 1] = e
+            end
+        end
+        n.order = kept
+    end
+    prune(root)
+    return root
 end
 
 -- Script-global (not a chunk local): the main chunk is at Lua 5.1's
 -- 200-locals limit, like menu_button_hitbox() and track_menu_*().
-function adv_menu_build()
-    local items = adv_menu_load_items()
+function adv_menu_level(node, parent_name, header)
+    local raw = {}
+    if parent_name then raw[#raw + 1] = { back = true, label = "‹ " .. parent_name } end
+    for _, e in ipairs(node.order) do
+        if e.kind == "sep" then
+            raw[#raw + 1] = { sep = true }
+        elseif e.kind == "leaf" then
+            raw[#raw + 1] = { label = e.label, cmd = e.cmd }
+        else
+            raw[#raw + 1] = { group = e.node, label = e.node.name .. "  ›" }
+        end
+    end
+    -- collapse separator runs, trim leading/trailing (never the back row)
+    local items = {}
+    for _, it in ipairs(raw) do
+        if it.sep then
+            if #items > 0 and not items[#items].sep and not items[#items].back then
+                items[#items + 1] = it
+            end
+        else
+            items[#items + 1] = it
+        end
+    end
+    while #items > 0 and items[#items].sep do items[#items] = nil end
     local fontsize = user_opts.track_menu_font_size or 18
-    local width = text_width(texts.menu or "Menu", fontsize)
+    local width = text_width(header or texts.menu or "Menu", fontsize)
     for _, item in ipairs(items) do
         if not item.sep then
             width = math.max(width, text_width(item.label, fontsize))
@@ -4511,19 +4588,31 @@ function adv_menu_build()
     return items, width
 end
 
-function open_adv_menu()
-    close_track_menu()
-    local items, width = adv_menu_build()
-    if #items == 0 then -- input.conf missing/unreadable: say so instead of looking dead
+function adv_menu_show(node, header, parent, trail, offset)
+    local items, width = adv_menu_level(node, parent, header)
+    if #items == 0 or (#items == 1 and items[1].back) then -- degenerate level: keep current menu
         show_toast(texts.na or "Not available", "warn", "modernx-menu")
-        return
+        return false
     end
-    state.adv_menu = { header = texts.menu or "Menu", items = items, width = width, offset = 0, pressed = nil, born = mp.get_time() }
+    state.adv_menu = { header = header, items = items, width = width, offset = offset or 0,
+        pressed = nil, born = mp.get_time(), node = node, parent = parent, trail = trail or {} }
     state.adv_menu_fading = nil -- a fresh open replaces any closing fade
     reset_timeout()
     show_osc()
-    mp.add_forced_key_binding("ESC", "modernx-adv-menu-close", close_adv_menu)
     request_tick()
+    return true
+end
+
+function open_adv_menu()
+    close_track_menu()
+    local tree = adv_menu_tree()
+    if #tree.order == 0 then -- input.conf missing/unreadable: say so instead of looking dead
+        show_toast(texts.na or "Not available", "warn", "modernx-menu")
+        return
+    end
+    if adv_menu_show(tree, texts.menu or "Menu", nil, {}) then
+        mp.add_forced_key_binding("ESC", "modernx-adv-menu-close", close_adv_menu)
+    end
 end
 
 function close_adv_menu()
@@ -4643,11 +4732,32 @@ function adv_menu_on_toggle_button(mx, my)
     return false
 end
 
+function adv_menu_drill(node)
+    local m = state.adv_menu
+    if not m or not node then return end
+    local trail = m.trail
+    trail[#trail + 1] = { node = m.node, header = m.header, parent = m.parent, offset = m.offset }
+    local pname = (m.node and m.node.name) or m.header -- short label for the back row
+    adv_menu_show(node, m.header .. " › " .. node.name, pname, trail)
+end
+
+function adv_menu_back()
+    local m = state.adv_menu
+    if not m or #m.trail == 0 then return end
+    local e = m.trail[#m.trail]
+    m.trail[#m.trail] = nil
+    adv_menu_show(e.node, e.header, e.parent, m.trail, e.offset)
+end
+
 function adv_menu_run(item)
+    if not item then return end
+    if item.back then adv_menu_back() return end
+    if item.group then adv_menu_drill(item.group) return end
+    local cmd = item.cmd
     close_adv_menu()
-    if not item or not item.cmd then return end
+    if not cmd or cmd == "" then return end
     -- input.conf grammar (quotes, ; chains): same parser as keybinds
-    local ok, err = pcall(mp.command, item.cmd)
+    local ok, err = pcall(mp.command, cmd)
     if not ok then
         show_toast(tostring(err or "failed"), "warn", "modernx-menu")
     end
@@ -4698,11 +4808,8 @@ function adv_menu_handle_event(source, what)
                 return true
             end
             -- outside: let toggle buttons switch instead of swallowing
-            if adv_menu_on_toggle_button(mx, my) then
-                adv_menu_drop_gesture()
-                close_adv_menu()
-                return false
-            end
+            -- (their own responder toggles, which closes this menu)
+            if adv_menu_on_toggle_button(mx, my) then return false end
             adv_menu_drop_gesture()
             close_adv_menu()
             return true
@@ -4724,11 +4831,9 @@ function adv_menu_handle_event(source, what)
                 adv_menu_drop_gesture()
                 return true
             end
-            if adv_menu_on_toggle_button(mx, my) then
-                adv_menu_drop_gesture()
-                close_adv_menu()
-                return false
-            end
+            -- outside: let toggle buttons switch instead of swallowing
+            -- (their own responder toggles, which closes this menu)
+            if adv_menu_on_toggle_button(mx, my) then return false end
             adv_menu_drop_gesture()
             close_adv_menu()
             return true
@@ -4771,7 +4876,7 @@ function render_adv_menu_one(ass, m, g, fade, dy, allow_hover)
     ass:pos(g.x0 + g.pad_x, g.y0 + dy + g.pad_y + g.header_h / 2)
     ass:an(4)
     ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "\\alpha&H" .. fa .. "&}")
-    ass:append(m.header)
+    ass:append(track_menu_fit(m.header, g.x1 - g.x0 - g.pad_x * 2, g.fontsize)) -- breadcrumbs can outgrow short levels
     ass:new_event()
     ass:pos(0, 0)
     ass:an(7)
