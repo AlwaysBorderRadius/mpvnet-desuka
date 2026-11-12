@@ -21,8 +21,27 @@ options.read_options(o, "update-checker")
 
 -- >>> CUSTOM Desuka <<<
 -- UI language comes from modernx.conf (single source).
-local mo = { language = "en" }
-options.read_options(mo, "modernx")
+-- Manual parse: read_options would warn on every undeclared key.
+local function read_modernx_language()
+    local path = mp.find_config_file("script-opts/modernx.conf")
+    if path == nil then
+        local dir = mp.get_script_directory()
+        if dir == nil or dir == "" then return "en" end
+        path = utils.join_path(dir, "../script-opts/modernx.conf")
+    end
+    local f = io.open(path, "r")
+    if f == nil then return "en" end
+    local content = f:read("*a")
+    f:close()
+    if content == nil then return "en" end
+    local lang = "en"
+    for line in content:gmatch("[^\r\n]+") do
+        local v = line:match("^%s*language%s*=%s*(%S+)")
+        if v ~= nil then lang = v:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1") end
+    end
+    return lang
+end
+local mo = { language = read_modernx_language() }
 
 -- Bilingual toast strings, keep en/es keys in sync.
 local STRINGS = {
