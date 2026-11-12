@@ -19,6 +19,36 @@ local o = {
 }
 options.read_options(o, "update-checker")
 
+-- >>> CUSTOM Desuka <<<
+-- UI language comes from modernx.conf (single source).
+local mo = { language = "en" }
+options.read_options(mo, "modernx")
+
+-- Bilingual toast strings, keep en/es keys in sync.
+local STRINGS = {
+    en = {
+        no_network = "Could not check for updates (no network or no curl).",
+        update_available = "New update available: %s (current: %s)",
+        up_to_date = "You already have the latest version (%s).",
+        local_newer = "Local version (%s) is newer than published (%s).",
+    },
+    es = {
+        no_network = "No se pudo comprobar la actualización (sin red o sin curl).",
+        update_available = "Nueva actualización disponible: %s (actual: %s)",
+        up_to_date = "Ya tienes la última versión (%s).",
+        local_newer = "Versión local (%s) más reciente que la publicada (%s).",
+    },
+}
+
+local function t(key, a, b)
+    local lang_table = STRINGS[mo.language] or STRINGS["en"]
+    local fmt = lang_table[key] or STRINGS["en"][key] or ""
+    if a == nil then return fmt end
+    if b == nil then return string.format(fmt, a) end
+    return string.format(fmt, a, b)
+end
+-- <<< CUSTOM Desuka >>>
+
 -- Clamp user opts to safe defaults.
 local function validate_user_opts()
     if type(o.check_on_startup) ~= "boolean" then
@@ -70,6 +100,10 @@ local function validate_user_opts()
     if o.curl_connect_timeout > o.curl_max_time then
         msg.warn("update-checker: connect timeout above max time, clamping")
         o.curl_connect_timeout = o.curl_max_time
+    end
+    if mo.language ~= "en" and mo.language ~= "es" then -- >>> EDIT Desuka <<<
+        msg.warn("update-checker: bad language, using en")
+        mo.language = "en"
     end
 end
 validate_user_opts()
@@ -195,7 +229,7 @@ local function check_for_update(manual)
             if manual then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "error", "update-checker",
-                    "No se pudo comprobar la actualización (sin red o sin curl).",
+                    t("no_network"), -- >>> EDIT Desuka <<<
                     "6000")
             end
             return
@@ -207,7 +241,7 @@ local function check_for_update(manual)
             -- Important toast, preempts any toast (no queue).
             mp.commandv("script-message-to", "modernx", "modernx-toast",
                 "warn", "update-checker",
-                "Nueva actualización disponible: " .. latest .. " (actual: " .. o.current_version .. ")",
+                t("update_available", latest, o.current_version), -- >>> EDIT Desuka <<<
                 "6000")
             msg.info("update-checker: new version " .. latest .. " (current " .. o.current_version .. ")")
         elseif cmp == 0 then
@@ -215,7 +249,7 @@ local function check_for_update(manual)
             if manual or o.notify_up_to_date then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "info", "update-checker",
-                    "Ya tienes la última versión (" .. o.current_version .. ").",
+                    t("up_to_date", o.current_version), -- >>> EDIT Desuka <<<
                     "4000")
             end
         else
@@ -223,7 +257,7 @@ local function check_for_update(manual)
             if manual then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "info", "update-checker",
-                    "Versión local (" .. o.current_version .. ") más reciente que la publicada (" .. latest .. ").",
+                    t("local_newer", o.current_version, latest), -- >>> EDIT Desuka <<<
                     "4000")
             end
         end
