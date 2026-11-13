@@ -38,3 +38,6 @@ portable_config/input-animejanai.conf
 !AGENTS.md
 !.docs/
 !.docs/**
+
+# Opt-in local del dueño (nunca commitear): check de updates AJN
+portable_config/script-opts/animejanai_update.conf

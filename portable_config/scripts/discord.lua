@@ -80,7 +80,10 @@ local function notify(kind, text)
 end
 -- <<< CUSTOM Desuka >>>
 
-local function start()
+-- >>> CUSTOM Desuka: silent autostart, toast only on manual toggle <<<
+local enabled = options.active
+
+local function start(silent)
 	if cmd == nil then
 		cmd = mp.command_native_async({
 			name = "subprocess",
@@ -92,9 +95,12 @@ local function start()
 			},
 		}, function() end)
 		msg.info("launched subprocess")
-		notify("info", "Discord Rich Presence: Started")
+		if not silent then
+			notify("info", "Discord Rich Presence: Started")
+		end
 	end
 end
+-- <<< CUSTOM Desuka >>>
 
 function stop()
 	mp.abort_async_command(cmd)
@@ -103,19 +109,22 @@ function stop()
 	notify("info", "Discord Rich Presence: Stopped")
 end
 
-if options.active then
-	mp.register_event("file-loaded", start)
-end
-
 -- >>> CUSTOM Desuka <<< -- key owned by input.conf (d), keep unbound
+-- d stays off for the session: file-loaded only auto-starts while enabled
+mp.register_event("file-loaded", function()
+	if enabled then start(true) end
+end)
+
 mp.add_key_binding(nil, "toggle-discord", function()
--- <<< CUSTOM Desuka >>>
 	if cmd ~= nil then
 		stop()
+		enabled = false
 	else
+		enabled = true
 		start()
 	end
 end)
+-- <<< CUSTOM Desuka >>>
 
 mp.register_event("shutdown", function()
 	if cmd ~= nil then
@@ -141,8 +150,9 @@ if options.autohide_threshold > 0 then
 				timer:kill()
 				timer = nil
 			end
-			if options.active and cmd == nil then
-				start()
+			-- EDIT Desuka: respect session toggle, silent resume
+			if enabled and cmd == nil then
+				start(true)
 			end
 		end
 	end)

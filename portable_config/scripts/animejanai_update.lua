@@ -11,6 +11,15 @@ local exe_name = mp.get_property("platform") == "windows" and "AnimeJaNaiUpdater
 local updater = mp.command_native({ "expand-path", "~~/../" .. exe_name })
 local available_version = nil
 
+-- >>> CUSTOM Desuka: AJN update check opt-in (default off) <<<
+-- Desuka releases set the pace: the automatic check only runs when
+-- script-opts/animejanai_update.conf exists with desuka_check_updates=yes
+-- (owner-local file, git-ignored). Ctrl+U with no prior check warns
+-- instead of lying "up to date".
+local check_opts = { desuka_check_updates = false }
+require("mp.options").read_options(check_opts, "animejanai_update")
+-- <<< CUSTOM Desuka >>>
+
 -- Inside an AppImage the install tree is a read-only squashfs, so the in-place
 -- updater can't apply. AppRun sets ANIMEJANAI_APPIMAGE (APPIMAGE is set by the
 -- runtime too); in that case we point the user at the new AppImage instead.
@@ -20,8 +29,11 @@ local releases_url = "github.com/the-database/mpv-upscale-2x_animejanai/releases
 local function start_update()
     if not available_version then
         -- >>> CUSTOM Desuka: toast instead of OSD <<<
+        local text = check_opts.desuka_check_updates
+            and "AnimeJaNai is up to date."
+            or "Desuka: AJN update check desactivado en este build."
         mp.commandv("script-message-to", "modernx", "modernx-toast",
-            "info", "animejanai", "AnimeJaNai is up to date.", 3000)
+            "info", "animejanai", text, 3000)
         -- <<< CUSTOM Desuka >>>
         return
     end
@@ -60,7 +72,7 @@ local function on_check(success, result)
         local how = is_appimage and "press Ctrl+U for the download link."
                                  or "press Ctrl+U to install."
         -- >>> CUSTOM Desuka: toast instead of OSD <<<
-        mp.commandv("script-message-to", "modernx", "modernx-toast", "info", "animejanai",
+        mp.commandv("script-message-to", "modernx", "modernx-toast", "warn", "animejanai",
             "AnimeJaNai update " .. ver .. " available - " .. how, 8000)
         -- <<< CUSTOM Desuka >>>
     else
@@ -68,9 +80,13 @@ local function on_check(success, result)
     end
 end
 
-mp.command_native_async({
-    name = "subprocess",
-    args = { updater, "--check" },
-    capture_stdout = true,
-    playback_only = false,
-}, on_check)
+-- >>> CUSTOM Desuka: no check unless opted in (see above) <<<
+if check_opts.desuka_check_updates then
+    mp.command_native_async({
+        name = "subprocess",
+        args = { updater, "--check" },
+        capture_stdout = true,
+        playback_only = false,
+    }, on_check)
+end
+-- <<< CUSTOM Desuka >>>
