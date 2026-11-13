@@ -150,8 +150,7 @@ if options.autohide_threshold > 0 then
 				timer:kill()
 				timer = nil
 			end
-			-- EDIT Desuka: respect session toggle, silent resume
-			if enabled and cmd == nil then
+			if enabled and cmd == nil then -- >>> EDIT Desuka <<< -- respect session toggle, silent resume
 				start(true)
 			end
 		end

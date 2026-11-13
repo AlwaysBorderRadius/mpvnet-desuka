@@ -29,9 +29,11 @@ opciones, keybinds) + tooling en `.tools/`.
 
 ## Convenciones
 
-- Cambios propios delimitados con `CUSTOM Desuka` (bloques) y
-  `EDIT Desuka` (líneas). Comentarios en inglés, cortos. En `.conf`,
-  comentarios de una línea con `DESUKA:`.
+- Marcadores propios, comentarios en inglés y cortos. Bloques:
+  `-- >>> CUSTOM Desuka: qué <<<` … `-- <<< CUSTOM Desuka >>>`.
+  Líneas: sufijo inline `-- >>> EDIT Desuka <<< -- por qué`, en la propia
+  línea (nunca standalone ni envolviendo). En `.conf`, `# DESUKA: ...`.
+  Legacy anterior exento; todo marcador nuevo sigue este formato.
 - Tablas de idioma en paridad estricta: `track_names["en"]`/`["es"]` mismas
   claves (+ centinelas `und`/`""`/`unknown` solo en nombres); `lang_to_cc`
   cubre las claves reales. Sin asset para un `cc` → fallback a `[code]`.

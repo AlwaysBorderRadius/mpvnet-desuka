@@ -8,6 +8,7 @@ local showingMessage = false
 -- NOTE: AJN updater overwrites portable_config/scripts/ on update
 -- (manifest.json overlay_paths). After any AJN update: git status, diff this
 -- file, re-apply this CUSTOM block. Path tracks v3.11 layout (no core/).
+-- <<< CUSTOM Desuka >>>
 
 -- Why upscaling stopped during playback, or nil. When the filter fails (an
 -- inference error mid-playback, a chain that won't configure), mpv's filter
@@ -80,7 +81,7 @@ function show_animejanai_stats()
             local data_file_path = (mp.command_native({'expand-path', "~~/../animejanai/currentanimejanai.log"}))
             message = read_file(data_file_path)
 
-            if message == "" or message == nil then  -- EDIT Desuka: missing log file
+            if message == "" or message == nil then -- >>> EDIT Desuka <<< -- missing log file returns nil
                 message = "Error during upscale; press ~ to view error in console"
             end
         end

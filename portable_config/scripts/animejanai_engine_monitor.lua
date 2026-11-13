@@ -100,12 +100,12 @@ mp.add_periodic_timer(o.poll_interval, function()
         local elapsed = math.floor(mp.get_time() - started_at)
         local second = we_paused and "Playback will resume on completion."
                                   or "Upscaling will activate on completion."
-        -- >>> CUSTOM Desuka: toast instead of OSD <<<
+        -- >>> CUSTOM Desuka: toast instead of OSD (dur in seconds: show_toast divides ms>1000) <<<
         mp.commandv("script-message-to", "modernx", "modernx-toast", "info", "animejanai", string.format(
             "AnimeJaNai: Building TensorRT engine for %s for %s " ..
             "(%ds, usually about a minute)\n%s",
             build_name, build_res, elapsed, second),
-            o.poll_interval + 0.5)  -- EDIT Desuka: seconds, not ms (show_toast divides >1000)
+            o.poll_interval + 0.5)
         -- <<< CUSTOM Desuka >>>
         -- while paused no frames flow, so the filter would never notice the
         -- finished build; this no-op command wakes it so it polls
