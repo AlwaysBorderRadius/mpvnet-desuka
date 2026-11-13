@@ -12,10 +12,10 @@ local updater = mp.command_native({ "expand-path", "~~/../" .. exe_name })
 local available_version = nil
 
 -- >>> CUSTOM Desuka: AJN update check opt-in (default off) <<<
--- Desuka releases set the pace: the automatic check only runs when
--- script-opts/animejanai_update.conf exists with desuka_check_updates=yes
--- (owner-local file, git-ignored). Ctrl+U with no prior check warns
--- instead of lying "up to date".
+-- Desuka releases set the pace: the automatic check only runs with
+-- desuka_check_updates=yes in script-opts/animejanai_update.conf
+-- (shipped default off; owner enables it locally, never commit yes).
+-- Ctrl+U with no prior check warns instead of lying "up to date".
 local check_opts = { desuka_check_updates = false }
 require("mp.options").read_options(check_opts, "animejanai_update")
 -- <<< CUSTOM Desuka >>>
