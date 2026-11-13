@@ -4466,9 +4466,16 @@ function adv_menu_overrides()
         -- stale key hints (key rebound elsewhere, row still runs on click)
         ["Navigate > Jump 5 min forward"]  = { key = "_", cmd = "seek 300 exact" },
         ["Navigate > Jump 5 min backward"] = { key = "_", cmd = "seek -300 exact" },
+        -- managed mislabel (Up/Down do -/+85 and now volume): keep the row
+        -- clickable with the honest command instead of deleting it
+        ["Navigate > Jump 30 sec forward"]  = { key = "_", cmd = "seek 30 exact" },
+        ["Navigate > Jump 30 sec backward"] = { key = "_", cmd = "seek -30 exact" },
         ["Video > Toggle Deinterlace"]     = { key = "_", cmd = "cycle deinterlace" },
         ["Exit"]                           = { key = "_", cmd = "quit" },
         ["View > Show Audio Tracks"]      = { key = "_", cmd = "script-message-to mpvnet show-audio-tracks" },
+        -- click == keybind (row ran the unmanaged variant, key runs the Desuka one)
+        ["Subtitle > Cycle/Next"]        = { key = "j", cmd = "script-message-to modernx cycle-sub" },
+        ["Audio > Cycle/Next"]           = { key = "a", cmd = "cycle audio" },
         -- stale commands (rebind replaced the action)
         ["Play/Pause"] = { key = "Space", cmd = "cycle pause" },
         ["View > Show Subtitle Tracks"] = { key = "Alt+j", cmd = "script-message-to mpvnet show-subtitle-tracks" },
