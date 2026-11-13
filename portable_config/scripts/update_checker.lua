@@ -49,12 +49,14 @@ local STRINGS = {
         update_available = "New mpv Desuka update available: %s (current: %s)",
         up_to_date = "mpv Desuka is up to date (%s).",
         local_newer = "Local mpv Desuka version (%s) is newer than published (%s).",
+        checking = "Searching for mpv Desuka updates...",
     },
     es = {
         no_network = "No se pudo comprobar la actualización de mpv Desuka (sin red o sin curl).",
         update_available = "Nueva actualización de mpv Desuka disponible: %s (actual: %s)",
         up_to_date = "mpv Desuka está actualizado (%s).",
         local_newer = "Versión local de mpv Desuka (%s) más reciente que la publicada (%s).",
+        checking = "Buscando actualización de mpv Desuka...",
     },
 }
 
@@ -240,8 +242,29 @@ local function fetch_latest_async(cb)
 end
 
 -- Main check. Manual=true forces feedback even when up to date.
+-- >>> CUSTOM Desuka: braille spinner while a manual check is in flight <<<
+local SPINNER_FRAMES = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+local spinner_timer = nil
+local spinner_step = 0
+local function spinner_stop()
+    if spinner_timer then spinner_timer:kill() spinner_timer = nil end
+end
+local function spinner_start()
+    spinner_stop()
+    spinner_step = 0
+    spinner_timer = mp.add_periodic_timer(0.12, function()
+        spinner_step = (spinner_step % #SPINNER_FRAMES) + 1
+        mp.commandv("script-message-to", "modernx", "modernx-toast",
+            "info", "update-checker",
+            SPINNER_FRAMES[spinner_step] .. " " .. t("checking"),
+            "1000")
+    end)
+end
+-- <<< CUSTOM Desuka >>>
 local function check_for_update(manual)
+    if manual then spinner_start() end
     fetch_latest_async(function(latest)
+        spinner_stop()
         if latest == nil then
             if manual then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
