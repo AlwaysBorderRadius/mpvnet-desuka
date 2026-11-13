@@ -1,5 +1,4 @@
--- quick_subtitle_edit.lua (v2)
--- Editor rápido de subtítulos externos para mpv.
+-- Editor rápido de subtítulos internos->externos para mpv.
 -- Teclas:
 --   Ctrl+z        -> editar el subtítulo actual EN PANTALLA (en el sitio del
 --                    subtítulo real, con su estilo y cursor fijo).

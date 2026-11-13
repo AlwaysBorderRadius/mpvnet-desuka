@@ -1,5 +1,5 @@
--- update-checker.lua
--- Startup update check against GitHub releases/latest.
+-- update_checker.lua
+-- Startup update check against mpvnet desuka GitHub releases/latest.
 -- Async fetch + short curl timeouts so a slow network can't freeze the OSD.
 -- Manual: script-message-to update_checker check-for-update
 
@@ -17,9 +17,8 @@ local o = {
     curl_connect_timeout = 5,
     notify_up_to_date = false,
 }
-options.read_options(o, "update-checker")
+options.read_options(o, "update_checker")
 
--- >>> CUSTOM Desuka <<<
 -- UI language comes from modernx.conf (single source).
 -- Manual parse: read_options would warn on every undeclared key.
 local function read_modernx_language()
@@ -46,16 +45,16 @@ local mo = { language = read_modernx_language() }
 -- Bilingual toast strings, keep en/es keys in sync.
 local STRINGS = {
     en = {
-        no_network = "Could not check for updates (no network or no curl).",
-        update_available = "New update available: %s (current: %s)",
-        up_to_date = "You already have the latest version (%s).",
-        local_newer = "Local version (%s) is newer than published (%s).",
+        no_network = "Could not check for mpv Desuka updates (no network or no curl).",
+        update_available = "New mpv Desuka update available: %s (current: %s)",
+        up_to_date = "mpv Desuka is up to date (%s).",
+        local_newer = "Local mpv Desuka version (%s) is newer than published (%s).",
     },
     es = {
-        no_network = "No se pudo comprobar la actualización (sin red o sin curl).",
-        update_available = "Nueva actualización disponible: %s (actual: %s)",
-        up_to_date = "Ya tienes la última versión (%s).",
-        local_newer = "Versión local (%s) más reciente que la publicada (%s).",
+        no_network = "No se pudo comprobar la actualización de mpv Desuka (sin red o sin curl).",
+        update_available = "Nueva actualización de mpv Desuka disponible: %s (actual: %s)",
+        up_to_date = "mpv Desuka está actualizado (%s).",
+        local_newer = "Versión local de mpv Desuka (%s) más reciente que la publicada (%s).",
     },
 }
 
@@ -66,7 +65,6 @@ local function t(key, a, b)
     if b == nil then return string.format(fmt, a) end
     return string.format(fmt, a, b)
 end
--- <<< CUSTOM Desuka >>>
 
 -- Clamp user opts to safe defaults.
 local function validate_user_opts()
