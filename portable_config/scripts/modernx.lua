@@ -4450,10 +4450,32 @@ mp.register_script_message("close-track-menu", function() close_track_menu() end
 -- context menu, which mpvnet suppresses near the window borders (i.e.
 -- everywhere the OSC lives). Rows are parsed from input.conf #menu:
 -- lines on every open, so it always matches the native menu.
--- Mirror, not keymap: later #menu: entries win (like mpv bindings), key
--- hints may differ from effective binds when keys were rebound without
--- updating #menu: (same as native); dynamic submenus (Recent/Titles/
--- Chapters/Track/Profile) are skipped, separators collapsed.
+-- Mirror, not keymap: later #menu: entries win (like mpv bindings);
+-- a " [Desuka]" leaf suffix is stripped for dedup/labels (native keeps
+-- it); dynamic submenus (Recent/Titles/Chapters/Track/Profile) are
+-- skipped, separators collapsed. adv_menu_overrides() below patches
+-- rows whose key/command went stale after a DESUKA rebind.
+--
+-- Script-global (not a chunk local): the main chunk is at Lua 5.1's
+-- 200-locals limit, like menu_button_hitbox() and track_menu_*().
+function adv_menu_overrides()
+    -- menupath -> { key, cmd }: applied over the parsed row (same shape),
+    -- so the menu always mirrors the effective binds. Presentation-only:
+    -- input.conf (and the native menu) is left untouched.
+    return {
+        -- stale key hints (key rebound elsewhere, row still runs on click)
+        ["Navigate > Jump 5 min forward"]  = { key = "_", cmd = "seek 300 exact" },
+        ["Navigate > Jump 5 min backward"] = { key = "_", cmd = "seek -300 exact" },
+        ["Video > Toggle Deinterlace"]     = { key = "_", cmd = "cycle deinterlace" },
+        ["Exit"]                           = { key = "_", cmd = "quit" },
+        ["View > Show Audio Tracks"]      = { key = "_", cmd = "script-message-to mpvnet show-audio-tracks" },
+        -- stale commands (rebind replaced the action)
+        ["Play/Pause"] = { key = "Space", cmd = "cycle pause" },
+        ["View > Show Subtitle Tracks"] = { key = "Alt+j", cmd = "script-message-to mpvnet show-subtitle-tracks" },
+        ["Toggle Fullscreen"] = { key = "f", cmd = "cycle fullscreen" },
+        ["AnimeJaNai > Toggle AnimeJaNai Stats"] = { key = "Ctrl+j", cmd = "script-binding animejanaistats/show_animejanai_stats" },
+    }
+end
 function adv_menu_tree()
     -- node: { name, kids = {}, index = {}, order = {} }
     -- order entries: { kind = "group", node } | { kind = "leaf", label, cmd } | { kind = "sep" }
@@ -4489,6 +4511,7 @@ function adv_menu_tree()
     if not ok or type(path) ~= "string" or path == "" then return root end
     local f = io.open(path, "r")
     if not f then return root end
+    local overrides = adv_menu_overrides() -- stale-row patches (built once per open)
     for line in f:lines() do
         local s = line:match("^%s*(.-)%s*$")
         if s ~= "" and s:sub(1, 1) ~= "#" then
@@ -4505,23 +4528,34 @@ function adv_menu_tree()
                     if segs then
                         local parent = root
                         for i = 1, #segs - 1 do parent = node_for(parent, segs[i]) end
-                        local leaf = segs[#segs]
-                        if leaf == "-" then
-                            parent.order[#parent.order + 1] = { kind = "sep" }
-                        elseif cmd ~= "" and cmd ~= "ignore" then
-                            local label = segs[#segs]
-                            if key ~= "_" then label = label .. "   [" .. key .. "]" end
-                            -- later #menu: entries win (like mpv bindings)
-                            local at = parent.index["_leaf:" .. leaf]
-                            if at == nil then
-                                at = #parent.order + 1
-                                parent.order[at] = { kind = "leaf" }
-                                parent.index["_leaf:" .. leaf] = at
+                        -- strip a trailing " [Desuka]" marker for grouping/labels/dedup
+                        -- (native menu keeps it; ours shows the canonical row)
+                        local leaf = segs[#segs]:gsub("%s*%[Desuka%]$", "")
+                        if leaf ~= "" then
+                            if leaf == "-" then
+                                parent.order[#parent.order + 1] = { kind = "sep" }
+                            else
+                                -- presentation overrides for stale managed rows
+                                -- (same table shape; input.conf untouched)
+                                local o = overrides[menupath:gsub("%s*%[Desuka%]$", "")]
+                                local k, c = key, cmd
+                                if o then k, c = o.key, o.cmd end
+                                if c ~= "" and c ~= "ignore" then
+                                    local label = leaf
+                                    if k ~= "_" then label = label .. "   [" .. k .. "]" end
+                                    -- later #menu: entries win (like mpv bindings)
+                                    local at = parent.index["_leaf:" .. leaf]
+                                    if at == nil then
+                                        at = #parent.order + 1
+                                        parent.order[at] = { kind = "leaf" }
+                                        parent.index["_leaf:" .. leaf] = at
+                                    end
+                                    parent.order[at].label = label
+                                    parent.order[at].cmd = c
+                                end
+                                -- ignore-rows (dynamic submenu spacers): skipped
                             end
-                            parent.order[at].label = label
-                            parent.order[at].cmd = cmd
                         end
-                        -- ignore-rows (dynamic submenu spacers): skipped
                     end
                 end
             end
