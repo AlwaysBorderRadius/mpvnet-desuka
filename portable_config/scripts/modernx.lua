@@ -3683,23 +3683,13 @@ local function render_toast(ass)
     end
     -- keep the pill on screen (narrow/portrait video, wide pill)
     cx = math.min(math.max(cx, pill_w / 2), math.max(pill_w / 2, osc_param.playresx - pill_w / 2))
-    -- extra bottom padding grows downward: top edge stays anchored
-    local cy_box = cy + pad_b / 2
+    -- top-anchored: the top edge stays at the margin, the pill grows downward
+    local y0 = cy + slide -- >>> EDIT Desuka <<< -- entrance rise: start below, settle at rest position
+    local y1 = y0 + pill_h
     -- text (and bar) vertical center, optical nudge included
-    local tcy = cy + text_dy
-    if slide > 0 then -- entrance rise: start below, settle at rest position
-        cy_box = cy_box + slide
-        tcy = tcy + slide
-    end
+    local tcy = y0 + pill_h / 2 + text_dy
     local x0 = cx - pill_w / 2
     local x1 = cx + pill_w / 2
-    local y0 = cy_box - pill_h / 2
-    if y0 < 0 then
-        cy_box = cy_box - y0
-        tcy = tcy - y0
-        y0 = 0
-    end
-    local y1 = cy_box + pill_h / 2
     if not asset then x1 = x1 - 10 end -- balance the text shift (plain only)
     local r_opt = tonumber(user_opts.toast_bg_radius)
     if r_opt == nil or r_opt < 0 then r_opt = 12 end
@@ -3807,7 +3797,8 @@ local function render_toast(ass)
     else
         local bar_h = content_h * bar_len
         local bar_x = x0 + pad_x / 2
-        ass:round_rect_cw(bar_x, cy_box - bar_h / 2, bar_x + bar_w, cy_box + bar_h / 2, 2)
+        local bar_cy = (y0 + y1) / 2 -- >>> EDIT Desuka <<< -- pill center, no text nudge
+        ass:round_rect_cw(bar_x, bar_cy - bar_h / 2, bar_x + bar_w, bar_cy + bar_h / 2, 2)
     end
     ass:draw_stop()
     end
