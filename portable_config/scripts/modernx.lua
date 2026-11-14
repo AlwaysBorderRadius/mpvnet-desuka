@@ -186,6 +186,7 @@ local user_opts = {
     info_button = false,            -- show info button
     ontop_button = true,            -- show window on top button
     menu_button = true,             -- show menu button top-left (opens the advanced menu) -- >>> EDIT Desuka <<<
+    show_shader_button = true, -- >>> EDIT Desuka <<< -- show shader button (Anime4K + AnimeJaNai menu)
     screenshot_button = false,      -- show screenshot button
     screenshot_flag = "subtitles",  -- flag for screenshot button: "subtitles", "video", "window", "each-frame"
     -- https://mpv.io/manual/master/#screenshot-commands
@@ -359,6 +360,7 @@ local icons = {
     subtitle = "\238\175\141",
     -- >>> CUSTOM Desuka <<<
     menu = "\239\147\161", -- hamburger (fluent-system-icons line-horizontal-3)
+    shader = "\238\172\179", -- >>> EDIT Desuka <<< -- sparkle (fluent-system-icons)
     -- <<< CUSTOM Desuka >>>
 
     volume = {
@@ -440,6 +442,7 @@ local language = {
         downloaded = "Already downloaded",
         -- >>> CUSTOM Desuka <<<
         menu = "Menu", -- adv menu header + top-left button tooltip
+        shaders = "Shaders", -- >>> EDIT Desuka <<< -- shader button tooltip + menu header
         -- <<< CUSTOM Desuka >>>
     },
 
@@ -474,6 +477,7 @@ local language = {
         downloading = "Descargando",
         downloaded = "Ya descargado",
         menu = "Menú", -- adv menu header + top-left button tooltip
+        shaders = "Shaders", -- >>> EDIT Desuka <<< -- shader button tooltip + menu header
     }
     -- <<< CUSTOM Desuka >>>
 }
@@ -4338,7 +4342,7 @@ end
 -- True while the cursor is over another track button, so it can toggle its
 -- own dropdown instead of being swallowed as an outside dismiss click.
 local function track_menu_on_cy_button(_mx, _my)
-    for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub", "menu_btn" }) do -- >>> EDIT Desuka <<< -- menu button toggles its own menu too
+    for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub", "menu_btn", "cy_shader" }) do -- >>> EDIT Desuka <<< -- shader button toggles its own menu too
         for _, el in pairs(elements) do
             if el.name == nm and el.hitbox and mouse_hit_coords(el.hitbox.x1, el.hitbox.y1, el.hitbox.x2, el.hitbox.y2) then
                 return true
@@ -4646,6 +4650,7 @@ function adv_menu_show(node, header, parent, trail, offset)
 end
 
 function open_adv_menu()
+    adv_menu_anchor_el = nil -- >>> EDIT Desuka <<< -- classic menu uses menu_btn below
     close_track_menu()
     local tree = adv_menu_tree()
     if #tree.order == 0 then -- input.conf missing/unreadable: say so instead of looking dead
@@ -4658,6 +4663,7 @@ function open_adv_menu()
 end
 
 function close_adv_menu()
+    adv_menu_anchor_el = nil -- >>> EDIT Desuka <<< -- drop shader anchor with the menu
     if state.adv_menu == nil then return end
     if user_opts.track_menu_animation and state.osc_visible then
         -- Closing fade snapshot; render_adv_menu() only runs while the OSC
@@ -4673,7 +4679,7 @@ function close_adv_menu()
 end
 
 function toggle_adv_menu()
-    if state.adv_menu then close_adv_menu() else open_adv_menu() end
+    if state.adv_menu and not adv_menu_anchor_el then close_adv_menu() else open_adv_menu() end -- >>> EDIT Desuka <<< -- shader menu counts as another menu, switch to classic
 end
 
 function adv_menu_scroll(delta)
@@ -4690,6 +4696,15 @@ function adv_menu_geometry()
     local m = state.adv_menu
     if not m then return nil end
     local anchor = menu_button_hitbox()
+    local above = false
+    if adv_menu_anchor_el then -- >>> EDIT Desuka <<< -- shader menu hangs above its own button
+        local found = nil
+        for _, el in pairs(elements) do
+            if el.name == adv_menu_anchor_el and el.hitbox then found = el.hitbox break end
+        end
+        if not found then return nil end -- button hidden (narrow window): don't teleport
+        anchor, above = found, true
+    end
     if not anchor then return nil end
     local fontsize = user_opts.track_menu_font_size or 18
     if fontsize <= 0 then fontsize = 18 end
@@ -4711,12 +4726,19 @@ function adv_menu_geometry()
     local menu_h = pad_y * 2 + header_h + top_gap + visible * row_h
     local x0 = anchor.x1 -- left-aligned with the button
     x0 = math.max(4, math.min(x0, osc_param.playresx - menu_w - 4))
-    local y0 = anchor.y2 + 8 -- hangs below the button (no room above)
-    local y1 = y0 + menu_h
-    if y1 > osc_param.playresy - 4 then
-        y1 = osc_param.playresy - 4
+    local y0, y1
+    if above then -- >>> EDIT Desuka <<< -- bottom-bar button: hang above like track menus
+        y1 = anchor.y1 - 8
         y0 = y1 - menu_h
-        if y0 < 4 then y0 = 4 end
+        if y0 < 4 then y0 = 4 y1 = y0 + menu_h end
+    else
+        y0 = anchor.y2 + 8 -- hangs below the button (no room above)
+        y1 = y0 + menu_h
+        if y1 > osc_param.playresy - 4 then
+            y1 = osc_param.playresy - 4
+            y0 = y1 - menu_h
+            if y0 < 4 then y0 = 4 end
+        end
     end
     local rows = {}
     for i = 1, visible do
@@ -4762,7 +4784,7 @@ end
 -- Script-global (not a chunk local): the main chunk is at Lua 5.1's
 -- 200-locals limit.
 function adv_menu_on_toggle_button(mx, my)
-    for _, nm in ipairs({ "menu_btn", "cy_video", "cy_audio", "cy_sub" }) do
+    for _, nm in ipairs({ "menu_btn", "cy_video", "cy_audio", "cy_sub", "cy_shader" }) do -- >>> EDIT Desuka <<< -- shader button switches menus too
         for _, el in pairs(elements) do
             if el.name == nm and el.hitbox
                 and mx >= el.hitbox.x1 and mx <= el.hitbox.x2
@@ -5802,13 +5824,13 @@ layouts["original"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -5924,6 +5946,13 @@ layouts["original"] = function()
     lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 700 - outeroffset)
+
+    if user_opts.show_shader_button then
+        lo = add_layout('cy_shader')
+        lo.geometry = { x = 217, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 750 - outeroffset)
+    end
 
     -- Fullscreen/Loop/Info
     lo = add_layout('tog_fs')
@@ -6103,13 +6132,13 @@ layouts["reduced"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -6213,6 +6242,13 @@ layouts["reduced"] = function()
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 700 - outeroffset)
 
+    if user_opts.show_shader_button then
+        lo = add_layout('cy_shader')
+        lo.geometry = { x = 217, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 750 - outeroffset)
+    end
+
     -- Fullscreen/Loop/Info
     lo = add_layout('tog_fs')
     lo.geometry = { x = osc_geo.w - 37, y = refY - 40, an = 5, w = 24, h = 24 }
@@ -6302,6 +6338,12 @@ function validate_user_opts()
     if type(user_opts.show_in_idle) ~= "boolean" then
         mp.msg.warn("show_in_idle must be boolean. Using true.")
         user_opts.show_in_idle = true
+    end
+    -- <<< CUSTOM Desuka >>>
+    -- >>> CUSTOM Desuka: shader button <<<
+    if type(user_opts.show_shader_button) ~= "boolean" then
+        mp.msg.warn("show_shader_button must be boolean. Using true.")
+        user_opts.show_shader_button = true
     end
     -- <<< CUSTOM Desuka >>>
 
@@ -6516,6 +6558,121 @@ function update_options(_)
     request_init()
 end
 
+-- >>> CUSTOM Desuka: shader menu (Anime4K + AnimeJaNai) <<<
+-- Single cy_shader button opening the Anime4K/AnimeJaNai groups as a submenu
+-- of the advanced menu machinery (same plate, drill, modal, ESC). The menu
+-- hangs above its own button; adv_menu_anchor_el selects that geometry.
+adv_menu_anchor_el = nil
+
+-- Current upscaler readout for the tooltip: Anime4K mode from glsl-shaders,
+-- AnimeJaNai slot from the vf aji filter params. Missing means off.
+function shader_state()
+    local a4k, ajn = nil, nil
+    local raw = mp.get_property_native("glsl-shaders", nil)
+    local parts = {}
+    if type(raw) == "table" then
+        parts = raw
+    elseif type(raw) == "string" and raw ~= "" then
+        for p in raw:gmatch("([^;,]+)") do parts[#parts + 1] = p end
+    end
+    local set = {}
+    for _, p in ipairs(parts) do
+        local base = tostring(p):match("^%s*(.-)%s*$"):match("([^/\\]+)$")
+        if base then set[base] = true end
+    end
+    if set["Anime4K_Upscale_CNN_x2_M.glsl"] then
+        local fam = "A"
+        if set["Anime4K_Upscale_Denoise_CNN_x2_VL.glsl"] then
+            fam = "C"
+        elseif set["Anime4K_Restore_CNN_Soft_VL.glsl"] then
+            fam = "B"
+        end
+        local plus = ""
+        if set["Anime4K_Restore_CNN_M.glsl"] then
+            plus = "+A"
+        elseif set["Anime4K_Restore_CNN_Soft_M.glsl"] then
+            plus = "+B"
+        end
+        a4k = "Anime4K Mode " .. fam .. plus .. " (HQ)"
+    elseif next(set) ~= nil then
+        for base in pairs(set) do
+            if base:match("^Anime4K_") then
+                a4k = "Anime4K custom" -- partial Anime4K chain (other shaders stay unreported)
+                break
+            end
+        end
+    end
+    local vf = mp.get_property_native("vf", {})
+    if type(vf) == "table" then
+        for _, f in ipairs(vf) do
+            if type(f) == "table" and (f.name == "aji" or f.label == "aji")
+                and f.enabled ~= false and type(f.params) == "table" then
+                local slot = tostring(f.params.slot or "")
+                if slot == "1001" then
+                    ajn = "AJN Quality"
+                elseif slot == "1002" then
+                    ajn = "AJN Balanced"
+                elseif slot == "1003" then
+                    ajn = "AJN Performance"
+                elseif slot:match("^[1-9]%d*$") then
+                    ajn = "AJN Custom " .. slot
+                end
+                break
+            end
+        end
+    end
+    return { a4k = a4k, ajn = ajn }
+end
+
+-- Tooltip: "Shaders" plus the active chain, if any.
+function shader_tooltip()
+    local st = shader_state()
+    local parts = {}
+    if st.a4k then parts[#parts + 1] = st.a4k end
+    if st.ajn then parts[#parts + 1] = st.ajn end
+    local base = texts.shaders or "Shaders"
+    if #parts > 0 then return base .. ": " .. table.concat(parts, " + ") end
+    return base
+end
+
+-- Filtered tree: only the Anime4K and AnimeJaNai groups.
+function open_shader_menu()
+    close_adv_menu()
+    close_track_menu() -- only one dropdown at a time
+    local tree = adv_menu_tree()
+    local root = { name = nil, kids = {}, index = {}, order = {} }
+    for _, nm in ipairs({ "Anime4K", "AnimeJaNai" }) do
+        local n = tree.index[nm]
+        if n then root.order[#root.order + 1] = { kind = "group", node = n } end
+    end
+    if #root.order == 0 then -- input.conf missing/unreadable: say so instead of looking dead
+        show_toast(texts.na or "Not available", "warn", "modernx-menu")
+        return
+    end
+    adv_menu_anchor_el = "cy_shader"
+    if adv_menu_show(root, texts.shaders or "Shaders", nil, {}) then
+        mp.add_forced_key_binding("ESC", "modernx-adv-menu-close", close_adv_menu)
+    else
+        adv_menu_anchor_el = nil
+    end
+end
+
+function toggle_shader_menu()
+    if state.adv_menu and adv_menu_anchor_el == "cy_shader" then
+        close_adv_menu()
+    else
+        open_shader_menu()
+    end
+end
+
+-- Keyboard / input.conf access (toggles like a left click).
+mp.register_script_message("open-shader-menu", function() open_shader_menu() end)
+mp.register_script_message("close-shader-menu", function()
+    if adv_menu_anchor_el == "cy_shader" then close_adv_menu() end
+end)
+mp.register_script_message("toggle-shader-menu", function() toggle_shader_menu() end)
+-- <<< CUSTOM Desuka >>>
+
 -- OSC INIT
 -- >>> CUSTOM Desuka: idle chrome <<<
 -- Idle logo drawn into the same ASS frame as the OSC (single set_osd),
@@ -6554,7 +6711,7 @@ function apply_idle_state()
     local grey = { "play_pause", "pl_prev", "pl_next", "skipback", "skipfrwd",
         "jumpback", "jumpfrwd", "cy_video", "cy_audio", "cy_sub",
         "vol_ctrl", "volumebar", "seekbar", "persistentseekbar",
-        "tog_loop", "download", "screenshot", "tog_info" }
+        "tog_loop", "download", "screenshot", "tog_info", "cy_shader" }
     for _, name in ipairs(grey) do
         if elements[name] then elements[name].enabled = false end
     end
@@ -6982,6 +7139,21 @@ local function osc_init()
     ne.eventresponder['shift+mbtn_right_down'] =
         function()
             track_menu_cycle('sub', 1)
+        end
+    -- <<< CUSTOM Desuka >>>
+
+    -- >>> CUSTOM Desuka: shader menu button (Anime4K + AnimeJaNai) <<<
+    -- Single button, submenus like the advanced menu; live state in the tooltip.
+    ne = new_element('cy_shader', 'button')
+    ne.enabled = true
+    ne.visible = (osc_param.playresx >= 750 - outeroffset) and user_opts.show_shader_button
+    ne.content = icons.shader
+    ne.tooltip_style = osc_styles.tooltip
+    ne.tooltipF = function() return shader_tooltip() end
+    ne.nothingavailable = texts.shaders or "Shaders"
+    ne.eventresponder['mbtn_left_up'] =
+        function()
+            toggle_shader_menu()
         end
     -- <<< CUSTOM Desuka >>>
 
