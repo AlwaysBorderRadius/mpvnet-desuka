@@ -46,14 +46,14 @@ local mo = { language = read_modernx_language() }
 local STRINGS = {
     en = {
         no_network = "Could not check for mpv Desuka updates (no network or no curl).",
-        update_available = "New mpv Desuka update available: %s (current: %s)",
+        update_available = "New mpv Desuka update available: %s (current: %s). See Menu > Desuka",
         up_to_date = "mpv Desuka is up to date (%s).",
         local_newer = "Local mpv Desuka version (%s) is newer than published (%s).",
         checking = "Searching for mpv Desuka updates...",
     },
     es = {
         no_network = "No se pudo comprobar la actualización de mpv Desuka (sin red o sin curl).",
-        update_available = "Nueva actualización de mpv Desuka disponible: %s (actual: %s)",
+        update_available = "Nueva actualización de mpv Desuka disponible: %s (actual: %s). Ver en menú > Desuka",
         up_to_date = "mpv Desuka está actualizado (%s).",
         local_newer = "Versión local de mpv Desuka (%s) más reciente que la publicada (%s).",
         checking = "Buscando actualización de mpv Desuka...",
