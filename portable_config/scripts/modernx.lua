@@ -189,7 +189,7 @@ local user_opts = {
     show_shader_button = true, -- >>> EDIT Desuka <<< -- show shader button (Anime4K + AnimeJaNai menu)
     show_subedit_button = true, -- >>> EDIT Desuka <<< -- show subtitle edit tool button
     screenshot_button = false,      -- show screenshot button
-    screenshot_flag = "subtitles",  -- flag for screenshot button: "subtitles", "video", "window", "each-frame"
+    screenshot_flag = "subtitles",  -- flag for screenshot button: "subtitles", "video" or "window" (each-frame needs %n templates, unsupported)
     -- https://mpv.io/manual/master/#screenshot-commands
 
     download_button = true,            -- show download button on web videos (requires yt-dlp and ffmpeg)
@@ -6366,6 +6366,14 @@ function validate_user_opts()
         user_opts.menu_button = true
     end
     -- <<< CUSTOM Desuka >>>
+    -- >>> CUSTOM Desuka: screenshot flag allowlist <<<
+    if user_opts.screenshot_flag ~= "subtitles" and
+        user_opts.screenshot_flag ~= "video" and
+        user_opts.screenshot_flag ~= "window" then
+        mp.msg.warn("screenshot_flag cannot be '" .. tostring(user_opts.screenshot_flag) .. "'. Using 'subtitles'.")
+        user_opts.screenshot_flag = "subtitles"
+    end
+    -- <<< CUSTOM Desuka >>>
     -- >>> CUSTOM Desuka: idle chrome <<<
     if type(user_opts.show_in_idle) ~= "boolean" then
         mp.msg.warn("show_in_idle must be boolean. Using true.")
@@ -7411,12 +7419,7 @@ local function osc_init()
     ne.tooltipF = texts.screenshot
     ne.visible = (osc_param.playresx >= 900 - outeroffset - (user_opts.loop_button and 0 or 100) - (user_opts.ontop_button and 0 or 100) - (user_opts.info_button and 0 or 100))
     ne.eventresponder["mbtn_left_up"] = function()
-        local temp_sub_pos = mp.get_property("sub-pos")
-        if user_opts.screenshot_flag == "subtitles" or user_opts.screenshot_flag == "subtitles+each-frame" then
-            mp.commandv("set", "sub-pos", 100)
-        end
-        mp.commandv("osd-msg", "screenshot", user_opts.screenshot_flag)
-        mp.commandv("set", "sub-pos", temp_sub_pos)
+        mp.commandv("script-message-to", "screenshotfolder", "screenshotfolder-shot", user_opts.screenshot_flag) -- >>> EDIT Desuka <<< -- numbered via script, never collides
     end
 
     --tog_info

@@ -289,8 +289,21 @@ local function init()
     refresh_template()
 end
 
-local function screenshot_done()
+local function screenshot_done(oneshot_mode) -- >>> EDIT Desuka <<< -- one-shot mode from the message
     if not state.dir or not state.prefix then refresh_template() end
+
+    -- >>> CUSTOM Desuka: one-shot screenshot mode (OSC button flag) <<<
+    -- Native each-frame bursts need %n templates, not (N): rejected, not truncated.
+    local mode = options.screenshot_mode
+    if type(oneshot_mode) == "string" then
+        local base = (oneshot_mode:match("^(%a+)") or ""):lower()
+        if base == "video" or base == "window" or base == "subtitles" then
+            mode = base
+        else
+            msg.warn("screenshotfolder: bad shot mode '" .. tostring(oneshot_mode) .. "', using option")
+        end
+    end
+    -- <<< CUSTOM Desuka >>>
 
     mp.set_property("screenshot-format", options.file_ext)
     if options.file_ext == "png" then
@@ -306,13 +319,13 @@ local function screenshot_done()
     end
 
     local sub_visibility = nil
-    if options.hide_subtitles then
+    if options.hide_subtitles and mode ~= "subtitles" then -- >>> EDIT Desuka <<< -- explicit subtitles mode wins over the global opt-out
         sub_visibility = mp.get_property("sub-visibility")
         mp.set_property("sub-visibility", "no")
     end
 
     -- mp.commandv blocks until the file is written, so restore after is safe
-    mp.commandv("screenshot", options.screenshot_mode)
+    mp.commandv("screenshot", mode) -- >>> EDIT Desuka <<< -- one-shot or option mode
 
     if options.hide_subtitles and sub_visibility ~= nil then
         mp.set_property("sub-visibility", sub_visibility)
@@ -342,7 +355,7 @@ end
 
 mp.register_event("file-loaded", init)
 mp.register_event("end-file", reset_on_unload)
--- Forced binding wins over input.conf 's' (native shot); Ctrl+s stays native.
--- key owned by input.conf (s), no forced override
+-- All screenshot keys go through input.conf via screenshotfolder-shot,
+-- so numbering never collides (see script-opts/screenshotfolder.conf).
 -- mp.add_forced_key_binding(options.screenshot_key, "screenshotfolder-shot", screenshot_done)
 mp.register_script_message("screenshotfolder-shot", screenshot_done)
