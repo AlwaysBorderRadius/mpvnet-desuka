@@ -1,12 +1,71 @@
 local open = io.open
 
 local showingMessage = false
--- >>> CUSTOM Desuka: persistent toast with source-aware clear <<<
--- New toasts preempt (no queue). Clear only clears our own toast: if another
--- toast replaced us, the next toggle resyncs instead of killing it.
+
+-- >>> CUSTOM Desuka: route stats and failure alerts through modernx toasts <<<
+-- Toggle shows a persistent toast (preemptive, source-aware clear). A filter
+-- failure while showing replaces it; while hidden it fires a timed error.
 -- NOTE: AJN updater overwrites portable_config/scripts/ on update
 -- (manifest.json overlay_paths). After any AJN update: git status, diff this
--- file, re-apply this CUSTOM block. Path tracks v3.10 layout (no core/).
+-- file, re-apply this CUSTOM block. Path tracks v3.11 layout (no core/).
+-- <<< CUSTOM Desuka >>>
+
+-- Why upscaling stopped during playback, or nil. When the filter fails (an
+-- inference error mid-playback, a chain that won't configure), mpv's filter
+-- chain logs "Disabling filter aji because it has failed." and plays the rest
+-- of the file without it. Nothing else reports that, and the stats log still
+-- describes the last chain, so this watches the log for that line and keeps
+-- the filter's last error as the reason. The failed filter stays off until it
+-- is rebuilt: the next file, a profile key (animejanai_slot.lua rebuilds it),
+-- or upscaling turned off and on.
+local stopped = nil
+local last_error = nil
+
+local function short(text)
+    text = (text or ""):match("^[^\r\n]*"):gsub("%s+$", "")
+    if #text > 120 then
+        text = text:sub(1, 117) .. "..."
+    end
+    return text
+end
+
+local function stopped_message()
+    return "Upscaling stopped: " .. stopped ..
+           "\nPress a profile key (Shift+1-3, Ctrl+1-9) or open the file again to retry." ..
+           "\nPress ~ for the console log."
+end
+
+mp.enable_messages("error")
+mp.register_event("log-message", function(e)
+    if e.prefix == "animejanai" then
+        last_error = e.text
+    elseif e.prefix == "vf" then
+        local name = e.text:match("^Disabling filter (%S+) because it has failed")
+        if name == "aji" or name == "animejanai" then
+            stopped = last_error and short(last_error) or "the upscaling filter failed"
+            mp.msg.error("Upscaling stopped: " .. stopped)
+            -- >>> CUSTOM Desuka: failure alerts via toast <<<
+            if showingMessage then
+                mp.commandv("script-message-to", "modernx", "modernx-toast",
+                    "persistent", "animejanai", stopped_message())
+            else
+                mp.commandv("script-message-to", "modernx", "modernx-toast",
+                    "error", "animejanai", stopped_message(), 10000)
+            end
+            -- <<< CUSTOM Desuka >>>
+        end
+    end
+end)
+
+-- A new file or a changed filter list builds a fresh filter.
+local function clear()
+    stopped = nil
+    last_error = nil
+end
+mp.register_event("start-file", clear)
+mp.observe_property("vf", "native", clear)
+
+-- Function to be called when the custom action is triggered
 function show_animejanai_stats()
     if showingMessage then
         mp.commandv("script-message-to", "modernx", "modernx-toast-clear", "animejanai")
@@ -16,11 +75,13 @@ function show_animejanai_stats()
 
         if mp.get_property("vf") == "" then
             message = "Upscaling is disabled"
+        elseif stopped then
+            message = stopped_message()
         else
             local data_file_path = (mp.command_native({'expand-path', "~~/../animejanai/currentanimejanai.log"}))
             message = read_file(data_file_path)
 
-            if message == "" or message == nil then
+            if message == "" or message == nil then -- >>> EDIT Desuka <<< -- missing log file returns nil
                 message = "Error during upscale; press ~ to view error in console"
             end
         end
@@ -30,7 +91,6 @@ function show_animejanai_stats()
         showingMessage = true
     end
 end
--- <<< CUSTOM Desuka >>>
 
 function read_file(path)
     local file = open(path, "r") -- r read mode and b binary mode

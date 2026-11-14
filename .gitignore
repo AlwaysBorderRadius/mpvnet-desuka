@@ -23,8 +23,9 @@
 !.opencode/
 !.opencode/**
 
-# Upstream AJN runtime (updater-owned, never edit): base de distribucion, fuera de git
-portable_config/scripts/animejanai_*.lua
+# Upstream AJN runtime: base de distribucion, fuera de git (managed confs).
+# Los scripts animejanai_*.lua SI se versionan aunque sean updater-owned:
+# el diff post-update guia la re-aplicacion de los bloques CUSTOM.
 portable_config/mpv-animejanai.conf
 portable_config/input-animejanai.conf
 
@@ -33,6 +34,7 @@ portable_config/input-animejanai.conf
 *.timing.cache
 *.timing.cache.lock
 *.engine.build.log
+*.onnxinfo
 !AGENTS.md
 !.docs/
 !.docs/**

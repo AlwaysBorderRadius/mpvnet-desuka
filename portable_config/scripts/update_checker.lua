@@ -1,5 +1,5 @@
--- update-checker.lua
--- Startup update check against GitHub releases/latest.
+-- update_checker.lua
+-- Startup update check against mpvnet desuka GitHub releases/latest.
 -- Async fetch + short curl timeouts so a slow network can't freeze the OSD.
 -- Manual: script-message-to update_checker check-for-update
 
@@ -17,7 +17,56 @@ local o = {
     curl_connect_timeout = 5,
     notify_up_to_date = false,
 }
-options.read_options(o, "update-checker")
+options.read_options(o, "update_checker")
+
+-- UI language comes from modernx.conf (single source).
+-- Manual parse: read_options would warn on every undeclared key.
+local function read_modernx_language()
+    local path = mp.find_config_file("script-opts/modernx.conf")
+    if path == nil then
+        local dir = mp.get_script_directory()
+        if dir == nil or dir == "" then return "en" end
+        path = utils.join_path(dir, "../script-opts/modernx.conf")
+    end
+    local f = io.open(path, "r")
+    if f == nil then return "en" end
+    local content = f:read("*a")
+    f:close()
+    if content == nil then return "en" end
+    local lang = "en"
+    for line in content:gmatch("[^\r\n]+") do
+        local v = line:match("^%s*language%s*=%s*(%S+)")
+        if v ~= nil then lang = v:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1") end
+    end
+    return lang
+end
+local mo = { language = read_modernx_language() }
+
+-- Bilingual toast strings, keep en/es keys in sync.
+local STRINGS = {
+    en = {
+        no_network = "Could not check for mpv Desuka updates (no network or no curl).",
+        update_available = "New mpv Desuka update available: %s (current: %s)",
+        up_to_date = "mpv Desuka is up to date (%s).",
+        local_newer = "Local mpv Desuka version (%s) is newer than published (%s).",
+        checking = "Searching for mpv Desuka updates...",
+    },
+    es = {
+        no_network = "No se pudo comprobar la actualización de mpv Desuka (sin red o sin curl).",
+        update_available = "Nueva actualización de mpv Desuka disponible: %s (actual: %s)",
+        up_to_date = "mpv Desuka está actualizado (%s).",
+        local_newer = "Versión local de mpv Desuka (%s) más reciente que la publicada (%s).",
+        checking = "Buscando actualización de mpv Desuka...",
+    },
+}
+
+local function t(key, a, b)
+    local lang_table = STRINGS[mo.language] or STRINGS["en"]
+    local fmt = lang_table[key] or STRINGS["en"][key] or ""
+    if a == nil then return fmt end
+    if b == nil then return string.format(fmt, a) end
+    return string.format(fmt, a, b)
+end
 
 -- Clamp user opts to safe defaults.
 local function validate_user_opts()
@@ -70,6 +119,10 @@ local function validate_user_opts()
     if o.curl_connect_timeout > o.curl_max_time then
         msg.warn("update-checker: connect timeout above max time, clamping")
         o.curl_connect_timeout = o.curl_max_time
+    end
+    if mo.language ~= "en" and mo.language ~= "es" then -- >>> EDIT Desuka <<<
+        msg.warn("update-checker: bad language, using en")
+        mo.language = "en"
     end
 end
 validate_user_opts()
@@ -189,13 +242,34 @@ local function fetch_latest_async(cb)
 end
 
 -- Main check. Manual=true forces feedback even when up to date.
+-- >>> CUSTOM Desuka: braille spinner while a manual check is in flight <<<
+local SPINNER_FRAMES = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+local spinner_timer = nil
+local spinner_step = 0
+local function spinner_stop()
+    if spinner_timer then spinner_timer:kill() spinner_timer = nil end
+end
+local function spinner_start()
+    spinner_stop()
+    spinner_step = 0
+    spinner_timer = mp.add_periodic_timer(0.12, function()
+        spinner_step = (spinner_step % #SPINNER_FRAMES) + 1
+        mp.commandv("script-message-to", "modernx", "modernx-toast",
+            "info", "update-checker",
+            SPINNER_FRAMES[spinner_step] .. " " .. t("checking"),
+            "1000")
+    end)
+end
+-- <<< CUSTOM Desuka >>>
 local function check_for_update(manual)
+    if manual then spinner_start() end
     fetch_latest_async(function(latest)
+        spinner_stop()
         if latest == nil then
             if manual then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "error", "update-checker",
-                    "No se pudo comprobar la actualización (sin red o sin curl).",
+                    t("no_network"), -- >>> EDIT Desuka <<<
                     "6000")
             end
             return
@@ -207,7 +281,7 @@ local function check_for_update(manual)
             -- Important toast, preempts any toast (no queue).
             mp.commandv("script-message-to", "modernx", "modernx-toast",
                 "warn", "update-checker",
-                "Nueva actualización disponible: " .. latest .. " (actual: " .. o.current_version .. ")",
+                t("update_available", latest, o.current_version), -- >>> EDIT Desuka <<<
                 "6000")
             msg.info("update-checker: new version " .. latest .. " (current " .. o.current_version .. ")")
         elseif cmp == 0 then
@@ -215,7 +289,7 @@ local function check_for_update(manual)
             if manual or o.notify_up_to_date then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "info", "update-checker",
-                    "Ya tienes la última versión (" .. o.current_version .. ").",
+                    t("up_to_date", o.current_version), -- >>> EDIT Desuka <<<
                     "4000")
             end
         else
@@ -223,7 +297,7 @@ local function check_for_update(manual)
             if manual then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "info", "update-checker",
-                    "Versión local (" .. o.current_version .. ") más reciente que la publicada (" .. latest .. ").",
+                    t("local_newer", o.current_version, latest), -- >>> EDIT Desuka <<<
                     "4000")
             end
         end

@@ -452,7 +452,7 @@ local activity_timer
 local function spawn(time)
     if disabled then return end
 
-    -- EDIT Desuka: late-resolve frontend exe (startup race)
+    -- >>> CUSTOM Desuka: late-resolve frontend exe (startup race) <<<
     if mpv_path == "mpv" and os_name == "windows" then
         local late_path = mp.get_property_native("user-data/frontend/process-path")
         local late_info = late_path and mp.utils.file_info(late_path)
@@ -462,6 +462,7 @@ local function spawn(time)
             mp.msg.warn("thumbfast: mpv_path late-resolved to " .. tostring(late_path))
         end
     end
+    -- <<< CUSTOM Desuka >>>
 
     local path = properties["path"]
     if path == nil then return end
@@ -533,8 +534,7 @@ local function spawn(time)
     table.insert(args, path)
 
     spawned = true
-    -- EDIT Desuka: capture overlap before overwriting spawn_waiting
-    local overlapped = spawn_waiting
+    local overlapped = spawn_waiting -- >>> EDIT Desuka <<< -- capture overlap before overwriting
     spawn_waiting = true
     -- >>> CUSTOM Desuka: spawn timing instrumentation <<<
     spawn_seq = spawn_seq + 1
@@ -559,7 +559,7 @@ local function spawn(time)
                 if not spawn_working then -- notify users of required configuration
                     -- >>> CUSTOM Desuka: errors go to the unified toast (no native OSD overlap) <<<
                     local function toast_err(text)
-                        -- EDIT Desuka: throttle error toasts
+                        -- throttle error toasts to one per 10s
                         local now = mp.get_time()
                         if now - last_error_toast < 10 then return false end
                         last_error_toast = now
@@ -581,13 +581,13 @@ local function spawn(time)
                                 end
                             end
                         else
-                            -- EDIT Desuka: hint at missing binary when no frontend path
+                            -- hint at missing binary when no frontend path
                             if frontend_path == nil then
                                 toast_err("thumbfast: mpv not found, set mpv_path in thumbfast.conf")
                             else
                                 toast_err("thumbfast: ERROR! cannot create mpv subprocess")
                             end
-                            -- NOTE Desuka: no mpvnet show-text here, the toast is the only channel
+                            -- no mpvnet show-text here, the toast is the only channel
                         end
                     else
                         -- found ImPlay but not defined in config
@@ -633,11 +633,12 @@ local function run(command)
         end
         if not file then
             file = io.open("\\\\.\\pipe\\"..options.socket, "r+b")
-            -- EDIT Desuka: log first pipe miss while waiting
+            -- >>> CUSTOM Desuka: log first pipe miss while waiting <<<
             if not file and spawn_waiting and not pipe_logged then
                 pipe_logged = true
                 mp.msg.warn(string.format("thumbfast: spawn #%d pipe not ready elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
             end
+            -- <<< CUSTOM Desuka >>>
         end
     elseif pre_0_33_0 then
         subprocess({"/usr/bin/env", "sh", "-c", "echo '" .. command .. "' | socat - " .. options.socket})
@@ -746,8 +747,7 @@ local function check_new_thumb()
     move_file(options.thumbnail, tmp)
     local finfo = mp.utils.file_info(tmp)
     if not finfo then return false end
-    -- EDIT Desuka: capture first-thumb transition before clearing flag
-    local was_waiting = spawn_waiting
+    local was_waiting = spawn_waiting -- >>> EDIT Desuka <<< -- capture first-thumb transition before clearing
     spawn_waiting = false
     -- >>> CUSTOM Desuka: first thumbnail timing <<<
     if was_waiting then
@@ -876,10 +876,11 @@ local function watch_changes()
     if spawned then
         if resized then
             -- mpv doesn't allow us to change output size
-            -- EDIT Desuka: log respawn overlap while waiting
+            -- >>> CUSTOM Desuka: log respawn overlap while waiting <<<
             if spawn_waiting then
                 mp.msg.warn(string.format("thumbfast: respawn overlap #%d elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
             end
+            -- <<< CUSTOM Desuka >>>
             local seek_time = last_seek_time
             run("quit")
             clear()
@@ -960,16 +961,15 @@ local function sync_changes(prop, val)
 end
 
 local function file_load()
-    -- EDIT Desuka: log abandoned spawn on file load
+    -- >>> CUSTOM Desuka: reset spawn state on file load <<<
     if spawn_waiting then
         mp.msg.warn(string.format("thumbfast: file-load abandoned spawn #%d elapsed=%.3fs", spawn_seq, mp.get_time() - spawn_start))
     end
-    -- EDIT Desuka: never keep thumbs disabled across files
-    force_disabled = false
-    -- EDIT Desuka: drop stale spawn state from previous file
     spawn_waiting = false
     pipe_logged = false
     last_error_toast = -10
+    -- <<< CUSTOM Desuka >>>
+    force_disabled = false -- >>> EDIT Desuka <<< -- never keep thumbs disabled across files
     clear()
     spawned = false
     real_w, real_h = nil, nil

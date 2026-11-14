@@ -87,6 +87,7 @@ local user_opts = {
     window_top_bar = "auto",    -- show OSC window top bar: "auto", "yes", or "no" (borderless/fullscreen)
     show_windowed = true,       -- show OSC when windowed
     show_fullscreen = true,     -- show OSC when fullscreen
+    show_in_idle = true, -- >>> EDIT Desuka <<< -- keep chrome (top bar + controls) visible when idle
     show_on_pause = true,       -- show OSC when paused
     keep_on_pause = false,      -- disable OSC hide timeout when paused
     green_and_grumpy = false,   -- disable the Santa hat in December
@@ -184,6 +185,9 @@ local user_opts = {
 
     info_button = false,            -- show info button
     ontop_button = true,            -- show window on top button
+    menu_button = true,             -- show menu button top-left (opens the advanced menu) -- >>> EDIT Desuka <<<
+    show_shader_button = true, -- >>> EDIT Desuka <<< -- show shader button (Anime4K + AnimeJaNai menu)
+    show_subedit_button = true, -- >>> EDIT Desuka <<< -- show subtitle edit tool button
     screenshot_button = false,      -- show screenshot button
     screenshot_flag = "subtitles",  -- flag for screenshot button: "subtitles", "video", "window", "each-frame"
     -- https://mpv.io/manual/master/#screenshot-commands
@@ -355,6 +359,11 @@ local icons = {
     video = "\243\176\128\186", -- video tracks icon (mpv-osd-symbols)
     -- <<< CUSTOM Desuka >>>
     subtitle = "\238\175\141",
+    -- >>> CUSTOM Desuka <<<
+    menu = "\239\147\161", -- hamburger (fluent-system-icons line-horizontal-3)
+    shader = "\238\172\179", -- >>> EDIT Desuka <<< -- sparkle (fluent-system-icons)
+    subedit = "\239\143\157", -- >>> EDIT Desuka <<< -- pencil (fluent-system-icons edit)
+    -- <<< CUSTOM Desuka >>>
 
     volume = {
         mute = "\238\173\138",
@@ -433,6 +442,11 @@ local language = {
         download_in_progress = "Download in progress",
         downloading = "Downloading",
         downloaded = "Already downloaded",
+        -- >>> CUSTOM Desuka <<<
+        menu = "Menu", -- adv menu header + top-left button tooltip
+        shaders = "Shaders", -- >>> EDIT Desuka <<< -- shader button tooltip + menu header
+        subedit = "Edit subtitles", -- >>> EDIT Desuka <<< -- subtitle edit button tooltip
+        -- <<< CUSTOM Desuka >>>
     },
 
     -- >>> CUSTOM Desuka <<<
@@ -465,6 +479,9 @@ local language = {
         download_in_progress = "Descargando",
         downloading = "Descargando",
         downloaded = "Ya descargado",
+        menu = "Menú", -- adv menu header + top-left button tooltip
+        shaders = "Shaders", -- >>> EDIT Desuka <<< -- shader button tooltip + menu header
+        subedit = "Editar subtítulos", -- >>> EDIT Desuka <<< -- subtitle edit button tooltip
     }
     -- <<< CUSTOM Desuka >>>
 }
@@ -1066,6 +1083,7 @@ local state = {
     input_enabled = true,
     showhide_enabled = false,
     wc_enabled = true, -- >>> EDIT Desuka <<< -- window-controls bindings start enabled (see bottom)
+    menu_enabled = true, -- >>> EDIT Desuka <<< -- menu-controls bindings start enabled (see bottom)
 
     border = true,
     title_bar = true,
@@ -1118,6 +1136,12 @@ local state = {
     -- Track dropdown menu (click cy_video/cy_audio/cy_sub to pick with the mouse)
     track_menu = nil, -- { ttype, items, header, width, offset, pressed, born } or nil
     track_menu_fading = nil, -- closing snapshot { m, g, t0 } for the fade-out
+    -- <<< CUSTOM Desuka >>>
+
+    -- >>> CUSTOM Desuka <<<
+    -- Advanced menu (top-left button): rows parsed from input.conf #menu:
+    adv_menu = nil, -- { items, header, width, offset, pressed, born } or nil
+    adv_menu_fading = nil, -- closing snapshot { m, g, t0 } for the fade-out
     -- <<< CUSTOM Desuka >>>
 
     -- >>> CUSTOM Desuka: unified toast (single slot, preemptive, no queue) <<<
@@ -1382,6 +1406,7 @@ local function get_hide_timeout()
     if user_opts.visibility == "always" then
         return -1 -- disable autohide
     end
+    if state.idle and user_opts.show_in_idle then return -1 end -- >>> EDIT Desuka <<< -- idle chrome stays up, nothing to reveal
     return user_opts.hide_timeout
 end
 
@@ -1748,7 +1773,7 @@ local function draw_seekbar_handle(element, elem_ass, override_alpha)
     local xp = get_slider_ele_pos_for(element, pos)                                  -- handle position
     local handle_hovered = mouse_hit_coords(element.hitbox.x1 + xp - rh, element.hitbox.y1 + elem_geo.h / 2 - rh,
         element.hitbox.x1 + xp + rh, element.hitbox.y1 + elem_geo.h / 2 + rh) and element.enabled
-        and not state.track_menu -- >>> EDIT Desuka <<< -- no handle hover while the menu is open
+        and not state.track_menu and not state.adv_menu -- >>> EDIT Desuka <<< -- no handle hover while a menu is open
 
     if display_handle then
         -- Apply size hover_effect only if hovering over the handle.
@@ -2132,9 +2157,9 @@ function render_elements(master_ass)
                 -- add tooltip
                 if element.slider.tooltipF ~= nil and element.enabled then
                     -- >>> CUSTOM Desuka <<<
-                    -- No slider tooltip/thumbfast while the track menu is
+                    -- No slider tooltip/thumbfast while a dropdown menu is
                     -- open (modal), anywhere on screen.
-                    if mouse_hit(element) and not state.track_menu then
+                    if mouse_hit(element) and not state.track_menu and not state.adv_menu then
                     -- <<< CUSTOM Desuka >>>
                         local sliderpos = get_slider_value(element)
                         local tooltiplabel = element.slider.tooltipF(sliderpos)
@@ -2290,10 +2315,12 @@ function render_elements(master_ass)
                 element.eventresponder["mbtn_left_up"] ~= nil
             )
             -- >>> CUSTOM Desuka <<<
-            -- No hover styling while the track menu is open (modal), except
-            -- the other track buttons (still clickable to toggle menus).
+            -- No hover styling while a dropdown menu is open (modal), except
+            -- the buttons that toggle another menu (still clickable).
             local cy_button = element.name == "cy_video" or element.name == "cy_audio" or element.name == "cy_sub"
+            local toggle_button = cy_button or element.name == "menu_btn"
             local hovered = mouse_hit(element) and (not state.track_menu or cy_button)
+                and (not state.adv_menu or toggle_button)
                 and is_clickable and element.enabled and state.mouse_down_counter == 0
             -- Gradual hover: ease size and glow in and out (~100/80 ms).
             -- No ramp (and no extra ticks) when neither is enabled.
@@ -2366,10 +2393,10 @@ function render_elements(master_ass)
             -- add tooltip for audio and subtitle tracks
             if not (element.tooltipF == nil) then
                 -- >>> CUSTOM Desuka <<<
-                -- No tooltip while the track menu is open (modal). No cy_*
-                -- exception here on purpose: it would paint underneath the
-                -- open menu (wasted render, invisible).
-                if mouse_hit(element) and not state.track_menu then
+                -- No tooltip while a dropdown menu is open (modal). No
+                -- toggle-button exception here on purpose: it would paint
+                -- underneath the open menu (wasted render, invisible).
+                if mouse_hit(element) and not state.track_menu and not state.adv_menu then
                 -- <<< CUSTOM Desuka >>>
                     local an = 1
                     local ty = element.hitbox.y1
@@ -2571,6 +2598,7 @@ local function newfilereset()
     request_init()
     -- >>> CUSTOM Desuka <<<
     close_track_menu() -- new file, stale dropdown
+    close_adv_menu() -- new file, stale dropdown
     thumb_clear() -- new file, stale thumbnail
     -- <<< CUSTOM Desuka >>>
     state.downloaded_once = false
@@ -3655,23 +3683,13 @@ local function render_toast(ass)
     end
     -- keep the pill on screen (narrow/portrait video, wide pill)
     cx = math.min(math.max(cx, pill_w / 2), math.max(pill_w / 2, osc_param.playresx - pill_w / 2))
-    -- extra bottom padding grows downward: top edge stays anchored
-    local cy_box = cy + pad_b / 2
+    -- top-anchored: the top edge stays at the margin, the pill grows downward
+    local y0 = cy + slide -- >>> EDIT Desuka <<< -- entrance rise: start below, settle at rest position
+    local y1 = y0 + pill_h
     -- text (and bar) vertical center, optical nudge included
-    local tcy = cy + text_dy
-    if slide > 0 then -- entrance rise: start below, settle at rest position
-        cy_box = cy_box + slide
-        tcy = tcy + slide
-    end
+    local tcy = y0 + pill_h / 2 + text_dy
     local x0 = cx - pill_w / 2
     local x1 = cx + pill_w / 2
-    local y0 = cy_box - pill_h / 2
-    if y0 < 0 then
-        cy_box = cy_box - y0
-        tcy = tcy - y0
-        y0 = 0
-    end
-    local y1 = cy_box + pill_h / 2
     if not asset then x1 = x1 - 10 end -- balance the text shift (plain only)
     local r_opt = tonumber(user_opts.toast_bg_radius)
     if r_opt == nil or r_opt < 0 then r_opt = 12 end
@@ -3779,7 +3797,8 @@ local function render_toast(ass)
     else
         local bar_h = content_h * bar_len
         local bar_x = x0 + pad_x / 2
-        ass:round_rect_cw(bar_x, cy_box - bar_h / 2, bar_x + bar_w, cy_box + bar_h / 2, 2)
+        local bar_cy = (y0 + y1) / 2 -- >>> EDIT Desuka <<< -- pill center, no text nudge
+        ass:round_rect_cw(bar_x, bar_cy - bar_h / 2, bar_x + bar_w, bar_cy + bar_h / 2, 2)
     end
     ass:draw_stop()
     end
@@ -3812,11 +3831,16 @@ local function render_toast(ass)
         return
     end
     render_toast_bar()
-    -- text (centered, multiline via \N)
+    -- text: single line centered (tight pill); multiline left-aligned, normal paragraph
     local body = table.concat(lines, "\\N")
     ass:new_event()
-    ass:pos(cx - 2, tcy)
-    ass:an(5)
+    if #lines > 1 then -- >>> EDIT Desuka <<< -- paragraphs read left-aligned, single lines unchanged
+        ass:pos(x0 + pad_x, tcy)
+        ass:an(4)
+    else
+        ass:pos(cx - 2, tcy)
+        ass:an(5)
+    end
     ass:append(text_style .. body)
 end
 -- <<< CUSTOM Desuka >>>
@@ -3975,6 +3999,7 @@ end
 
 function open_track_menu(ttype)
     if ttype ~= "video" and ttype ~= "audio" and ttype ~= "sub" then return end
+    close_adv_menu() -- only one dropdown at a time
     if not track_menu_anchor(ttype) then
         show_tracklist(ttype) -- button hidden (narrow window): legacy block list
         return
@@ -4009,6 +4034,7 @@ function close_track_menu()
 end
 
 function toggle_track_menu(ttype)
+    close_adv_menu() -- only one dropdown at a time
     if state.track_menu and state.track_menu.ttype == ttype then
         close_track_menu()
     else
@@ -4316,7 +4342,7 @@ end
 -- True while the cursor is over another track button, so it can toggle its
 -- own dropdown instead of being swallowed as an outside dismiss click.
 local function track_menu_on_cy_button(_mx, _my)
-    for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub" }) do
+    for _, nm in ipairs({ "cy_video", "cy_audio", "cy_sub", "menu_btn", "cy_shader" }) do -- >>> EDIT Desuka <<< -- shader button toggles its own menu too
         for _, el in pairs(elements) do
             if el.name == nm and el.hitbox and mouse_hit_coords(el.hitbox.x1, el.hitbox.y1, el.hitbox.x2, el.hitbox.y2) then
                 return true
@@ -4325,6 +4351,17 @@ local function track_menu_on_cy_button(_mx, _my)
     end
     return false
 end
+
+-- >>> CUSTOM Desuka <<<
+-- Menu button hitbox for mouse area + autohide.
+-- Script-global: the main chunk is at Lua 5.1's 200-locals limit.
+function menu_button_hitbox()
+    for _, el in pairs(elements) do
+        if el.name == "menu_btn" and el.hitbox then return el.hitbox end
+    end
+    return nil
+end
+-- <<< CUSTOM Desuka >>>
 
 function track_menu_handle_event(source, what)
     local m = state.track_menu
@@ -4412,6 +4449,609 @@ mp.register_script_message("open-track-menu", function(tt)
     end
 end)
 mp.register_script_message("close-track-menu", function() close_track_menu() end)
+-- <<< CUSTOM Desuka >>>
+
+-- >>> CUSTOM Desuka <<<
+-- Advanced menu (top-left button): in-OSC replacement for the mpvnet
+-- context menu, which mpvnet suppresses near the window borders (i.e.
+-- everywhere the OSC lives). Rows are parsed from input.conf #menu:
+-- lines on every open, so it always matches the native menu.
+-- Mirror, not keymap: later #menu: entries win (like mpv bindings);
+-- a " [Desuka]" leaf suffix is stripped for dedup/labels (native keeps
+-- it); dynamic submenus (Recent/Titles/Chapters/Track/Profile) are
+-- skipped, separators collapsed. adv_menu_overrides() below patches
+-- rows whose key/command went stale after a DESUKA rebind.
+--
+-- Script-global (not a chunk local): the main chunk is at Lua 5.1's
+-- 200-locals limit, like menu_button_hitbox() and track_menu_*().
+function adv_menu_overrides()
+    -- menupath -> { key, cmd }: applied over the parsed row (same shape),
+    -- so the menu always mirrors the effective binds. Presentation-only:
+    -- input.conf (and the native menu) is left untouched.
+    return {
+        -- stale key hints (key rebound elsewhere, row still runs on click)
+        ["Navigate > Jump 5 min forward"]  = { key = "_", cmd = "seek 300 exact" },
+        ["Navigate > Jump 5 min backward"] = { key = "_", cmd = "seek -300 exact" },
+        -- managed mislabel (Up/Down do -/+85 and now volume): keep the row
+        -- clickable with the honest command instead of deleting it
+        ["Navigate > Jump 30 sec forward"]  = { key = "_", cmd = "seek 30 exact" },
+        ["Navigate > Jump 30 sec backward"] = { key = "_", cmd = "seek -30 exact" },
+        ["Video > Toggle Deinterlace"]     = { key = "_", cmd = "cycle deinterlace" },
+        ["Exit"]                           = { key = "_", cmd = "quit" },
+        ["View > Show Audio Tracks"]      = { key = "_", cmd = "script-message-to mpvnet show-audio-tracks" },
+        -- click == keybind (row ran the unmanaged variant, key runs the Desuka one)
+        ["Subtitle > Cycle/Next"]        = { key = "j", cmd = "script-message-to modernx cycle-sub" },
+        ["Audio > Cycle/Next"]           = { key = "a", cmd = "cycle audio" },
+        -- stale commands (rebind replaced the action)
+        ["Play/Pause"] = { key = "Space", cmd = "cycle pause" },
+        ["Toggle Fullscreen"] = { key = "f", cmd = "cycle fullscreen" },
+        ["AnimeJaNai > Toggle AnimeJaNai Stats"] = { key = "Ctrl+j", cmd = "script-binding animejanaistats/show_animejanai_stats" },
+    }
+end
+function adv_menu_tree()
+    -- node: { name, kids = {}, index = {}, order = {} }
+    -- order entries: { kind = "group", node } | { kind = "leaf", label, cmd } | { kind = "sep" }
+    local root = { name = nil, kids = {}, index = {}, order = {} }
+    local function node_for(parent, name)
+        local n = parent.index[name]
+        if not n then
+            n = { name = name, kids = {}, index = {}, order = {} }
+            parent.index[name] = n
+            parent.order[#parent.order + 1] = { kind = "group", node = n }
+        end
+        return n
+    end
+    local function split_path(menupath)
+        local segs, pos = {}, 1
+        while true do
+            local a, b = menupath:find(">", pos, true)
+            if not a then
+                segs[#segs + 1] = menupath:sub(pos):match("^%s*(.-)%s*$")
+                break
+            end
+            segs[#segs + 1] = menupath:sub(pos, a - 1):match("^%s*(.-)%s*$")
+            pos = b + 1
+        end
+        -- drop empty segments from malformed "A >> B" paths
+        local clean = {}
+        for _, s in ipairs(segs) do
+            if s ~= "" then clean[#clean + 1] = s end
+        end
+        return clean
+    end
+    local ok, path = pcall(mp.command_native, { "expand-path", "~~/input.conf" })
+    if not ok or type(path) ~= "string" or path == "" then return root end
+    local f = io.open(path, "r")
+    if not f then return root end
+    local overrides = adv_menu_overrides() -- stale-row patches (built once per open)
+    local slot_names = ajn_slot_names() -- >>> EDIT Desuka <<< -- live AJN profile names
+    for line in f:lines() do
+        local s = line:match("^%s*(.-)%s*$")
+        if s ~= "" and s:sub(1, 1) ~= "#" then
+            local key, rest = s:match("^(%S+)%s+(.-)%s*$")
+            if key and rest then
+                -- NOTE: matches the first "#menu:" even inside a quoted
+                -- command string; no such case in input.conf today.
+                local mi = rest:find("#menu:", 1, true)
+                if mi then
+                    local cmd = rest:sub(1, mi - 1):match("^%s*(.-)%s*$")
+                    local menupath = rest:sub(mi + 6):match("^%s*(.-)%s*$")
+                    local segs = split_path(menupath)
+                    if #segs == 0 then segs = nil end -- malformed empty path: skip row
+                    if segs then
+                        local parent = root
+                        for i = 1, #segs - 1 do parent = node_for(parent, segs[i]) end
+                        -- strip a trailing " [Desuka]" marker for grouping/labels/dedup
+                        -- (native menu keeps it; ours shows the canonical row)
+                        local leaf = segs[#segs]:gsub("%s*%[Desuka%]$", "")
+                        leaf = ajn_slot_leaf(segs, leaf, slot_names, parent) -- >>> EDIT Desuka <<< -- show profile names
+                        if leaf ~= "" then
+                            if leaf == "-" then
+                                parent.order[#parent.order + 1] = { kind = "sep" }
+                            else
+                                -- presentation overrides for stale managed rows
+                                -- (same table shape; input.conf untouched)
+                                local o = overrides[menupath:gsub("%s*%[Desuka%]$", "")]
+                                local k, c = key, cmd
+                                if o then k, c = o.key, o.cmd end
+                                if c ~= "" and c ~= "ignore" then
+                                    local label = leaf
+                                    if k ~= "_" then label = label .. "   [" .. k .. "]" end
+                                    -- later #menu: entries win (like mpv bindings)
+                                    local at = parent.index["_leaf:" .. leaf]
+                                    if at == nil then
+                                        at = #parent.order + 1
+                                        parent.order[at] = { kind = "leaf" }
+                                        parent.index["_leaf:" .. leaf] = at
+                                    end
+                                    parent.order[at].label = label
+                                    parent.order[at].cmd = c
+                                end
+                                -- ignore-rows (dynamic submenu spacers): skipped
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    f:close()
+    -- prune groups with no actionable descendant
+    local function has_action(n)
+        for _, e in ipairs(n.order) do
+            if e.kind == "leaf" then return true end
+            if e.kind == "group" and has_action(e.node) then return true end
+        end
+        return false
+    end
+    local function prune(n)
+        local kept = {}
+        for _, e in ipairs(n.order) do
+            if e.kind == "group" then
+                prune(e.node)
+                if has_action(e.node) then kept[#kept + 1] = e end
+            else
+                kept[#kept + 1] = e
+            end
+        end
+        n.order = kept
+    end
+    prune(root)
+    return root
+end
+
+-- Script-global (not a chunk local): the main chunk is at Lua 5.1's
+-- 200-locals limit, like menu_button_hitbox() and track_menu_*().
+function adv_menu_level(node, parent_name, header)
+    local raw = {}
+    if parent_name then raw[#raw + 1] = { back = true, label = "‹ " .. parent_name } end
+    for _, e in ipairs(node.order) do
+        if e.kind == "sep" then
+            raw[#raw + 1] = { sep = true }
+        elseif e.kind == "leaf" then
+            raw[#raw + 1] = { label = e.label, cmd = e.cmd }
+        else
+            raw[#raw + 1] = { group = e.node, label = e.node.name .. "  ›" }
+        end
+    end
+    -- collapse separator runs, trim leading/trailing (never the back row)
+    local items = {}
+    for _, it in ipairs(raw) do
+        if it.sep then
+            if #items > 0 and not items[#items].sep and not items[#items].back then
+                items[#items + 1] = it
+            end
+        else
+            items[#items + 1] = it
+        end
+    end
+    while #items > 0 and items[#items].sep do items[#items] = nil end
+    local fontsize = user_opts.track_menu_font_size or 18
+    local width = text_width(header or texts.menu or "Menu", fontsize)
+    for _, item in ipairs(items) do
+        if not item.sep then
+            width = math.max(width, text_width(item.label, fontsize))
+        end
+    end
+    return items, width
+end
+
+function adv_menu_show(node, header, parent, trail, offset)
+    local items, width = adv_menu_level(node, parent, header)
+    if #items == 0 or (#items == 1 and items[1].back) then -- degenerate level: keep current menu
+        show_toast(texts.na or "Not available", "warn", "modernx-menu")
+        return false
+    end
+    state.adv_menu = { header = header, items = items, width = width, offset = offset or 0,
+        pressed = nil, born = mp.get_time(), node = node, parent = parent, trail = trail or {} }
+    state.adv_menu_fading = nil -- a fresh open replaces any closing fade
+    reset_timeout()
+    show_osc()
+    request_tick()
+    return true
+end
+
+function open_adv_menu()
+    adv_menu_anchor_el = nil -- >>> EDIT Desuka <<< -- classic menu uses menu_btn below
+    close_track_menu()
+    local tree = adv_menu_tree()
+    if #tree.order == 0 then -- input.conf missing/unreadable: say so instead of looking dead
+        show_toast(texts.na or "Not available", "warn", "modernx-menu")
+        return
+    end
+    if adv_menu_show(tree, texts.menu or "Menu", nil, {}) then
+        mp.add_forced_key_binding("ESC", "modernx-adv-menu-close", close_adv_menu)
+    end
+end
+
+function close_adv_menu()
+    if state.adv_menu == nil then adv_menu_anchor_el = nil return end -- >>> EDIT Desuka <<< -- keep anchor until the fade snapshot is taken
+    if user_opts.track_menu_animation and state.osc_visible then
+        -- Closing fade snapshot; render_adv_menu() only runs while the OSC
+        -- is visible, so skip it when already hidden (nothing to paint over).
+        local g = adv_menu_geometry()
+        if g then state.adv_menu_fading = { m = state.adv_menu, g = g, t0 = mp.get_time(), above = (adv_menu_anchor_el ~= nil) } end -- >>> EDIT Desuka <<< -- fade sinks toward its own button
+    else
+        state.adv_menu_fading = nil
+    end
+    state.adv_menu = nil
+    adv_menu_anchor_el = nil -- >>> EDIT Desuka <<< -- drop shader anchor with the menu
+    mp.remove_key_binding("modernx-adv-menu-close")
+    request_tick()
+end
+
+function toggle_adv_menu()
+    if state.adv_menu and not adv_menu_anchor_el then close_adv_menu() else open_adv_menu() end -- >>> EDIT Desuka <<< -- shader menu counts as another menu, switch to classic
+end
+
+function adv_menu_scroll(delta)
+    local m = state.adv_menu
+    if not m then return end
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    local max_off = math.max(0, #m.items - max_rows)
+    m.offset = math.max(0, math.min(max_off, m.offset + delta))
+    reset_timeout()
+    request_tick()
+end
+
+function adv_menu_geometry()
+    local m = state.adv_menu
+    if not m then return nil end
+    local anchor = menu_button_hitbox()
+    local above = false
+    if adv_menu_anchor_el then -- >>> EDIT Desuka <<< -- shader menu hangs above its own button
+        local found = nil
+        for _, el in pairs(elements) do
+            if el.name == adv_menu_anchor_el and el.hitbox then found = el.hitbox break end
+        end
+        if not found then return nil end -- button hidden (narrow window): don't teleport
+        anchor, above = found, true
+    end
+    if not anchor then return nil end
+    local fontsize = user_opts.track_menu_font_size or 18
+    if fontsize <= 0 then fontsize = 18 end
+    local max_rows = math.floor(user_opts.track_menu_max_rows or 8)
+    if max_rows < 3 then max_rows = 3 end
+    local row_h = fontsize * 1.5
+    local pad_x, pad_y = 12, 8
+    local header_h = fontsize * 1.2
+    local total = #m.items
+    local visible = math.min(total, max_rows)
+    local scrollable = total > max_rows
+    local sb_w, sb_right, sb_gap, top_gap = 6, 3, 0, 6
+    local sb_reserve = scrollable and (sb_gap + sb_w + sb_right) or 0
+    -- reuse the dropdown plate metrics (same visual family)
+    local menu_w = m.width + pad_x * 2 + sb_reserve
+    local max_w = osc_param.playresx - 8
+    if max_w < 40 then max_w = 40 end -- degenerate init canvas: clamp, don't invert
+    if menu_w > max_w then menu_w = max_w end
+    local menu_h = pad_y * 2 + header_h + top_gap + visible * row_h
+    local x0 = anchor.x1 -- left-aligned with the button
+    x0 = math.max(4, math.min(x0, osc_param.playresx - menu_w - 4))
+    local y0, y1
+    if above then -- >>> EDIT Desuka <<< -- bottom-bar button: hang above like track menus
+        y1 = anchor.y1 - 8
+        y0 = y1 - menu_h
+        if y0 < 4 then y0 = 4 y1 = y0 + menu_h end
+    else
+        y0 = anchor.y2 + 8 -- hangs below the button (no room above)
+        y1 = y0 + menu_h
+        if y1 > osc_param.playresy - 4 then
+            y1 = osc_param.playresy - 4
+            y0 = y1 - menu_h
+            if y0 < 4 then y0 = 4 end
+        end
+    end
+    local rows = {}
+    for i = 1, visible do
+        local idx = m.offset + i
+        if idx > total then break end
+        rows[#rows + 1] = {
+            x0 = x0, y0 = y0 + pad_y + header_h + top_gap + (i - 1) * row_h,
+            x1 = x0 + menu_w - sb_reserve, y1 = y0 + pad_y + header_h + top_gap + i * row_h,
+            index = idx,
+        }
+    end
+    local sb = nil
+    if scrollable then
+        sb = { x0 = x0 + menu_w - sb_right - sb_w, w = sb_w,
+            top = y0 + pad_y + header_h + top_gap, bottom = y1 - pad_y }
+    end
+    return { x0 = x0, y0 = y0, x1 = x0 + menu_w, y1 = y0 + menu_h,
+        row_h = row_h, fontsize = fontsize, header_h = header_h,
+        pad_x = pad_x, pad_y = pad_y, visible = visible,
+        scrollable = scrollable, rows = rows, sb = sb }
+end
+
+-- Release a stranded OSC press before the menu swallows its release.
+-- Script-global (not a chunk local): the main chunk is at Lua 5.1's
+-- 200-locals limit.
+function adv_menu_drop_gesture()
+    local n = state.active_element
+    local el = n and elements[n]
+    if el then
+        if el.eventresponder and el.eventresponder['reset'] then
+            el.eventresponder['reset'](el)
+        end
+        if el.state then
+            el.state.mbtnleft = false -- reset() doesn't clear it (up does, and up was swallowed)
+        end
+    end
+    state.active_element = nil
+    state.mouse_down_counter = 0
+end
+
+-- True while the cursor is over a button that toggles its own menu,
+-- so it can switch instead of being swallowed as an outside dismiss.
+-- Script-global (not a chunk local): the main chunk is at Lua 5.1's
+-- 200-locals limit.
+function adv_menu_on_toggle_button(mx, my)
+    for _, nm in ipairs({ "menu_btn", "cy_video", "cy_audio", "cy_sub", "cy_shader" }) do -- >>> EDIT Desuka <<< -- shader button switches menus too
+        for _, el in pairs(elements) do
+            if el.name == nm and el.hitbox
+                and mx >= el.hitbox.x1 and mx <= el.hitbox.x2
+                and my >= el.hitbox.y1 and my <= el.hitbox.y2 then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function adv_menu_drill(node)
+    local m = state.adv_menu
+    if not m or not node then return end
+    local trail = m.trail
+    trail[#trail + 1] = { node = m.node, header = m.header, parent = m.parent, offset = m.offset }
+    local pname = (m.node and m.node.name) or m.header -- short label for the back row
+    adv_menu_show(node, m.header .. " › " .. node.name, pname, trail)
+end
+
+function adv_menu_back()
+    local m = state.adv_menu
+    if not m or #m.trail == 0 then return end
+    local e = m.trail[#m.trail]
+    m.trail[#m.trail] = nil
+    adv_menu_show(e.node, e.header, e.parent, m.trail, e.offset)
+end
+
+function adv_menu_run(item)
+    if not item then return end
+    if item.back then adv_menu_back() return end
+    if item.group then adv_menu_drill(item.group) return end
+    local cmd = item.cmd
+    close_adv_menu()
+    if not cmd or cmd == "" then return end
+    -- input.conf grammar (quotes, ; chains): same parser as keybinds
+    local ok, err = pcall(mp.command, cmd)
+    if not ok then
+        show_toast(tostring(err or "failed"), "warn", "modernx-menu")
+    end
+    -- no success toast: matches the silent native menu
+end
+
+function adv_menu_handle_event(source, what)
+    local m = state.adv_menu
+    if not m then return false end
+    if source == "mouse_move" then return false end
+    local mx, my = get_virt_mouse_pos()
+    local g = adv_menu_geometry()
+    if not g then close_adv_menu() return false end
+    local inside = mx >= g.x0 and mx <= g.x1 and my >= g.y0 and my <= g.y1
+    if source == "wheel_up" or source == "wheel_down" then
+        if inside then
+            adv_menu_scroll(source == "wheel_down" and 1 or -1)
+            return true
+        end
+        -- Outside the box: swallow so neither volume nor seekbar react
+        -- while the modal menu is open, but let toggle buttons keep theirs.
+        if adv_menu_on_toggle_button(mx, my) then return false end
+        reset_timeout()
+        request_tick()
+        return true
+    end
+    if source == "mbtn_right" then
+        adv_menu_drop_gesture()
+        close_adv_menu()
+        return true
+    end
+    if source == "mbtn_left" or source == "shift+mbtn_left" then
+        if what == "down" then
+            for _, r in ipairs(g.rows) do
+                local item = m.items[r.index]
+                if item and not item.sep
+                    and mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 then
+                    adv_menu_drop_gesture() -- abort any in-flight OSC drag first
+                    m.pressed = r.index
+                    request_tick()
+                    return true
+                end
+            end
+            -- inside the box but not on an actionable row: swallow
+            if inside then
+                adv_menu_drop_gesture()
+                request_tick()
+                return true
+            end
+            -- outside: let toggle buttons switch instead of swallowing
+            -- (their own responder toggles, which closes this menu)
+            if adv_menu_on_toggle_button(mx, my) then return false end
+            adv_menu_drop_gesture()
+            close_adv_menu()
+            return true
+        elseif what == "up" then
+            if m.pressed then
+                local p = m.pressed
+                m.pressed = nil
+                adv_menu_drop_gesture()
+                for _, r in ipairs(g.rows) do
+                    if mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1 and r.index == p then
+                        adv_menu_run(m.items[r.index])
+                        return true
+                    end
+                end
+                request_tick()
+                return true
+            end
+            if inside then
+                adv_menu_drop_gesture()
+                return true
+            end
+            -- outside: let toggle buttons switch instead of swallowing
+            -- (their own responder toggles, which closes this menu)
+            if adv_menu_on_toggle_button(mx, my) then return false end
+            adv_menu_drop_gesture()
+            close_adv_menu()
+            return true
+        end
+    end
+    return false
+end
+
+-- Script-global (not a chunk local): the main chunk is at Lua 5.1's
+-- 200-locals limit, like the rest of the adv menu entry points.
+function render_adv_menu_one(ass, m, g, fade, dy, allow_hover)
+    local mx, my = get_virt_mouse_pos()
+    if not allow_hover then mx, my = -9999, -9999 end -- fading snapshot: no hover
+    local row_r = math.max(0, user_opts.track_menu_radius or 5)
+    local bg_col = osc_color_convert(sanitize_hex_color(user_opts.track_menu_bg_color, "#141414"))
+    local bg_op = tonumber(user_opts.track_menu_bg_opacity)
+    if bg_op == nil or bg_op < 0 or bg_op > 1 then bg_op = 1 end
+    local bd_col = osc_color_convert(sanitize_hex_color(user_opts.track_menu_border_color, "#999999"))
+    local bd_w = tonumber(user_opts.track_menu_border_size)
+    if bd_w == nil or bd_w < 0 then bd_w = 1 end
+    local fa = string.format("%02X", math.floor((1 - fade) * 255 + 0.5))
+    local bg_aa = string.format("%02X", math.floor((1 - bg_op * fade) * 255 + 0.5))
+    if bd_w > 0 then
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&H" .. bd_col .. "\\alpha&H" .. fa .. "&}")
+        ass:draw_start()
+        ass:round_rect_cw(g.x0 - bd_w, g.y0 + dy - bd_w, g.x1 + bd_w, g.y1 + dy + bd_w, 6 + bd_w)
+        ass:draw_stop()
+    end
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord0\\1c&H" .. bg_col .. "\\alpha&H" .. bg_aa .. "&}")
+    ass:draw_start()
+    ass:round_rect_cw(g.x0, g.y0 + dy, g.x1, g.y1 + dy, 6)
+    ass:draw_stop()
+    ass:new_event()
+    ass:pos(g.x0 + g.pad_x, g.y0 + dy + g.pad_y + g.header_h / 2)
+    ass:an(4)
+    ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "\\alpha&H" .. fa .. "&}")
+    ass:append(track_menu_fit(m.header, g.x1 - g.x0 - g.pad_x * 2, g.fontsize)) -- breadcrumbs can outgrow short levels
+    ass:new_event()
+    ass:pos(0, 0)
+    ass:an(7)
+    ass:append("{\\blur0\\bord0\\1c&H999999&\\alpha&H" .. fa .. "&}")
+    ass:draw_start()
+    ass:rect_cw(g.x0 + g.pad_x, g.y0 + dy + g.pad_y + g.header_h, g.x1 - g.pad_x, g.y0 + dy + g.pad_y + g.header_h + 1)
+    ass:draw_stop()
+    for _, r in ipairs(g.rows) do
+        local item = m.items[r.index]
+        if item then
+            if item.sep then
+                ass:new_event()
+                ass:pos(0, 0)
+                ass:an(7)
+                ass:append("{\\blur0\\bord0\\1c&H3A3A3A&\\alpha&H" .. fa .. "&}")
+                ass:draw_start()
+                ass:rect_cw(r.x0 + 8, (r.y0 + r.y1) / 2 + dy, r.x1 - 8, (r.y0 + r.y1) / 2 + dy + 1)
+                ass:draw_stop()
+            else
+                local hovered = mx >= r.x0 and mx <= r.x1 and my >= r.y0 and my <= r.y1
+                local pressed = (m.pressed == r.index) and hovered
+                if pressed then
+                    ass:new_event()
+                    ass:pos(0, 0)
+                    ass:an(7)
+                    ass:append("{\\blur0\\bord0\\1c&H" .. osc_color_convert(user_opts.seekbarfg_color) .. "\\alpha&H" .. fa .. "&}")
+                    ass:draw_start()
+                    ass:round_rect_cw(r.x0 + 3, r.y0 + dy + 1, r.x1 - 3, r.y1 + dy - 1,
+                        math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
+                    ass:draw_stop()
+                elseif hovered then
+                    ass:new_event()
+                    ass:pos(0, 0)
+                    ass:an(7)
+                    ass:append("{\\blur0\\bord0\\1c&H3A3A3A&\\alpha&H" .. fa .. "&}")
+                    ass:draw_start()
+                    ass:round_rect_cw(r.x0 + 3, r.y0 + dy + 1, r.x1 - 3, r.y1 + dy - 1,
+                        math.max(0, math.min(row_r, (r.y1 - r.y0) / 2 - 1)))
+                    ass:draw_stop()
+                end
+                local style = "{\\blur0\\bord0\\1c&HFFFFFF&\\fs" .. g.fontsize .. "\\fn" .. user_opts.font .. "\\alpha&H" .. fa .. "&}"
+                local tx = g.x0 + g.pad_x
+                local ty = (r.y0 + r.y1) / 2 + dy
+                local avail = r.x1 - tx - 4
+                ass:new_event()
+                ass:pos(tx, ty)
+                ass:an(4)
+                ass:append(style)
+                ass:append(track_menu_fit(item.label, avail, g.fontsize))
+            end
+        end
+    end
+    if g.scrollable and g.sb then
+        local top, bottom, sb_x0 = g.sb.top + dy, g.sb.bottom + dy, g.sb.x0
+        local sb_w = g.sb.w
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&H3A3A3A&\\alpha&H" .. fa .. "&}")
+        ass:draw_start()
+        ass:round_rect_cw(sb_x0, top, sb_x0 + sb_w, bottom, math.min(row_r, sb_w / 2))
+        ass:draw_stop()
+        local total = #m.items
+        local h = (bottom - top) * (g.visible / total)
+        local y = top + (bottom - top) * (m.offset / total)
+        ass:new_event()
+        ass:pos(0, 0)
+        ass:an(7)
+        ass:append("{\\blur0\\bord0\\1c&HFFFFFF&\\alpha&H" .. fa .. "&}")
+        ass:draw_start()
+        ass:round_rect_cw(sb_x0, y, sb_x0 + sb_w, y + h, math.max(0, math.min(row_r, sb_w / 2, h / 2)))
+        ass:draw_stop()
+    end
+end
+
+function render_adv_menu(ass)
+    local now = mp.get_time()
+    local anim = user_opts.track_menu_animation
+    local f = state.adv_menu_fading
+    if f then
+        local age = now - f.t0
+        if (not anim) or age >= 0.15 or not f.g then
+            state.adv_menu_fading = nil
+        else
+            -- fade out sinking back toward the button (mirror of the open slide)
+            local k = age / 0.15
+            local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
+            render_adv_menu_one(ass, f.m, f.g, 1 - k, (f.above and 1 or -1) * k * k * dist, false) -- >>> EDIT Desuka <<< -- sink toward its own button
+            request_tick()
+        end
+    end
+    local m = state.adv_menu
+    if not m then return end
+    local g = adv_menu_geometry()
+    if not g then return end
+    local fade, dy = 1, 0
+    if anim then
+        local age = now - (m.born or now)
+        if age < 0 then age = 0 end
+        if age < 0.15 then
+            local k = age / 0.15
+            fade = k
+            local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
+            dy = (adv_menu_anchor_el and 1 or -1) * ((1 - k) * (1 - k) * (1 - k)) * dist -- >>> EDIT Desuka <<< -- rise/slide from its own button
+            request_tick()
+        end
+    end
+    render_adv_menu_one(ass, m, g, fade, dy, true)
+end
 -- <<< CUSTOM Desuka >>>
 
 function bind_keys(keys, name, func, opts)
@@ -5032,7 +5672,9 @@ function window_controls()
         end
         lo = add_layout('window_title')
 
-        local geo = { x = 12, y = button_y + 9, an = 1, w = osc_param.playresx - 150, h = wc_geo.h }
+        -- >>> EDIT Desuka <<< -- leave room for the top-left menu button
+        local title_x = user_opts.menu_button and 58 or 12
+        local geo = { x = title_x, y = button_y + 9, an = 1, w = osc_param.playresx - 150 - (title_x - 12), h = wc_geo.h }
 
         lo.geometry = geo
         lo.style = string.format("%s{\\clip(0,%f,%f,%f)}", osc_styles.window_title,
@@ -5184,13 +5826,13 @@ layouts["original"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -5302,10 +5944,17 @@ layouts["original"] = function()
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 600 - outeroffset)
 
+    if user_opts.show_shader_button then
+        lo = add_layout('cy_shader')
+        lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button, before volume
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 700 - outeroffset)
+    end
+
     lo = add_layout('vol_ctrl')
-    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
+    lo.geometry = { x = user_opts.show_shader_button and 217 or 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- after the shader button
     lo.style = osc_styles.control_3
-    lo.visible = (osc_param.playresx >= 700 - outeroffset)
+    lo.visible = (osc_param.playresx >= (user_opts.show_shader_button and 750 or 700) - outeroffset)
 
     -- Fullscreen/Loop/Info
     lo = add_layout('tog_fs')
@@ -5361,6 +6010,28 @@ layouts["original"] = function()
         lo.style = osc_styles.control_3
         lo.visible = (osc_param.playresx >= 400 - outeroffset)
     end
+
+    if user_opts.show_subedit_button then -- >>> EDIT Desuka <<< -- subtitle edit tool, leftmost of the right cluster
+        lo = add_layout('sub_edit')
+        lo.geometry = {
+            x = osc_geo.w - 307 + (loop_button and 0 or 45) + (ontop_button and 0 or 45) +
+                (info_button and 0 or 45) + (screenshot_button and 0 or 45) +
+                ((state.is_URL and user_opts.download_button) and 0 or 45), -- >>> EDIT Desuka <<< -- collapse when download hidden
+            y = refY - 40,
+            an = 5,
+            w = 24,
+            h = 24
+        }
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 350 - outeroffset)
+    end
+
+    -- >>> CUSTOM Desuka <<<
+    -- Menu button: top-left strip, outside the bottom bar (no width gate).
+    lo = add_layout('menu_btn')
+    lo.geometry = { x = 30, y = 15, an = 5, w = 40, h = 30 }
+    lo.style = osc_styles.control_3
+    -- <<< CUSTOM Desuka >>>
 end
 
 -- Reduced occupation layout
@@ -5478,13 +6149,13 @@ layouts["reduced"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<<
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -5583,10 +6254,17 @@ layouts["reduced"] = function()
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 600 - outeroffset)
 
+    if user_opts.show_shader_button then
+        lo = add_layout('cy_shader')
+        lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button, before volume
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 700 - outeroffset)
+    end
+
     lo = add_layout('vol_ctrl')
-    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
+    lo.geometry = { x = user_opts.show_shader_button and 217 or 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- after the shader button
     lo.style = osc_styles.control_3
-    lo.visible = (osc_param.playresx >= 700 - outeroffset)
+    lo.visible = (osc_param.playresx >= (user_opts.show_shader_button and 750 or 700) - outeroffset)
 
     -- Fullscreen/Loop/Info
     lo = add_layout('tog_fs')
@@ -5642,6 +6320,28 @@ layouts["reduced"] = function()
         lo.style = osc_styles.control_3
         lo.visible = (osc_param.playresx >= 400 - outeroffset)
     end
+
+    if user_opts.show_subedit_button then -- >>> EDIT Desuka <<< -- subtitle edit tool, leftmost of the right cluster
+        lo = add_layout('sub_edit')
+        lo.geometry = {
+            x = osc_geo.w - 307 + (loop_button and 0 or 45) + (ontop_button and 0 or 45) +
+                (info_button and 0 or 45) + (screenshot_button and 0 or 45) +
+                ((state.is_URL and user_opts.download_button) and 0 or 45), -- >>> EDIT Desuka <<< -- collapse when download hidden
+            y = refY - 40,
+            an = 5,
+            w = 24,
+            h = 24
+        }
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 350 - outeroffset)
+    end
+
+    -- >>> CUSTOM Desuka <<<
+    -- Menu button: top-left strip, outside the bottom bar (no width gate).
+    lo = add_layout('menu_btn')
+    lo.geometry = { x = 30, y = 15, an = 5, w = 40, h = 30 }
+    lo.style = osc_styles.control_3
+    -- <<< CUSTOM Desuka >>>
 end
 
 -- Validate string type user options
@@ -5660,6 +6360,30 @@ function validate_user_opts()
         mp.msg.warn("window_top_bar cannot be '" .. user_opts.window_top_bar .. "'. Ignoring.")
         user_opts.window_top_bar = "auto"
     end
+    -- >>> CUSTOM Desuka <<<
+    if type(user_opts.menu_button) ~= "boolean" then
+        mp.msg.warn("menu_button must be boolean. Using true.")
+        user_opts.menu_button = true
+    end
+    -- <<< CUSTOM Desuka >>>
+    -- >>> CUSTOM Desuka: idle chrome <<<
+    if type(user_opts.show_in_idle) ~= "boolean" then
+        mp.msg.warn("show_in_idle must be boolean. Using true.")
+        user_opts.show_in_idle = true
+    end
+    -- <<< CUSTOM Desuka >>>
+    -- >>> CUSTOM Desuka: shader button <<<
+    if type(user_opts.show_shader_button) ~= "boolean" then
+        mp.msg.warn("show_shader_button must be boolean. Using true.")
+        user_opts.show_shader_button = true
+    end
+    -- <<< CUSTOM Desuka >>>
+    -- >>> CUSTOM Desuka: subtitle edit button <<<
+    if type(user_opts.show_subedit_button) ~= "boolean" then
+        mp.msg.warn("show_subedit_button must be boolean. Using true.")
+        user_opts.show_subedit_button = true
+    end
+    -- <<< CUSTOM Desuka >>>
 
     if user_opts.volume_control_type ~= "linear" and
         user_opts.volume_control_type ~= "logarithmic" then
@@ -5872,7 +6596,257 @@ function update_options(_)
     request_init()
 end
 
+-- >>> CUSTOM Desuka: shader menu (Anime4K + AnimeJaNai) <<<
+-- Single cy_shader button opening the Anime4K/AnimeJaNai groups as a submenu
+-- of the advanced menu machinery (same plate, drill, modal, ESC). The menu
+-- hangs above its own button; adv_menu_anchor_el selects that geometry.
+adv_menu_anchor_el = nil
+
+-- Current upscaler readout for the tooltip: Anime4K mode from glsl-shaders,
+-- AnimeJaNai slot from the vf aji filter params. Missing means off.
+function shader_state()
+    local a4k, ajn = nil, nil
+    local raw = mp.get_property_native("glsl-shaders", nil)
+    local parts = {}
+    if type(raw) == "table" then
+        parts = raw
+    elseif type(raw) == "string" and raw ~= "" then
+        for p in raw:gmatch("([^;,]+)") do parts[#parts + 1] = p end
+    end
+    local set = {}
+    for _, p in ipairs(parts) do
+        local base = tostring(p):match("^%s*(.-)%s*$"):match("([^/\\]+)$")
+        if base then set[base] = true end
+    end
+    if set["Anime4K_Upscale_CNN_x2_M.glsl"] then
+        local fam = "A"
+        if set["Anime4K_Upscale_Denoise_CNN_x2_VL.glsl"] then
+            fam = "C"
+        elseif set["Anime4K_Restore_CNN_Soft_VL.glsl"] then
+            fam = "B"
+        end
+        local plus = ""
+        if set["Anime4K_Restore_CNN_M.glsl"] then
+            plus = "+A"
+        elseif set["Anime4K_Restore_CNN_Soft_M.glsl"] then
+            plus = "+B"
+        end
+        a4k = "Anime4K Mode " .. fam .. plus .. " (HQ)"
+    elseif next(set) ~= nil then
+        for base in pairs(set) do
+            if base:match("^Anime4K_") then
+                a4k = "Anime4K custom" -- partial Anime4K chain (other shaders stay unreported)
+                break
+            end
+        end
+    end
+    -- Authoritative slot: broadcast by the input.conf rows and re-applied by
+    -- the backend on every file load. nil (never heard) and 0 both mean off.
+    local slot = aji_slot_tracked
+    local name = ajn_slot_label(slot)
+    if name then ajn = "AnimeJaNai " .. name end
+    return { a4k = a4k, ajn = ajn }
+end
+
+-- Display name for an AJN slot: V3 presets, live profile names, Custom N, off = nil.
+function ajn_slot_label(slot)
+    if slot == 1001 then return "Quality"
+    elseif slot == 1002 then return "Balanced"
+    elseif slot == 1003 then return "Performance"
+    elseif slot and slot > 0 then
+        local name = ajn_slot_names()[slot]
+        if name and name ~= "" then return name end
+        return "Custom " .. slot
+    end
+    return nil
+end
+
+-- Tooltip: "Shaders" plus the active chain, if any.
+function shader_tooltip()
+    local st = shader_state()
+    local parts = {}
+    if st.a4k then parts[#parts + 1] = st.a4k end
+    if st.ajn then parts[#parts + 1] = st.ajn end
+    local base = texts.shaders or "Shaders"
+    if #parts > 0 then return base .. ": " .. table.concat(parts, " + ") end
+    return base
+end
+
+-- Filtered tree: only the Anime4K and AnimeJaNai groups.
+function open_shader_menu()
+    close_adv_menu()
+    close_track_menu() -- only one dropdown at a time
+    local tree = adv_menu_tree()
+    local root = { name = nil, kids = {}, index = {}, order = {} }
+    local a4k = tree.index["Anime4K"]
+    if a4k then root.order[#root.order + 1] = { kind = "group", node = a4k } end
+    local ajn = tree.index["AnimeJaNai"] -- slots directly, skip Manager/Stats/Update
+    if ajn then
+        local slots = nil
+        for _, e in ipairs(ajn.order) do
+            if e.kind == "group" and e.node and e.node.name == "Slots" then
+                slots = e.node
+                break
+            end
+        end
+        if slots then
+            root.order[#root.order + 1] = { kind = "group",
+                node = { name = "AnimeJaNai", kids = slots.kids or {}, index = slots.index or {}, order = slots.order } }
+        else
+            root.order[#root.order + 1] = { kind = "group", node = ajn }
+        end
+    end
+    if #root.order == 0 then -- input.conf missing/unreadable: say so instead of looking dead
+        show_toast(texts.na or "Not available", "warn", "modernx-menu")
+        return
+    end
+    adv_menu_anchor_el = "cy_shader"
+    if adv_menu_show(root, texts.shaders or "Shaders", nil, {}) then
+        mp.add_forced_key_binding("ESC", "modernx-adv-menu-close", close_adv_menu)
+    else
+        adv_menu_anchor_el = nil
+    end
+end
+
+function toggle_shader_menu()
+    if state.adv_menu and adv_menu_anchor_el == "cy_shader" then
+        close_adv_menu()
+    else
+        open_shader_menu()
+    end
+end
+
+-- Toast with the live profile name (input.conf rows call this instead of static text).
+mp.register_script_message("modernx-aji-toast", function(slot)
+    local name = ajn_slot_label(tonumber(slot))
+    show_toast("AnimeJaNai " .. (name or texts.off or "Off"), "info", "modernx-aji")
+end)
+
+-- Keyboard / input.conf access (toggles like a left click).
+mp.register_script_message("open-shader-menu", function() open_shader_menu() end)
+mp.register_script_message("close-shader-menu", function()
+    if adv_menu_anchor_el == "cy_shader" then close_adv_menu() end
+end)
+mp.register_script_message("toggle-shader-menu", function() toggle_shader_menu() end)
+
+-- Track the active AJN slot: input.conf rows broadcast it and the backend
+-- re-applies it on every file load (vf params go stale after vf-command).
+-- 0 = off; nil = never heard = off.
+aji_slot_tracked = nil
+mp.register_script_message("aji-slot", function(slot)
+    local n = tonumber(slot)
+    if n then aji_slot_tracked = n end
+end)
+
+-- Live AnimeJaNai custom profile names ([slot_N] profile_name), mtime-cached
+-- so hover tooltips can call it every frame without re-reading the file.
+ajn_slot_cache = { path = nil, mtime = nil, names = {} }
+
+function ajn_slot_names()
+    local names = {}
+    local ok, path = pcall(mp.command_native, { "expand-path", "~~/../animejanai/animejanai.conf" })
+    if not ok or type(path) ~= "string" or path == "" then return names end
+    local info = mp.utils.file_info(path)
+    local mtime = info and info.mtime or nil
+    if ajn_slot_cache.path == path and ajn_slot_cache.mtime == mtime then
+        return ajn_slot_cache.names
+    end
+    local f = io.open(path, "r")
+    if f then
+        local slot = nil
+        for line in f:lines() do
+            line = line:gsub("\r$", "")
+            local sec = line:match("^%[slot_(%d+)%]")
+            if sec then
+                slot = tonumber(sec)
+            else
+                local name = line:match("^profile_name=(.-)%s*$")
+                if slot and name and name ~= "" and name ~= "New Profile" then names[slot] = name end
+            end
+        end
+        f:close()
+    end
+    ajn_slot_cache.path, ajn_slot_cache.mtime, ajn_slot_cache.names = path, mtime, names
+    return names
+end
+
+-- Display leaf for AnimeJaNai custom slot rows (both dropdowns share the tree).
+-- First claim wins: duplicate profile names keep their "Custom N" label so no
+-- two rows collapse into one command via the tree's later-wins dedup.
+function ajn_slot_leaf(segs, leaf, names, parent)
+    if #segs == 3 and segs[1] == "AnimeJaNai" and segs[2] == "Slots" then
+        local n = leaf:match("^Custom (%d+)$")
+        if n then
+            local name = names and names[tonumber(n)]
+            if name and name ~= "" then
+                if parent and parent.index["_leaf:" .. name] then return leaf end
+                return name
+            end
+        end
+    end
+    return leaf
+end
+-- <<< CUSTOM Desuka >>>
+
 -- OSC INIT
+-- >>> CUSTOM Desuka: idle chrome <<<
+-- Idle logo drawn into the same ASS frame as the OSC (single set_osd),
+-- scaled from the legacy 360p layout to the current playres.
+function render_idle_logo(ass)
+    if not user_opts.idle_screen then return end
+    if not osc_param.playresy or osc_param.playresy <= 0 then return end
+    if not osc_param.playresx or osc_param.playresx <= 0 then return end
+    local s = osc_param.playresy / 360
+    if s <= 0 then return end
+    local icon_w = (1800 / 32) * s
+    local icon_x, icon_y = (osc_param.playresx - icon_w) / 2, 140 * s
+    local sc = s * 100
+    local line_prefix = ('{\\rDefault\\an7\\fscx%f\\fscy%f\\1a&H00&\\bord0\\shad0\\pos(%f,%f)}'):format(sc, sc, icon_x, icon_y)
+    for _, line in ipairs(logo_lines) do
+        ass:new_event()
+        ass:append(line_prefix .. line)
+    end
+    if is_december and not user_opts.green_and_grumpy then
+        for _, line in ipairs(santa_hat_lines) do
+            ass:new_event()
+            ass:append(line_prefix .. line)
+        end
+    end
+    ass:new_event()
+    ass:pos(osc_param.playresx / 2, icon_y + 65 * s)
+    ass:an(8)
+    ass:append(("{\\fs%f\\1c&H0&\\1c&HFFFFFF&}"):format(24 * s) .. texts.welcome)
+end
+
+-- Idle keeps window chrome + menu usable, everything else greyed out.
+-- Runs inside osc_init() before prepare_elements() so the grey style
+-- (alpha 215 + no eventresponder) is baked in like any disabled element.
+function apply_idle_state()
+    if not (state.idle and user_opts.show_in_idle) then return end
+    local grey = { "play_pause", "pl_prev", "pl_next", "skipback", "skipfrwd",
+        "jumpback", "jumpfrwd", "cy_video", "cy_audio", "cy_sub",
+        "vol_ctrl", "volumebar", "seekbar", "persistentseekbar",
+        "tog_loop", "download", "screenshot", "tog_info", "cy_shader", "sub_edit" }
+    for _, name in ipairs(grey) do
+        if elements[name] then elements[name].enabled = false end
+    end
+    if elements["persistentseekbar"] then elements["persistentseekbar"].visible = false end
+    if elements["title"] then elements["title"].visible = false end
+    if elements["description"] then elements["description"].visible = false end
+    if elements["separator"] then elements["separator"].visible = false end
+    if elements["chapter_title"] then elements["chapter_title"].visible = false end
+    if elements["tc_left"] then
+        elements["tc_left"].enabled = false
+        elements["tc_left"].visible = true
+        elements["tc_left"].content = function() return "--:--" end
+    end
+    if elements["tc_right"] then
+        elements["tc_right"].enabled = false
+        elements["tc_right"].visible = true
+        elements["tc_right"].content = function() return "--:--" end
+    end
+end
+-- <<< CUSTOM Desuka >>>
 local function osc_init()
     mp.msg.debug("osc_init")
 
@@ -6283,11 +7257,26 @@ local function osc_init()
         end
     -- <<< CUSTOM Desuka >>>
 
+    -- >>> CUSTOM Desuka: shader menu button (Anime4K + AnimeJaNai) <<<
+    -- Single button, submenus like the advanced menu; live state in the tooltip.
+    ne = new_element('cy_shader', 'button')
+    ne.enabled = true
+    ne.visible = (osc_param.playresx >= 700 - outeroffset) and user_opts.show_shader_button
+    ne.content = icons.shader
+    ne.tooltip_style = osc_styles.tooltip
+    ne.tooltipF = function() return shader_tooltip() end
+    ne.nothingavailable = texts.shaders or "Shaders"
+    ne.eventresponder['mbtn_left_up'] =
+        function()
+            toggle_shader_menu()
+        end
+    -- <<< CUSTOM Desuka >>>
+
     -- volume slider
     ne = new_element("vol_ctrl", "button")
     ne.enabled = get_track("audio") > 0
     ne.off = get_track("audio") == 0
-    ne.visible = (osc_param.playresx >= 700 - outeroffset) and user_opts.volume_control
+    ne.visible = (osc_param.playresx >= (user_opts.show_shader_button and 750 or 700) - outeroffset) and user_opts.volume_control
     ne.content = function()
         local volume = mp.get_property_number("volume", 0)
         if state.mute then
@@ -6396,6 +7385,25 @@ local function osc_init()
         end
     end
 
+    -- >>> CUSTOM Desuka: subtitle edit tool button <<<
+    -- Momentary action (right side): left opens the screen editor, right the OSD one.
+    ne = new_element('sub_edit', 'button')
+    ne.enabled = #tracks_osc.sub > 0
+    ne.visible = (osc_param.playresx >= 350 - outeroffset) and user_opts.show_subedit_button
+    ne.content = icons.subedit
+    ne.tooltip_style = osc_styles.tooltip
+    ne.tooltipF = texts.subedit or "Edit subtitles"
+    ne.nothingavailable = texts.nosub
+    ne.eventresponder['mbtn_left_up'] =
+        function()
+            mp.commandv("script-binding", "quick_subtitle_edit/edit-subtitle")
+        end
+    ne.eventresponder['mbtn_right_up'] =
+        function()
+            mp.commandv("script-binding", "quick_subtitle_edit/edit-subtitle-osd")
+        end
+    -- <<< CUSTOM Desuka >>>
+
     --screenshot
     ne = new_element("screenshot", "button")
     ne.content = icons.screenshot
@@ -6454,6 +7462,20 @@ local function osc_init()
         function()
             mp.commandv("cycle", "ontop")
         end
+
+    -- >>> CUSTOM Desuka <<<
+    -- Menu button: top-left, opens the advanced menu (input.conf #menu:).
+    ne = new_element('menu_btn', 'button')
+    ne.content = icons.menu
+    ne.visible = user_opts.menu_button
+    ne.tooltip_style = osc_styles.tooltip
+    ne.tooltipF = texts.menu or "Menu"
+    ne.eventresponder['mbtn_left_up'] =
+        function()
+            close_track_menu()
+            toggle_adv_menu()
+        end
+    -- <<< CUSTOM Desuka >>>
 
     --seekbar
     ne = new_element('seekbar', 'slider')
@@ -6778,6 +7800,8 @@ local function osc_init()
         window_controls()
     end
 
+    apply_idle_state() -- >>> EDIT Desuka <<< -- grey out playback controls when idle (before styling)
+
     --do something with the elements
     prepare_elements()
 end
@@ -6823,6 +7847,24 @@ autohide.compute_mouse_over_osc = function()
             menu_hovered = true
         end
     end
+    -- >>> CUSTOM Desuka <<<
+    -- Top-left menu button lives outside the input box: hovering it
+    -- counts as over the OSC so autohide does not fire mid-click.
+    if user_opts.osc_keep_with_cursor and not mouse_over_osc then
+        local menu_hitbox = menu_button_hitbox()
+        if menu_hitbox
+            and mouse_hit_coords(menu_hitbox.x1, menu_hitbox.y1, menu_hitbox.x2, menu_hitbox.y2) then
+            mouse_over_osc = true
+        end
+    end
+    if state.adv_menu and state.osc_visible then
+        local mg = adv_menu_geometry()
+        if mg and mouse_hit_coords(mg.x0, mg.y0, mg.x1, mg.y1) then
+            mouse_over_osc = true
+            menu_hovered = true
+        end
+    end
+    -- <<< CUSTOM Desuka >>>
     return mouse_over_osc, menu_hovered
 end
 
@@ -6894,8 +7936,9 @@ end
 function hide_osc()
     mp.msg.trace('hide_osc')
     -- >>> CUSTOM Desuka <<<
-    -- Track dropdown never outlives the OSC.
+    -- Dropdown menus never outlive the OSC.
     close_track_menu()
+    close_adv_menu()
     -- Hidden now: nothing overdue until the next show/reset re-arms.
     if state.autohide_timer then state.autohide_timer:kill() end
     -- <<< CUSTOM Desuka >>>
@@ -7003,6 +8046,11 @@ local function enable_osc(enable)
             state.wc_enabled = false
             set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
         end
+        if state.menu_enabled then -- no render() will run to sync it
+            mp.disable_key_bindings('menu-controls')
+            state.menu_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'menu-controls')
+        end
         -- <<< CUSTOM Desuka >>>
     end
 end
@@ -7084,7 +8132,7 @@ local function render()
 
     -- mouse input area
     local mouse_over_osc = false
-    local menu_hovered = false -- track dropdown hover (autohide guard) -- >>> EDIT Desuka <<<
+    local menu_hovered = false -- dropdown hover (autohide guard) -- >>> EDIT Desuka <<<
 
     for _, cords in ipairs(osc_param.areas['input']) do
         if state.osc_visible then -- activate only when OSC is actually visible
@@ -7145,13 +8193,36 @@ local function render()
     end
 
     -- >>> CUSTOM Desuka <<<
+    -- Menu button area: single rect per section, so it gets its own.
+    -- Toggle bindings on transition only (mirrors window-controls).
+    local menu_hitbox = menu_button_hitbox()
+    if menu_hitbox and state.osc_visible then
+        set_virt_mouse_area(menu_hitbox.x1, menu_hitbox.y1, menu_hitbox.x2, menu_hitbox.y2, 'menu-controls')
+        if not state.menu_enabled then
+            mp.enable_key_bindings('menu-controls')
+            state.menu_enabled = true
+        end
+        if mouse_hit_coords(menu_hitbox.x1, menu_hitbox.y1, menu_hitbox.x2, menu_hitbox.y2)
+            and user_opts.osc_keep_with_cursor then
+            mouse_over_osc = true
+        end
+    else
+        if state.menu_enabled then
+            mp.disable_key_bindings('menu-controls')
+            state.menu_enabled = false
+            set_virt_mouse_area(0, 0, 0, 0, 'menu-controls')
+        end
+    end
+    -- <<< CUSTOM Desuka >>>
+
+    -- >>> CUSTOM Desuka <<<
     -- Track dropdown open: clicks anywhere (even on bare video) must reach
     -- the script so outside clicks dismiss it; see fullscreen area below.
-    if state.track_menu and state.osc_visible then
-        local mg = track_menu_geometry()
+    if (state.track_menu or state.adv_menu) and state.osc_visible then
+        local mg = state.track_menu and track_menu_geometry() or adv_menu_geometry()
         if mg then
             -- >>> CUSTOM Desuka <<<
-            -- While the dropdown is open, every click must reach the script
+            -- While a dropdown is open, every click must reach the script
             -- (the video area has no click binding of its own): fullscreen
             -- input area, the menu handler dismisses outside clicks itself.
             set_virt_mouse_area(0, 0, osc_param.playresx, osc_param.playresy, 'input')
@@ -7162,6 +8233,7 @@ local function render()
             end
         else
             close_track_menu()
+            close_adv_menu()
         end
     end
     -- <<< CUSTOM Desuka >>>
@@ -7178,6 +8250,8 @@ local function render()
     -- actual rendering
     local ass = mp.assdraw.ass_new()
 
+    if state.idle and user_opts.show_in_idle then render_idle_logo(ass) end -- >>> EDIT Desuka <<< -- same frame as the chrome
+
     -- Messages
     render_message(ass)
     render_toast(ass)
@@ -7186,8 +8260,9 @@ local function render()
     if state.osc_visible then
         render_elements(ass)
         -- >>> CUSTOM Desuka <<<
-        -- Track dropdown renders on top of the OSC elements.
+        -- Dropdowns render on top of the OSC elements.
         render_track_menu(ass)
+        render_adv_menu(ass)
         -- <<< CUSTOM Desuka >>>
     end
 
@@ -7408,9 +8483,10 @@ local watch_max_tick = 0
 local function watch_report()
     if watch_max_tick > 0.25 or watch_events > 750 then
         mp.msg.warn(string.format(
-            "modernx: loop health: max_tick=%.0fms inputs=%d mouse=%d ticks=%d%s%s%s",
+            "modernx: loop health: max_tick=%.0fms inputs=%d mouse=%d ticks=%d%s%s%s%s",
             watch_max_tick * 1000, watch_events, watch_mouse, watch_ticks,
             state.track_menu and " menu=open" or "",
+            state.adv_menu and " adv=open" or "", -- >>> EDIT Desuka <<<
             flood_shedding and " shed=1" or "",
             string.format(" osc=%d in=%d", state.osc_visible and 1 or 0,
                 state.input_enabled and 1 or 0)))
@@ -7452,6 +8528,11 @@ function process_event(source, what)
         end
     end
     -- >>> CUSTOM Desuka <<<
+    -- Advanced menu is modal like the track dropdown (only one open at a time).
+    if state.adv_menu and adv_menu_handle_event(source, what) then
+        request_tick()
+        return
+    end
     -- Track dropdown gets first pick of mouse events while open.
     if state.track_menu and track_menu_handle_event(source, what) then
         request_tick()
@@ -7505,7 +8586,7 @@ function process_event(source, what)
         -- >>> CUSTOM Desuka <<<
         -- Adaptive shed (engaged above): drop sub-threshold moves only when
         -- idle (no drag) and menu closed. Never consumes the movement budget.
-        if flood_shedding and state.active_element == nil and not state.track_menu then
+        if flood_shedding and state.active_element == nil and not state.track_menu and not state.adv_menu then
             local fdx = state.last_mouseX and math.abs(mouseX - state.last_mouseX) or 999
             local fdy = state.last_mouseY and math.abs(mouseY - state.last_mouseY) or 999
             if fdx < FLOOD_MIN_MOVE and fdy < FLOOD_MIN_MOVE then
@@ -7520,7 +8601,11 @@ function process_event(source, what)
                     or (math.abs(mouseY - state.last_mouseY) >= user_opts.min_mouse_move)
                 )
             ) then
-            if user_opts.bottom_hover then -- if enabled, only show osc if mouse is hovering at the bottom of the screen (where the UI elements are)
+            if state.idle and user_opts.show_in_idle and user_opts.visibility ~= "never"
+                and ((state.fullscreen and user_opts.show_fullscreen)
+                    or ((not state.fullscreen) and user_opts.show_windowed)) then
+                show_osc() -- >>> EDIT Desuka <<< -- idle chrome stays up
+            elseif user_opts.bottom_hover then -- if enabled, only show osc if mouse is hovering at the bottom of the screen (where the UI elements are)
                 local top_hover = window_controls_enabled() and (user_opts.window_title or user_opts.window_top_bar)
                 if mouseY > osc_param.playresy - (user_opts.bottom_hover_zone or 200) or
                     (user_opts.window_top_bar == "yes" or (not state.border) or (not state.title_bar) or state.fullscreen) and (mouseY < 40 and top_hover) then
@@ -7580,56 +8665,87 @@ function tick()
     local wt0 = mp.get_time() -- >>> EDIT Desuka <<< -- loop-health tick duration
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)
-        -- >>> CUSTOM Desuka <<<
-        thumb_clear() -- no stuck thumbnail into idle
-        if state.wc_enabled then -- idle never reaches render() to sync it
-            mp.disable_key_bindings('window-controls')
-            state.wc_enabled = false
-            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
-        end
-        -- <<< CUSTOM Desuka >>>
-        -- render idle message
-        mp.msg.trace('idle message')
-        local _, _, display_aspect = mp.get_osd_size()
-        if display_aspect == 0 then
-            return
-        end
-        local display_h = 360
-        local display_w = display_h * display_aspect
-        -- logo is rendered at 2^(6-1) = 32 times resolution with size 1800x1800
-        local icon_x, icon_y = (display_w - 1800 / 32) / 2, 140
-        local line_prefix = ('{\\rDefault\\an7\\1a&H00&\\bord0\\shad0\\pos(%f,%f)}'):format(icon_x, icon_y)
-
-        local ass = mp.assdraw.ass_new()
-
-        -- mpv logo
-        if user_opts.idle_screen then
-            for _, line in ipairs(logo_lines) do
-                ass:new_event()
-                ass:append(line_prefix .. line)
+        -- >>> CUSTOM Desuka: idle chrome <<<
+        -- Logo-only legacy path unless the chrome is enabled for idle.
+        if not user_opts.show_in_idle
+            or user_opts.visibility == "never"
+            or not ((state.fullscreen and user_opts.show_fullscreen)
+                or ((not state.fullscreen) and user_opts.show_windowed)) then
+            thumb_clear() -- no stuck thumbnail into idle
+            if state.wc_enabled then -- idle never reaches render() to sync it
+                mp.disable_key_bindings('window-controls')
+                state.wc_enabled = false
+                set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
             end
-        end
-
-        -- Santa hat
-        if is_december and user_opts.idle_screen and not user_opts.green_and_grumpy then
-            for _, line in ipairs(santa_hat_lines) do
-                ass:new_event()
-                ass:append(line_prefix .. line)
+            if state.menu_enabled then -- idle never reaches render() to sync it
+                mp.disable_key_bindings('menu-controls')
+                state.menu_enabled = false
+                set_virt_mouse_area(0, 0, 0, 0, 'menu-controls')
             end
-        end
+            -- <<< CUSTOM Desuka >>>
+            -- render idle message
+            mp.msg.trace('idle message')
+            local _, _, display_aspect = mp.get_osd_size()
+            if display_aspect == 0 then
+                return
+            end
+            local display_h = 360
+            local display_w = display_h * display_aspect
+            -- logo is rendered at 2^(6-1) = 32 times resolution with size 1800x1800
+            local icon_x, icon_y = (display_w - 1800 / 32) / 2, 140
+            local line_prefix = ('{\\rDefault\\an7\\1a&H00&\\bord0\\shad0\\pos(%f,%f)}'):format(icon_x, icon_y)
 
-        if user_opts.idle_screen then
-            ass:new_event()
-            ass:pos(display_w / 2, icon_y + 65)
-            ass:an(8)
-            ass:append("{\\fs24\\1c&H0&\\1c&HFFFFFF&}" .. texts.welcome)
-        end
-        set_osd(display_w, display_h, ass.text)
+            local ass = mp.assdraw.ass_new()
 
-        if state.showhide_enabled then
-            mp.disable_key_bindings('showhide')
-            mp.disable_key_bindings('showhide_wc')
-            state.showhide_enabled = false
+            -- mpv logo
+            if user_opts.idle_screen then
+                for _, line in ipairs(logo_lines) do
+                    ass:new_event()
+                    ass:append(line_prefix .. line)
+                end
+            end
+
+            -- Santa hat
+            if is_december and user_opts.idle_screen and not user_opts.green_and_grumpy then
+                for _, line in ipairs(santa_hat_lines) do
+                    ass:new_event()
+                    ass:append(line_prefix .. line)
+                end
+            end
+
+            if user_opts.idle_screen then
+                ass:new_event()
+                ass:pos(display_w / 2, icon_y + 65)
+                ass:an(8)
+                ass:append("{\\fs24\\1c&H0&\\1c&HFFFFFF&}" .. texts.welcome)
+            end
+            set_osd(display_w, display_h, ass.text)
+
+            if state.showhide_enabled then
+                mp.disable_key_bindings('showhide')
+                mp.disable_key_bindings('showhide_wc')
+                state.showhide_enabled = false
+            end
+        else
+            -- >>> CUSTOM Desuka: idle chrome <<<
+            -- Same chrome as playback (logo fused in render()), pinned visible:
+            -- nothing to reveal and no video to cover.
+            thumb_clear() -- no stuck thumbnail into idle
+            local _, _, display_aspect = mp.get_osd_size()
+            if display_aspect == 0 then
+                return
+            end
+            state.showtime = nil
+            if state.autohide_timer then state.autohide_timer:kill() end
+            state.anitype = nil
+            state.anistart = nil
+            state.animation = nil
+            if not state.osc_visible then
+                state.osc_visible = true
+                adjust_subtitles(true)
+            end
+            render()
+            -- <<< CUSTOM Desuka >>>
         end
     elseif (state.fullscreen and user_opts.show_fullscreen)
         or (not state.fullscreen and user_opts.show_windowed) then
@@ -7825,6 +8941,8 @@ mp.observe_property('window-maximized', 'bool',
 mp.observe_property('idle-active', 'bool',
     function(_, val)
         state.idle = val
+        request_init() -- >>> EDIT Desuka <<< -- rebuild chrome grey state on idle transitions
+        if not val then reset_timeout() end -- >>> EDIT Desuka <<< -- rearm autohide so playback OSC can hide again
         request_tick()
     end
 )
@@ -7896,6 +9014,20 @@ mp.set_key_bindings({
 }, 'window-controls', 'force')
 mp.enable_key_bindings('window-controls')
 
+-- >>> CUSTOM Desuka <<<
+-- Menu button lives outside the bottom bar (single rect per section),
+-- so it gets its own mouse area + section routing into process_event.
+mp.set_key_bindings({
+    { 'mbtn_left', function(_) process_event('mbtn_left', 'up') end,
+        function(_) process_event('mbtn_left', 'down') end },
+    { 'mbtn_left_dbl', function(_) -- swallow double-clicks like input (no fullscreen)
+            process_event('mbtn_left', 'down')
+            process_event('mbtn_left', 'up')
+        end },
+}, 'menu-controls', 'force')
+mp.enable_key_bindings('menu-controls')
+-- <<< CUSTOM Desuka >>>
+
 function reset_timeout()
     state.showtime = mp.get_time()
     -- >>> CUSTOM Desuka <<<
@@ -7919,6 +9051,9 @@ function visibility_mode(mode)
     state.input_enabled = false
     state.wc_enabled = false -- >>> EDIT Desuka <<< -- keep transition guard in sync
     set_virt_mouse_area(0, 0, 0, 0, "window-controls") -- >>> EDIT Desuka <<< -- no render() in never mode
+    mp.disable_key_bindings("menu-controls") -- >>> EDIT Desuka <<< -- menu button section
+    state.menu_enabled = false -- >>> EDIT Desuka <<< -- keep transition guard in sync
+    set_virt_mouse_area(0, 0, 0, 0, "menu-controls") -- >>> EDIT Desuka <<< -- no render() in never mode
     request_tick()
 end
 
@@ -7977,6 +9112,7 @@ end)
 
 set_virt_mouse_area(0, 0, 0, 0, 'input')
 set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
+set_virt_mouse_area(0, 0, 0, 0, 'menu-controls') -- >>> EDIT Desuka <<<
 mp.set_property("title", "mpv")
 
 -- >>> CUSTOM Desuka <<<

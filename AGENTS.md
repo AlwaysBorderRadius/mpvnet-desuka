@@ -29,9 +29,11 @@ opciones, keybinds) + tooling en `.tools/`.
 
 ## Convenciones
 
-- Cambios propios delimitados con `CUSTOM Desuka` (bloques) y
-  `EDIT Desuka` (líneas). Comentarios en inglés, cortos. En `.conf`,
-  comentarios de una línea con `DESUKA:`.
+- Marcadores propios, comentarios en inglés y cortos. Bloques:
+  `-- >>> CUSTOM Desuka: qué <<<` … `-- <<< CUSTOM Desuka >>>`.
+  Líneas: sufijo inline `-- >>> EDIT Desuka <<< -- por qué`, en la propia
+  línea (nunca standalone ni envolviendo). En `.conf`, `# DESUKA: ...`.
+  Legacy anterior exento; todo marcador nuevo sigue este formato.
 - Tablas de idioma en paridad estricta: `track_names["en"]`/`["es"]` mismas
   claves (+ centinelas `und`/`""`/`unknown` solo en nombres); `lang_to_cc`
   cubre las claves reales. Sin asset para un `cc` → fallback a `[code]`.
@@ -41,6 +43,14 @@ opciones, keybinds) + tooling en `.tools/`.
 - No usar `type`/`next` como parámetro o local en Lua: eclipsan a los builtins
   `type()`/`next()` (upstream lo hace en varias funciones; ya nos rompió
   `get_tracklist` una vez).
+- No añadir `local` a nivel de chunk en `modernx.lua`: el chunk principal
+  está en el límite de 200 locales de Lua 5.1 (rompe la carga del script);
+  usar globales de script como `track_menu_*`.
+- Botón menú (`menu_button`): abre el menú avanzado propio (dropdown ASS
+  con filas parseadas de `#menu:` en `input.conf` en cada apertura; usa
+  estilo/sección `menu-controls` y comparte visual `track_menu_*`).
+  El `show-menu` nativo de mpvnet no sirve aquí: lo suprime cerca de
+  los bordes (zonas muertas 10% laterales/superior, 22% inferior).
 - Los `.conf` de `portable_config/` se commitean en cada rama como parte del
   estado portable (incluidos `mpv.conf`, `discord.conf` y `update-checker.conf`
   con sus ajustes locales).
@@ -57,11 +67,14 @@ automático. A `main` solo por merge explícito `[vN] merge dev` + tag anotado
 
 - Regla: se trackea lo que añades o modificas + piezas mínimas para que un
   clon + base upstream funcione. La base upstream (mpvnet, dlls, `inference/`,
-  `benchmarks/`, scripts `animejanai_*.lua`, managed confs) NO se versiona.
+  `benchmarks/`, managed confs) NO se versiona. Excepción: los scripts
+  `animejanai_*.lua` sí se versionan aunque sean updater-owned.
 - Track además: `animejanai/animejanai.conf` (slots del manager),
   `animejanai/onnx/` (modelos .onnx incl. V2 retirados + su LICENSE),
   `portable_config/shaders/` (Anime4K propios), `mpv-discord.exe`,
-  `fonts/`, `console.conf`.
+  `fonts/`, `console.conf`,
+  `portable_config/scripts/animejanai_*.lua` (updater-owned, CUSTOMs; el diff
+  post-update guía la re-aplicación).
 - Nunca: `*.engine` / `*.timing.cache` (GPU-local), `cache/`, `watch_later/`,
   `*.log`, `backups/`, `manager-ui.json`, managed (`mpv-animejanai.conf`,
   `input-animejanai.conf`).

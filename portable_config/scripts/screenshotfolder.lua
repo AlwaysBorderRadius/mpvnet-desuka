@@ -5,7 +5,7 @@
     - https://github.com/zydezu/mpvconfig/blob/main/scripts/screenshotfolder.lua
     - https://github.com/jonniek/mpv-scripts/blob/master/customscreenshot.lua
 
-    Rewritten (desuka): Series/Season extraction from path, naming modes,
+    Rewritten for mpvnet desuka: Series/Season extraction from path, naming modes,
     portable save_location, validated options, forced key binding.
 
     Layouts (save_location = S):

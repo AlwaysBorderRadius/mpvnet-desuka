@@ -1,0 +1,92 @@
+-- On startup, asks AnimeJaNaiUpdater.exe whether a newer mpv-upscale-2x_animejanai release exists.
+-- If so, shows a one-time OSD prompt; Ctrl+U (or the AnimeJaNai > Install Update menu entry, both
+-- mapped to the "animejanai-update" script-message) applies it: the updater is launched detached,
+-- mpv quits so files unlock, the update is applied in place (user files preserved), and mpv relaunches.
+
+local mp = require 'mp'
+local msg = require 'mp.msg'
+
+-- The updater ships at the install root, one level above portable_config (~~/ = config dir).
+local exe_name = mp.get_property("platform") == "windows" and "AnimeJaNaiUpdater.exe" or "AnimeJaNaiUpdater"
+local updater = mp.command_native({ "expand-path", "~~/../" .. exe_name })
+local available_version = nil
+
+-- >>> CUSTOM Desuka: AJN update check opt-in (default off) <<<
+-- Desuka releases set the pace: the automatic check only runs with
+-- desuka_check_updates=yes in script-opts/animejanai_update.conf
+-- (shipped default off; owner enables it locally, never commit yes).
+-- Ctrl+U with no prior check warns instead of lying "up to date".
+local check_opts = { desuka_check_updates = false }
+require("mp.options").read_options(check_opts, "animejanai_update")
+-- <<< CUSTOM Desuka >>>
+
+-- Inside an AppImage the install tree is a read-only squashfs, so the in-place
+-- updater can't apply. AppRun sets ANIMEJANAI_APPIMAGE (APPIMAGE is set by the
+-- runtime too); in that case we point the user at the new AppImage instead.
+local is_appimage = os.getenv("ANIMEJANAI_APPIMAGE") ~= nil or os.getenv("APPIMAGE") ~= nil
+local releases_url = "github.com/the-database/mpv-upscale-2x_animejanai/releases"
+
+local function start_update()
+    if not available_version then
+        -- >>> CUSTOM Desuka: toast instead of OSD <<<
+        local text = check_opts.desuka_check_updates
+            and "AnimeJaNai is up to date."
+            or "Desuka: AJN update check desactivado en este build."
+        mp.commandv("script-message-to", "modernx", "modernx-toast",
+            "info", "animejanai", text, 3000)
+        -- <<< CUSTOM Desuka >>>
+        return
+    end
+    if is_appimage then
+        -- >>> CUSTOM Desuka: toast instead of OSD <<<
+        mp.commandv("script-message-to", "modernx", "modernx-toast", "info", "animejanai",
+            "AnimeJaNai " .. available_version ..
+            " is available.\nDownload the new AppImage:\n" .. releases_url, 12000)
+        -- <<< CUSTOM Desuka >>>
+        return
+    end
+    -- >>> CUSTOM Desuka: toast instead of OSD <<<
+    mp.commandv("script-message-to", "modernx", "modernx-toast", "info", "animejanai",
+        "Installing AnimeJaNai " .. available_version .. " - mpv will close and reopen...", 5000)
+    -- <<< CUSTOM Desuka >>>
+    -- Detached so it outlives mpv; the updater waits for mpv to exit, applies, then relaunches mpv.
+    mp.command_native({
+        name = "subprocess",
+        args = { updater, "--apply" },
+        detach = true,
+        playback_only = false,
+    })
+    mp.add_timeout(1.0, function() mp.command("quit") end)
+end
+
+mp.register_script_message("animejanai-update", start_update)
+
+local function on_check(success, result)
+    if not success or not result or result.status ~= 0 then
+        return -- offline / updater missing / error: stay quiet
+    end
+    local ver = (result.stdout or ""):match("UPDATE_AVAILABLE%s+(%S+)")
+    if ver then
+        available_version = ver
+        msg.info("Update available: " .. ver)
+        local how = is_appimage and "press Ctrl+U for the download link."
+                                 or "press Ctrl+U to install."
+        -- >>> CUSTOM Desuka: toast instead of OSD <<<
+        mp.commandv("script-message-to", "modernx", "modernx-toast", "warn", "animejanai",
+            "AnimeJaNai update " .. ver .. " available - " .. how, 8000)
+        -- <<< CUSTOM Desuka >>>
+    else
+        msg.verbose("AnimeJaNai is up to date.")
+    end
+end
+
+-- >>> CUSTOM Desuka: no check unless opted in (see above) <<<
+if check_opts.desuka_check_updates then
+    mp.command_native_async({
+        name = "subprocess",
+        args = { updater, "--check" },
+        capture_stdout = true,
+        playback_only = false,
+    }, on_check)
+end
+-- <<< CUSTOM Desuka >>>
