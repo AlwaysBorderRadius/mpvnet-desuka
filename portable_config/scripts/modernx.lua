@@ -4470,6 +4470,7 @@ function adv_menu_overrides()
         -- clickable with the honest command instead of deleting it
         ["Navigate > Jump 30 sec forward"]  = { key = "_", cmd = "seek 30 exact" },
         ["Navigate > Jump 30 sec backward"] = { key = "_", cmd = "seek -30 exact" },
+        ["Video > Toggle Deinterlace"]     = { key = "_", cmd = "cycle deinterlace" },
         ["Exit"]                           = { key = "_", cmd = "quit" },
         ["View > Show Audio Tracks"]      = { key = "_", cmd = "script-message-to mpvnet show-audio-tracks" },
         -- click == keybind (row ran the unmanaged variant, key runs the Desuka one)
