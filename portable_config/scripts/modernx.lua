@@ -4524,6 +4524,7 @@ function adv_menu_tree()
     local f = io.open(path, "r")
     if not f then return root end
     local overrides = adv_menu_overrides() -- stale-row patches (built once per open)
+    local slot_names = ajn_slot_names() -- >>> EDIT Desuka <<< -- live AJN profile names
     for line in f:lines() do
         local s = line:match("^%s*(.-)%s*$")
         if s ~= "" and s:sub(1, 1) ~= "#" then
@@ -4543,6 +4544,7 @@ function adv_menu_tree()
                         -- strip a trailing " [Desuka]" marker for grouping/labels/dedup
                         -- (native menu keeps it; ours shows the canonical row)
                         local leaf = segs[#segs]:gsub("%s*%[Desuka%]$", "")
+                        leaf = ajn_slot_leaf(segs, leaf, slot_names, parent) -- >>> EDIT Desuka <<< -- show profile names
                         if leaf ~= "" then
                             if leaf == "-" then
                                 parent.order[#parent.order + 1] = { kind = "sep" }
@@ -6612,7 +6614,8 @@ function shader_state()
     elseif slot == 1003 then
         ajn = "AJN Performance"
     elseif slot and slot > 0 then
-        ajn = "AJN Custom " .. slot
+        local name = ajn_slot_names()[slot]
+        ajn = "AJN " .. ((name and name ~= "" and name) or ("Custom " .. slot))
     end
     return { a4k = a4k, ajn = ajn }
 end
@@ -6687,6 +6690,55 @@ mp.register_script_message("aji-slot", function(slot)
     local n = tonumber(slot)
     if n then aji_slot_tracked = n end
 end)
+
+-- Live AnimeJaNai custom profile names ([slot_N] profile_name), mtime-cached
+-- so hover tooltips can call it every frame without re-reading the file.
+ajn_slot_cache = { path = nil, mtime = nil, names = {} }
+
+function ajn_slot_names()
+    local names = {}
+    local ok, path = pcall(mp.command_native, { "expand-path", "~~/../animejanai/animejanai.conf" })
+    if not ok or type(path) ~= "string" or path == "" then return names end
+    local info = mp.utils.file_info(path)
+    local mtime = info and info.mtime or nil
+    if ajn_slot_cache.path == path and ajn_slot_cache.mtime == mtime then
+        return ajn_slot_cache.names
+    end
+    local f = io.open(path, "r")
+    if f then
+        local slot = nil
+        for line in f:lines() do
+            line = line:gsub("\r$", "")
+            local sec = line:match("^%[slot_(%d+)%]")
+            if sec then
+                slot = tonumber(sec)
+            else
+                local name = line:match("^profile_name=(.-)%s*$")
+                if slot and name and name ~= "" then names[slot] = name end
+            end
+        end
+        f:close()
+    end
+    ajn_slot_cache.path, ajn_slot_cache.mtime, ajn_slot_cache.names = path, mtime, names
+    return names
+end
+
+-- Display leaf for AnimeJaNai custom slot rows (both dropdowns share the tree).
+-- First claim wins: duplicate profile names keep their "Custom N" label so no
+-- two rows collapse into one command via the tree's later-wins dedup.
+function ajn_slot_leaf(segs, leaf, names, parent)
+    if #segs == 3 and segs[1] == "AnimeJaNai" and segs[2] == "Slots" then
+        local n = leaf:match("^Custom (%d+)$")
+        if n then
+            local name = names and names[tonumber(n)]
+            if name and name ~= "" then
+                if parent and parent.index["_leaf:" .. name] then return leaf end
+                return name
+            end
+        end
+    end
+    return leaf
+end
 -- <<< CUSTOM Desuka >>>
 
 -- OSC INIT
