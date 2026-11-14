@@ -6608,7 +6608,7 @@ function shader_state()
     -- the backend on every file load. nil (never heard) and 0 both mean off.
     local slot = aji_slot_tracked
     local name = ajn_slot_label(slot)
-    if name then ajn = "AJN " .. name end
+    if name then ajn = "AnimeJaNai " .. name end
     return { a4k = a4k, ajn = ajn }
 end
 
@@ -6683,7 +6683,7 @@ end
 -- Toast with the live profile name (input.conf rows call this instead of static text).
 mp.register_script_message("modernx-aji-toast", function(slot)
     local name = ajn_slot_label(tonumber(slot))
-    show_toast("AJN " .. (name or texts.off or "Off"), "info", "modernx-aji")
+    show_toast("AnimeJaNai " .. (name or texts.off or "Off"), "info", "modernx-aji")
 end)
 
 -- Keyboard / input.conf access (toggles like a left click).
