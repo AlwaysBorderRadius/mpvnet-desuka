@@ -87,6 +87,7 @@ local user_opts = {
     window_top_bar = "auto",    -- show OSC window top bar: "auto", "yes", or "no" (borderless/fullscreen)
     show_windowed = true,       -- show OSC when windowed
     show_fullscreen = true,     -- show OSC when fullscreen
+    show_in_idle = true, -- >>> EDIT Desuka <<< -- keep chrome (top bar + controls) visible when idle
     show_on_pause = true,       -- show OSC when paused
     keep_on_pause = false,      -- disable OSC hide timeout when paused
     green_and_grumpy = false,   -- disable the Santa hat in December
@@ -1397,6 +1398,7 @@ local function get_hide_timeout()
     if user_opts.visibility == "always" then
         return -1 -- disable autohide
     end
+    if state.idle and user_opts.show_in_idle then return -1 end -- >>> EDIT Desuka <<< -- idle chrome stays up, nothing to reveal
     return user_opts.hide_timeout
 end
 
@@ -6296,6 +6298,12 @@ function validate_user_opts()
         user_opts.menu_button = true
     end
     -- <<< CUSTOM Desuka >>>
+    -- >>> CUSTOM Desuka: idle chrome <<<
+    if type(user_opts.show_in_idle) ~= "boolean" then
+        mp.msg.warn("show_in_idle must be boolean. Using true.")
+        user_opts.show_in_idle = true
+    end
+    -- <<< CUSTOM Desuka >>>
 
     if user_opts.volume_control_type ~= "linear" and
         user_opts.volume_control_type ~= "logarithmic" then
@@ -6509,6 +6517,64 @@ function update_options(_)
 end
 
 -- OSC INIT
+-- >>> CUSTOM Desuka: idle chrome <<<
+-- Idle logo drawn into the same ASS frame as the OSC (single set_osd),
+-- scaled from the legacy 360p layout to the current playres.
+function render_idle_logo(ass)
+    if not user_opts.idle_screen then return end
+    if not osc_param.playresy or osc_param.playresy <= 0 then return end
+    if not osc_param.playresx or osc_param.playresx <= 0 then return end
+    local s = osc_param.playresy / 360
+    if s <= 0 then return end
+    local icon_w = (1800 / 32) * s
+    local icon_x, icon_y = (osc_param.playresx - icon_w) / 2, 140 * s
+    local sc = s * 100
+    local line_prefix = ('{\\rDefault\\an7\\fscx%f\\fscy%f\\1a&H00&\\bord0\\shad0\\pos(%f,%f)}'):format(sc, sc, icon_x, icon_y)
+    for _, line in ipairs(logo_lines) do
+        ass:new_event()
+        ass:append(line_prefix .. line)
+    end
+    if is_december and not user_opts.green_and_grumpy then
+        for _, line in ipairs(santa_hat_lines) do
+            ass:new_event()
+            ass:append(line_prefix .. line)
+        end
+    end
+    ass:new_event()
+    ass:pos(osc_param.playresx / 2, icon_y + 65 * s)
+    ass:an(8)
+    ass:append(("{\\fs%f\\1c&H0&\\1c&HFFFFFF&}"):format(24 * s) .. texts.welcome)
+end
+
+-- Idle keeps window chrome + menu usable, everything else greyed out.
+-- Runs inside osc_init() before prepare_elements() so the grey style
+-- (alpha 215 + no eventresponder) is baked in like any disabled element.
+function apply_idle_state()
+    if not (state.idle and user_opts.show_in_idle) then return end
+    local grey = { "play_pause", "pl_prev", "pl_next", "skipback", "skipfrwd",
+        "jumpback", "jumpfrwd", "cy_video", "cy_audio", "cy_sub",
+        "vol_ctrl", "volumebar", "seekbar", "persistentseekbar",
+        "tog_loop", "download", "screenshot", "tog_info" }
+    for _, name in ipairs(grey) do
+        if elements[name] then elements[name].enabled = false end
+    end
+    if elements["persistentseekbar"] then elements["persistentseekbar"].visible = false end
+    if elements["title"] then elements["title"].visible = false end
+    if elements["description"] then elements["description"].visible = false end
+    if elements["separator"] then elements["separator"].visible = false end
+    if elements["chapter_title"] then elements["chapter_title"].visible = false end
+    if elements["tc_left"] then
+        elements["tc_left"].enabled = false
+        elements["tc_left"].visible = true
+        elements["tc_left"].content = function() return "--:--" end
+    end
+    if elements["tc_right"] then
+        elements["tc_right"].enabled = false
+        elements["tc_right"].visible = true
+        elements["tc_right"].content = function() return "--:--" end
+    end
+end
+-- <<< CUSTOM Desuka >>>
 local function osc_init()
     mp.msg.debug("osc_init")
 
@@ -7428,6 +7494,8 @@ local function osc_init()
         window_controls()
     end
 
+    apply_idle_state() -- >>> EDIT Desuka <<< -- grey out playback controls when idle (before styling)
+
     --do something with the elements
     prepare_elements()
 end
@@ -7876,6 +7944,8 @@ local function render()
     -- actual rendering
     local ass = mp.assdraw.ass_new()
 
+    if state.idle and user_opts.show_in_idle then render_idle_logo(ass) end -- >>> EDIT Desuka <<< -- same frame as the chrome
+
     -- Messages
     render_message(ass)
     render_toast(ass)
@@ -8225,7 +8295,11 @@ function process_event(source, what)
                     or (math.abs(mouseY - state.last_mouseY) >= user_opts.min_mouse_move)
                 )
             ) then
-            if user_opts.bottom_hover then -- if enabled, only show osc if mouse is hovering at the bottom of the screen (where the UI elements are)
+            if state.idle and user_opts.show_in_idle and user_opts.visibility ~= "never"
+                and ((state.fullscreen and user_opts.show_fullscreen)
+                    or ((not state.fullscreen) and user_opts.show_windowed)) then
+                show_osc() -- >>> EDIT Desuka <<< -- idle chrome stays up
+            elseif user_opts.bottom_hover then -- if enabled, only show osc if mouse is hovering at the bottom of the screen (where the UI elements are)
                 local top_hover = window_controls_enabled() and (user_opts.window_title or user_opts.window_top_bar)
                 if mouseY > osc_param.playresy - (user_opts.bottom_hover_zone or 200) or
                     (user_opts.window_top_bar == "yes" or (not state.border) or (not state.title_bar) or state.fullscreen) and (mouseY < 40 and top_hover) then
@@ -8285,61 +8359,87 @@ function tick()
     local wt0 = mp.get_time() -- >>> EDIT Desuka <<< -- loop-health tick duration
 
     if state.idle then -- this is the screen mpv opens to (not playing a file directly), or if you quit a video (idle=yes in mpv.conf)
-        -- >>> CUSTOM Desuka <<<
-        thumb_clear() -- no stuck thumbnail into idle
-        if state.wc_enabled then -- idle never reaches render() to sync it
-            mp.disable_key_bindings('window-controls')
-            state.wc_enabled = false
-            set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
-        end
-        if state.menu_enabled then -- idle never reaches render() to sync it
-            mp.disable_key_bindings('menu-controls')
-            state.menu_enabled = false
-            set_virt_mouse_area(0, 0, 0, 0, 'menu-controls')
-        end
-        -- <<< CUSTOM Desuka >>>
-        -- render idle message
-        mp.msg.trace('idle message')
-        local _, _, display_aspect = mp.get_osd_size()
-        if display_aspect == 0 then
-            return
-        end
-        local display_h = 360
-        local display_w = display_h * display_aspect
-        -- logo is rendered at 2^(6-1) = 32 times resolution with size 1800x1800
-        local icon_x, icon_y = (display_w - 1800 / 32) / 2, 140
-        local line_prefix = ('{\\rDefault\\an7\\1a&H00&\\bord0\\shad0\\pos(%f,%f)}'):format(icon_x, icon_y)
-
-        local ass = mp.assdraw.ass_new()
-
-        -- mpv logo
-        if user_opts.idle_screen then
-            for _, line in ipairs(logo_lines) do
-                ass:new_event()
-                ass:append(line_prefix .. line)
+        -- >>> CUSTOM Desuka: idle chrome <<<
+        -- Logo-only legacy path unless the chrome is enabled for idle.
+        if not user_opts.show_in_idle
+            or user_opts.visibility == "never"
+            or not ((state.fullscreen and user_opts.show_fullscreen)
+                or ((not state.fullscreen) and user_opts.show_windowed)) then
+            thumb_clear() -- no stuck thumbnail into idle
+            if state.wc_enabled then -- idle never reaches render() to sync it
+                mp.disable_key_bindings('window-controls')
+                state.wc_enabled = false
+                set_virt_mouse_area(0, 0, 0, 0, 'window-controls')
             end
-        end
-
-        -- Santa hat
-        if is_december and user_opts.idle_screen and not user_opts.green_and_grumpy then
-            for _, line in ipairs(santa_hat_lines) do
-                ass:new_event()
-                ass:append(line_prefix .. line)
+            if state.menu_enabled then -- idle never reaches render() to sync it
+                mp.disable_key_bindings('menu-controls')
+                state.menu_enabled = false
+                set_virt_mouse_area(0, 0, 0, 0, 'menu-controls')
             end
-        end
+            -- <<< CUSTOM Desuka >>>
+            -- render idle message
+            mp.msg.trace('idle message')
+            local _, _, display_aspect = mp.get_osd_size()
+            if display_aspect == 0 then
+                return
+            end
+            local display_h = 360
+            local display_w = display_h * display_aspect
+            -- logo is rendered at 2^(6-1) = 32 times resolution with size 1800x1800
+            local icon_x, icon_y = (display_w - 1800 / 32) / 2, 140
+            local line_prefix = ('{\\rDefault\\an7\\1a&H00&\\bord0\\shad0\\pos(%f,%f)}'):format(icon_x, icon_y)
 
-        if user_opts.idle_screen then
-            ass:new_event()
-            ass:pos(display_w / 2, icon_y + 65)
-            ass:an(8)
-            ass:append("{\\fs24\\1c&H0&\\1c&HFFFFFF&}" .. texts.welcome)
-        end
-        set_osd(display_w, display_h, ass.text)
+            local ass = mp.assdraw.ass_new()
 
-        if state.showhide_enabled then
-            mp.disable_key_bindings('showhide')
-            mp.disable_key_bindings('showhide_wc')
-            state.showhide_enabled = false
+            -- mpv logo
+            if user_opts.idle_screen then
+                for _, line in ipairs(logo_lines) do
+                    ass:new_event()
+                    ass:append(line_prefix .. line)
+                end
+            end
+
+            -- Santa hat
+            if is_december and user_opts.idle_screen and not user_opts.green_and_grumpy then
+                for _, line in ipairs(santa_hat_lines) do
+                    ass:new_event()
+                    ass:append(line_prefix .. line)
+                end
+            end
+
+            if user_opts.idle_screen then
+                ass:new_event()
+                ass:pos(display_w / 2, icon_y + 65)
+                ass:an(8)
+                ass:append("{\\fs24\\1c&H0&\\1c&HFFFFFF&}" .. texts.welcome)
+            end
+            set_osd(display_w, display_h, ass.text)
+
+            if state.showhide_enabled then
+                mp.disable_key_bindings('showhide')
+                mp.disable_key_bindings('showhide_wc')
+                state.showhide_enabled = false
+            end
+        else
+            -- >>> CUSTOM Desuka: idle chrome <<<
+            -- Same chrome as playback (logo fused in render()), pinned visible:
+            -- nothing to reveal and no video to cover.
+            thumb_clear() -- no stuck thumbnail into idle
+            local _, _, display_aspect = mp.get_osd_size()
+            if display_aspect == 0 then
+                return
+            end
+            state.showtime = nil
+            if state.autohide_timer then state.autohide_timer:kill() end
+            state.anitype = nil
+            state.anistart = nil
+            state.animation = nil
+            if not state.osc_visible then
+                state.osc_visible = true
+                adjust_subtitles(true)
+            end
+            render()
+            -- <<< CUSTOM Desuka >>>
         end
     elseif (state.fullscreen and user_opts.show_fullscreen)
         or (not state.fullscreen and user_opts.show_windowed) then
@@ -8535,6 +8635,8 @@ mp.observe_property('window-maximized', 'bool',
 mp.observe_property('idle-active', 'bool',
     function(_, val)
         state.idle = val
+        request_init() -- >>> EDIT Desuka <<< -- rebuild chrome grey state on idle transitions
+        if not val then reset_timeout() end -- >>> EDIT Desuka <<< -- rearm autohide so playback OSC can hide again
         request_tick()
     end
 )
