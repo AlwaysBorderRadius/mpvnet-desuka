@@ -4663,8 +4663,7 @@ function open_adv_menu()
 end
 
 function close_adv_menu()
-    adv_menu_anchor_el = nil -- >>> EDIT Desuka <<< -- drop shader anchor with the menu
-    if state.adv_menu == nil then return end
+    if state.adv_menu == nil then adv_menu_anchor_el = nil return end -- >>> EDIT Desuka <<< -- keep anchor until the fade snapshot is taken
     if user_opts.track_menu_animation and state.osc_visible then
         -- Closing fade snapshot; render_adv_menu() only runs while the OSC
         -- is visible, so skip it when already hidden (nothing to paint over).
@@ -4674,6 +4673,7 @@ function close_adv_menu()
         state.adv_menu_fading = nil
     end
     state.adv_menu = nil
+    adv_menu_anchor_el = nil -- >>> EDIT Desuka <<< -- drop shader anchor with the menu
     mp.remove_key_binding("modernx-adv-menu-close")
     request_tick()
 end
@@ -5824,13 +5824,13 @@ layouts["original"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -5942,17 +5942,17 @@ layouts["original"] = function()
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 600 - outeroffset)
 
-    lo = add_layout('vol_ctrl')
-    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
-    lo.style = osc_styles.control_3
-    lo.visible = (osc_param.playresx >= 700 - outeroffset)
-
     if user_opts.show_shader_button then
         lo = add_layout('cy_shader')
-        lo.geometry = { x = 217, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button
+        lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button, before volume
         lo.style = osc_styles.control_3
-        lo.visible = (osc_param.playresx >= 750 - outeroffset)
+        lo.visible = (osc_param.playresx >= 700 - outeroffset)
     end
+
+    lo = add_layout('vol_ctrl')
+    lo.geometry = { x = user_opts.show_shader_button and 217 or 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- after the shader button
+    lo.style = osc_styles.control_3
+    lo.visible = (osc_param.playresx >= (user_opts.show_shader_button and 750 or 700) - outeroffset)
 
     -- Fullscreen/Loop/Info
     lo = add_layout('tog_fs')
@@ -6132,13 +6132,13 @@ layouts["reduced"] = function()
         lo = new_element("volumebarbg", "box")
         lo.visible = (osc_param.playresx >= 900 - outeroffset) and user_opts.volume_control
         lo = add_layout("volumebarbg")
-        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 2 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.layer = 13
         lo.alpha[1] = 128
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_bg or osc_styles.volumebar_bg
 
         lo = add_layout("volumebar")
-        lo.geometry = { x = 245, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
+        lo.geometry = { x = user_opts.show_shader_button and 245 or 200, y = refY - 40, an = 4, w = 80, h = 8 } -- >>> EDIT Desuka <<< -- clear of the shader button
         lo.style = user_opts.volumebar_match_seek_color and osc_styles.seekbar_fg or osc_styles.volumebar_fg
         lo.slider.gap = 3
         lo.slider.tooltip_style = osc_styles.tooltip
@@ -6237,17 +6237,17 @@ layouts["reduced"] = function()
     lo.style = osc_styles.control_3
     lo.visible = (osc_param.playresx >= 600 - outeroffset)
 
-    lo = add_layout('vol_ctrl')
-    lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<<
-    lo.style = osc_styles.control_3
-    lo.visible = (osc_param.playresx >= 700 - outeroffset)
-
     if user_opts.show_shader_button then
         lo = add_layout('cy_shader')
-        lo.geometry = { x = 217, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button
+        lo.geometry = { x = 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- shader menu button, before volume
         lo.style = osc_styles.control_3
-        lo.visible = (osc_param.playresx >= 750 - outeroffset)
+        lo.visible = (osc_param.playresx >= 700 - outeroffset)
     end
+
+    lo = add_layout('vol_ctrl')
+    lo.geometry = { x = user_opts.show_shader_button and 217 or 172, y = refY - 40, an = 5, w = 24, h = 24 } -- >>> EDIT Desuka <<< -- after the shader button
+    lo.style = osc_styles.control_3
+    lo.visible = (osc_param.playresx >= (user_opts.show_shader_button and 750 or 700) - outeroffset)
 
     -- Fullscreen/Loop/Info
     lo = add_layout('tog_fs')
@@ -6641,9 +6641,23 @@ function open_shader_menu()
     close_track_menu() -- only one dropdown at a time
     local tree = adv_menu_tree()
     local root = { name = nil, kids = {}, index = {}, order = {} }
-    for _, nm in ipairs({ "Anime4K", "AnimeJaNai" }) do
-        local n = tree.index[nm]
-        if n then root.order[#root.order + 1] = { kind = "group", node = n } end
+    local a4k = tree.index["Anime4K"]
+    if a4k then root.order[#root.order + 1] = { kind = "group", node = a4k } end
+    local ajn = tree.index["AnimeJaNai"] -- slots directly, skip Manager/Stats/Update
+    if ajn then
+        local slots = nil
+        for _, e in ipairs(ajn.order) do
+            if e.kind == "group" and e.node and e.node.name == "Slots" then
+                slots = e.node
+                break
+            end
+        end
+        if slots then
+            root.order[#root.order + 1] = { kind = "group",
+                node = { name = "AnimeJaNai", kids = slots.kids or {}, index = slots.index or {}, order = slots.order } }
+        else
+            root.order[#root.order + 1] = { kind = "group", node = ajn }
+        end
     end
     if #root.order == 0 then -- input.conf missing/unreadable: say so instead of looking dead
         show_toast(texts.na or "Not available", "warn", "modernx-menu")
@@ -7146,7 +7160,7 @@ local function osc_init()
     -- Single button, submenus like the advanced menu; live state in the tooltip.
     ne = new_element('cy_shader', 'button')
     ne.enabled = true
-    ne.visible = (osc_param.playresx >= 750 - outeroffset) and user_opts.show_shader_button
+    ne.visible = (osc_param.playresx >= 700 - outeroffset) and user_opts.show_shader_button
     ne.content = icons.shader
     ne.tooltip_style = osc_styles.tooltip
     ne.tooltipF = function() return shader_tooltip() end
@@ -7161,7 +7175,7 @@ local function osc_init()
     ne = new_element("vol_ctrl", "button")
     ne.enabled = get_track("audio") > 0
     ne.off = get_track("audio") == 0
-    ne.visible = (osc_param.playresx >= 700 - outeroffset) and user_opts.volume_control
+    ne.visible = (osc_param.playresx >= (user_opts.show_shader_button and 750 or 700) - outeroffset) and user_opts.volume_control
     ne.content = function()
         local volume = mp.get_property_number("volume", 0)
         if state.mute then
