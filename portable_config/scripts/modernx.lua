@@ -187,6 +187,7 @@ local user_opts = {
     ontop_button = true,            -- show window on top button
     menu_button = true,             -- show menu button top-left (opens the advanced menu) -- >>> EDIT Desuka <<<
     show_shader_button = true, -- >>> EDIT Desuka <<< -- show shader button (Anime4K + AnimeJaNai menu)
+    show_subedit_button = true, -- >>> EDIT Desuka <<< -- show subtitle edit tool button
     screenshot_button = false,      -- show screenshot button
     screenshot_flag = "subtitles",  -- flag for screenshot button: "subtitles", "video", "window", "each-frame"
     -- https://mpv.io/manual/master/#screenshot-commands
@@ -361,6 +362,7 @@ local icons = {
     -- >>> CUSTOM Desuka <<<
     menu = "\239\147\161", -- hamburger (fluent-system-icons line-horizontal-3)
     shader = "\238\172\179", -- >>> EDIT Desuka <<< -- sparkle (fluent-system-icons)
+    subedit = "\239\143\157", -- >>> EDIT Desuka <<< -- pencil (fluent-system-icons edit)
     -- <<< CUSTOM Desuka >>>
 
     volume = {
@@ -443,6 +445,7 @@ local language = {
         -- >>> CUSTOM Desuka <<<
         menu = "Menu", -- adv menu header + top-left button tooltip
         shaders = "Shaders", -- >>> EDIT Desuka <<< -- shader button tooltip + menu header
+        subedit = "Edit subtitles", -- >>> EDIT Desuka <<< -- subtitle edit button tooltip
         -- <<< CUSTOM Desuka >>>
     },
 
@@ -478,6 +481,7 @@ local language = {
         downloaded = "Ya descargado",
         menu = "Menú", -- adv menu header + top-left button tooltip
         shaders = "Shaders", -- >>> EDIT Desuka <<< -- shader button tooltip + menu header
+        subedit = "Editar subtítulos", -- >>> EDIT Desuka <<< -- subtitle edit button tooltip
     }
     -- <<< CUSTOM Desuka >>>
 }
@@ -6011,6 +6015,21 @@ layouts["original"] = function()
         lo.visible = (osc_param.playresx >= 400 - outeroffset)
     end
 
+    if user_opts.show_subedit_button then -- >>> EDIT Desuka <<< -- subtitle edit tool, leftmost of the right cluster
+        lo = add_layout('sub_edit')
+        lo.geometry = {
+            x = osc_geo.w - 307 + (loop_button and 0 or 45) + (ontop_button and 0 or 45) +
+                (info_button and 0 or 45) + (screenshot_button and 0 or 45) +
+                ((state.is_URL and user_opts.download_button) and 0 or 45), -- >>> EDIT Desuka <<< -- collapse when download hidden
+            y = refY - 40,
+            an = 5,
+            w = 24,
+            h = 24
+        }
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 350 - outeroffset)
+    end
+
     -- >>> CUSTOM Desuka <<<
     -- Menu button: top-left strip, outside the bottom bar (no width gate).
     lo = add_layout('menu_btn')
@@ -6306,6 +6325,21 @@ layouts["reduced"] = function()
         lo.visible = (osc_param.playresx >= 400 - outeroffset)
     end
 
+    if user_opts.show_subedit_button then -- >>> EDIT Desuka <<< -- subtitle edit tool, leftmost of the right cluster
+        lo = add_layout('sub_edit')
+        lo.geometry = {
+            x = osc_geo.w - 307 + (loop_button and 0 or 45) + (ontop_button and 0 or 45) +
+                (info_button and 0 or 45) + (screenshot_button and 0 or 45) +
+                ((state.is_URL and user_opts.download_button) and 0 or 45), -- >>> EDIT Desuka <<< -- collapse when download hidden
+            y = refY - 40,
+            an = 5,
+            w = 24,
+            h = 24
+        }
+        lo.style = osc_styles.control_3
+        lo.visible = (osc_param.playresx >= 350 - outeroffset)
+    end
+
     -- >>> CUSTOM Desuka <<<
     -- Menu button: top-left strip, outside the bottom bar (no width gate).
     lo = add_layout('menu_btn')
@@ -6346,6 +6380,12 @@ function validate_user_opts()
     if type(user_opts.show_shader_button) ~= "boolean" then
         mp.msg.warn("show_shader_button must be boolean. Using true.")
         user_opts.show_shader_button = true
+    end
+    -- <<< CUSTOM Desuka >>>
+    -- >>> CUSTOM Desuka: subtitle edit button <<<
+    if type(user_opts.show_subedit_button) ~= "boolean" then
+        mp.msg.warn("show_subedit_button must be boolean. Using true.")
+        user_opts.show_subedit_button = true
     end
     -- <<< CUSTOM Desuka >>>
 
@@ -6790,7 +6830,7 @@ function apply_idle_state()
     local grey = { "play_pause", "pl_prev", "pl_next", "skipback", "skipfrwd",
         "jumpback", "jumpfrwd", "cy_video", "cy_audio", "cy_sub",
         "vol_ctrl", "volumebar", "seekbar", "persistentseekbar",
-        "tog_loop", "download", "screenshot", "tog_info", "cy_shader" }
+        "tog_loop", "download", "screenshot", "tog_info", "cy_shader", "sub_edit" }
     for _, name in ipairs(grey) do
         if elements[name] then elements[name].enabled = false end
     end
@@ -7348,6 +7388,25 @@ local function osc_init()
             exec_async(command, download_done)
         end
     end
+
+    -- >>> CUSTOM Desuka: subtitle edit tool button <<<
+    -- Momentary action (right side): left opens the screen editor, right the OSD one.
+    ne = new_element('sub_edit', 'button')
+    ne.enabled = #tracks_osc.sub > 0
+    ne.visible = (osc_param.playresx >= 350 - outeroffset) and user_opts.show_subedit_button
+    ne.content = icons.subedit
+    ne.tooltip_style = osc_styles.tooltip
+    ne.tooltipF = texts.subedit or "Edit subtitles"
+    ne.nothingavailable = texts.nosub
+    ne.eventresponder['mbtn_left_up'] =
+        function()
+            mp.commandv("script-binding", "quick_subtitle_edit/edit-subtitle")
+        end
+    ne.eventresponder['mbtn_right_up'] =
+        function()
+            mp.commandv("script-binding", "quick_subtitle_edit/edit-subtitle-osd")
+        end
+    -- <<< CUSTOM Desuka >>>
 
     --screenshot
     ne = new_element("screenshot", "button")
