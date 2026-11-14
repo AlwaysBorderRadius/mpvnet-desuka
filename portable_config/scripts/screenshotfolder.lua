@@ -88,6 +88,49 @@ local function validate_user_opts()
 end
 validate_user_opts()
 
+-- >>> CUSTOM Desuka: bilingual toasts <<<
+-- UI language comes from modernx.conf (single source), like update_checker.
+local function read_modernx_language()
+    local path = mp.find_config_file("script-opts/modernx.conf")
+    if path == nil then
+        local dir = mp.get_script_directory()
+        if dir == nil or dir == "" then return "en" end
+        path = dir .. "/../script-opts/modernx.conf"
+    end
+    local f = io.open(path, "r")
+    if f == nil then return "en" end
+    local content = f:read("*a")
+    f:close()
+    if content == nil then return "en" end
+    local lang = "en"
+    for line in content:gmatch("[^\r\n]+") do
+        local v = line:match("^%s*language%s*=%s*(%S+)")
+        if v ~= nil then lang = v:gsub('^"(.*)"$', "%1"):gsub("^'(.-)'$", "%1") end
+    end
+    if lang ~= "en" and lang ~= "es" then lang = "en" end
+    return lang
+end
+local mo = { language = read_modernx_language() }
+
+local STRINGS = {
+    en = {
+        saved = "Screenshot saved",
+        saved_to = "Screenshot saved to: %s",
+    },
+    es = {
+        saved = "Captura guardada",
+        saved_to = "Captura guardada en: %s",
+    },
+}
+
+local function t(key, a)
+    local lang_table = STRINGS[mo.language] or STRINGS["en"]
+    local fmt = lang_table[key] or STRINGS["en"][key] or ""
+    if a == nil then return fmt end
+    return string.format(fmt, a)
+end
+-- <<< CUSTOM Desuka >>>
+
 local state = {
     series = "default",
     season = nil,
@@ -317,6 +360,7 @@ local function screenshot_done(oneshot_mode) -- >>> EDIT Desuka <<< -- one-shot 
         if state.counter <= highest then state.counter = highest + 1 end
         mp.set_property("screenshot-template", state.prefix .. " (" .. state.counter .. ")")
     end
+    local shot_n = options.sequential_numbering and state.counter or nil -- >>> EDIT Desuka <<< -- number used below, before the bump
 
     local sub_visibility = nil
     if options.hide_subtitles and mode ~= "subtitles" then -- >>> EDIT Desuka <<< -- explicit subtitles mode wins over the global opt-out
@@ -337,10 +381,14 @@ local function screenshot_done(oneshot_mode) -- >>> EDIT Desuka <<< -- one-shot 
         mp.set_property("screenshot-template", state.prefix .. " (" .. state.counter .. ")")
     end
 
-    local toast_msg = "Screenshot saved"
+    local toast_msg = t("saved")
     if not options.short_saved_message then
         local dir = mp.get_property("screenshot-directory") or state.dir or ""
-        toast_msg = "Screenshot saved to: " .. dir:gsub("\\", "/")
+        if options.sequential_numbering and shot_n then -- >>> EDIT Desuka <<< -- full file path when we know the number
+            toast_msg = t("saved_to", utils.join_path(dir, state.prefix .. " (" .. shot_n .. ")." .. options.file_ext):gsub("\\", "/"))
+        else
+            toast_msg = t("saved_to", dir:gsub("\\", "/"))
+        end
     end
     -- unified toast via modernx (replaces native OSD)
     mp.commandv("script-message-to", "modernx", "modernx-toast", "success", "screenshot", toast_msg)
