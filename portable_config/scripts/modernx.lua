@@ -6602,24 +6602,17 @@ function shader_state()
             end
         end
     end
-    local vf = mp.get_property_native("vf", {})
-    if type(vf) == "table" then
-        for _, f in ipairs(vf) do
-            if type(f) == "table" and (f.name == "aji" or f.label == "aji")
-                and f.enabled ~= false and type(f.params) == "table" then
-                local slot = tostring(f.params.slot or "")
-                if slot == "1001" then
-                    ajn = "AJN Quality"
-                elseif slot == "1002" then
-                    ajn = "AJN Balanced"
-                elseif slot == "1003" then
-                    ajn = "AJN Performance"
-                elseif slot:match("^[1-9]%d*$") then
-                    ajn = "AJN Custom " .. slot
-                end
-                break
-            end
-        end
+    -- Authoritative slot: broadcast by the input.conf rows and re-applied by
+    -- the backend on every file load. nil (never heard) and 0 both mean off.
+    local slot = aji_slot_tracked
+    if slot == 1001 then
+        ajn = "AJN Quality"
+    elseif slot == 1002 then
+        ajn = "AJN Balanced"
+    elseif slot == 1003 then
+        ajn = "AJN Performance"
+    elseif slot and slot > 0 then
+        ajn = "AJN Custom " .. slot
     end
     return { a4k = a4k, ajn = ajn }
 end
@@ -6685,6 +6678,15 @@ mp.register_script_message("close-shader-menu", function()
     if adv_menu_anchor_el == "cy_shader" then close_adv_menu() end
 end)
 mp.register_script_message("toggle-shader-menu", function() toggle_shader_menu() end)
+
+-- Track the active AJN slot: input.conf rows broadcast it and the backend
+-- re-applies it on every file load (vf params go stale after vf-command).
+-- 0 = off; nil = never heard = off.
+aji_slot_tracked = nil
+mp.register_script_message("aji-slot", function(slot)
+    local n = tonumber(slot)
+    if n then aji_slot_tracked = n end
+end)
 -- <<< CUSTOM Desuka >>>
 
 -- OSC INIT
