@@ -4670,7 +4670,7 @@ function close_adv_menu()
         -- Closing fade snapshot; render_adv_menu() only runs while the OSC
         -- is visible, so skip it when already hidden (nothing to paint over).
         local g = adv_menu_geometry()
-        if g then state.adv_menu_fading = { m = state.adv_menu, g = g, t0 = mp.get_time() } end
+        if g then state.adv_menu_fading = { m = state.adv_menu, g = g, t0 = mp.get_time(), above = (adv_menu_anchor_el ~= nil) } end -- >>> EDIT Desuka <<< -- fade sinks toward its own button
     else
         state.adv_menu_fading = nil
     end
@@ -5030,7 +5030,7 @@ function render_adv_menu(ass)
             -- fade out sinking back toward the button (mirror of the open slide)
             local k = age / 0.15
             local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
-            render_adv_menu_one(ass, f.m, f.g, 1 - k, -k * k * dist, false)
+            render_adv_menu_one(ass, f.m, f.g, 1 - k, (f.above and 1 or -1) * k * k * dist, false) -- >>> EDIT Desuka <<< -- sink toward its own button
             request_tick()
         end
     end
@@ -5046,7 +5046,7 @@ function render_adv_menu(ass)
             local k = age / 0.15
             fade = k
             local dist = math.max(0, tonumber(user_opts.track_menu_animation_distance) or 0)
-            dy = -((1 - k) * (1 - k) * (1 - k)) * dist -- slide down from the button
+            dy = (adv_menu_anchor_el and 1 or -1) * ((1 - k) * (1 - k) * (1 - k)) * dist -- >>> EDIT Desuka <<< -- rise/slide from its own button
             request_tick()
         end
     end
