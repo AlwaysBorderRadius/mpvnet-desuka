@@ -6714,7 +6714,7 @@ function ajn_slot_names()
                 slot = tonumber(sec)
             else
                 local name = line:match("^profile_name=(.-)%s*$")
-                if slot and name and name ~= "" then names[slot] = name end
+                if slot and name and name ~= "" and name ~= "New Profile" then names[slot] = name end
             end
         end
         f:close()
