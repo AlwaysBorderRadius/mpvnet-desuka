@@ -6607,17 +6607,22 @@ function shader_state()
     -- Authoritative slot: broadcast by the input.conf rows and re-applied by
     -- the backend on every file load. nil (never heard) and 0 both mean off.
     local slot = aji_slot_tracked
-    if slot == 1001 then
-        ajn = "AJN Quality"
-    elseif slot == 1002 then
-        ajn = "AJN Balanced"
-    elseif slot == 1003 then
-        ajn = "AJN Performance"
+    local name = ajn_slot_label(slot)
+    if name then ajn = "AJN " .. name end
+    return { a4k = a4k, ajn = ajn }
+end
+
+-- Display name for an AJN slot: V3 presets, live profile names, Custom N, off = nil.
+function ajn_slot_label(slot)
+    if slot == 1001 then return "Quality"
+    elseif slot == 1002 then return "Balanced"
+    elseif slot == 1003 then return "Performance"
     elseif slot and slot > 0 then
         local name = ajn_slot_names()[slot]
-        ajn = "AJN " .. ((name and name ~= "" and name) or ("Custom " .. slot))
+        if name and name ~= "" then return name end
+        return "Custom " .. slot
     end
-    return { a4k = a4k, ajn = ajn }
+    return nil
 end
 
 -- Tooltip: "Shaders" plus the active chain, if any.
@@ -6674,6 +6679,12 @@ function toggle_shader_menu()
         open_shader_menu()
     end
 end
+
+-- Toast with the live profile name (input.conf rows call this instead of static text).
+mp.register_script_message("modernx-aji-toast", function(slot)
+    local name = ajn_slot_label(tonumber(slot))
+    show_toast("AJN " .. (name or texts.off or "Off"), "info", "modernx-aji")
+end)
 
 -- Keyboard / input.conf access (toggles like a left click).
 mp.register_script_message("open-shader-menu", function() open_shader_menu() end)
