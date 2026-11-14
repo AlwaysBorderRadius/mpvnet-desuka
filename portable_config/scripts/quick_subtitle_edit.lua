@@ -670,6 +670,17 @@ local function ui_msg(text, dur, kind)
         kind or "info", "subedit", tostring(text or ""), ms and tostring(ms) or "")
 end
 
+-- >>> CUSTOM Desuka: native OSD for the OSD editor <<<
+-- The OSD editor repaints on every keystroke: native OSD neither steals the
+-- toast pill nor vanishes after the toast cap. Other messages stay on toast.
+local function osd_editor_msg(text)
+    mp.osd_message(tostring(text or ""), 100)
+end
+local function osd_editor_hide()
+    mp.osd_message("", 0)
+end
+-- <<< CUSTOM Desuka >>>
+
 -- Loading indicator: a single static message on the modernx toast
 -- (persistent slot, same source) until the menu/editor shows up.
 local loading_active = false
@@ -1479,6 +1490,7 @@ local function exit_mode(message, dur, discard)
     msg.info("[salida] exit_mode: mensaje=" .. tostring(message)
           .. " discard=" .. tostring(discard)
           .. " path=" .. tostring(mp.get_property("path")))
+    local osd_editor = edit and not (edit.render == "screen" and edit.overlay) -- >>> EDIT Desuka <<< -- mirror render_editor()
     unbind_all()
     stop_loading()
     if selector_overlay then
@@ -1510,6 +1522,7 @@ local function exit_mode(message, dur, discard)
     sel_index = 1
     pending_dead = ""
     loading = false
+    if osd_editor then osd_editor_hide() end -- >>> EDIT Desuka <<< -- clear the native editor OSD
     if pause_saved ~= nil then
         if not pause_saved then
             mp.set_property_bool("pause", false)
@@ -2086,7 +2099,7 @@ local function render_editor_osd()
     table.insert(out, "")
     table.insert(out, "Enter: guardar · Shift+Enter: salto de línea · Esc: cancelar")
     table.insert(out, "↑/↓: cambiar de línea · ←/→: mover cursor (mantén pulsado para repetir)")
-    ui_msg(table.concat(out, "\n"), 100)
+    osd_editor_msg(table.concat(out, "\n")) -- >>> EDIT Desuka <<< -- native OSD, never the toast
 end
 
 local function render_editor()

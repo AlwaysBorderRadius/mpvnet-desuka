@@ -3840,11 +3840,16 @@ local function render_toast(ass)
         return
     end
     render_toast_bar()
-    -- text (centered, multiline via \N)
+    -- text: single line centered (tight pill); multiline left-aligned, normal paragraph
     local body = table.concat(lines, "\\N")
     ass:new_event()
-    ass:pos(cx - 2, tcy)
-    ass:an(5)
+    if #lines > 1 then -- >>> EDIT Desuka <<< -- paragraphs read left-aligned, single lines unchanged
+        ass:pos(x0 + pad_x, tcy)
+        ass:an(4)
+    else
+        ass:pos(cx - 2, tcy)
+        ass:an(5)
+    end
     ass:append(text_style .. body)
 end
 -- <<< CUSTOM Desuka >>>
