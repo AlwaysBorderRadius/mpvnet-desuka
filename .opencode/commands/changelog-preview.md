@@ -9,7 +9,7 @@ tag git; en futuras releases sustituye `1.3` por el ultimo publicado). Si el usu
 indica otra base en el mensaje, usa esa; si el LOG de abajo no cubre el rango pedido,
 pide el log correcto en vez de inventar.
 
-Datos:
+Datos (tras publicar vN, actualizar la linea 13 con la nueva base):
 !`git tag --list --sort=version:refname`
 !`git log --no-color 1.3..HEAD --oneline`
 
