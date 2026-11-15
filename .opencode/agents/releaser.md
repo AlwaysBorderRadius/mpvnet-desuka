@@ -22,7 +22,7 @@ cambie comportamiento. No inventes versiones ni fechas.
 ## Descargas
 | | Full portable (Windows / Linux (wine/proton)) | Patch (sobre AJN vAJN_VER) |
 |-|-|-|
-| Archivo | [FULL_NAME](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases/download/vDESUKA_VER/FULL_NAME) | [PATCH_NAME](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases/download/vDESUKA_VER/PATCH_NAME) |
+| Archivo | [FULL_NAME](https://github.com/AlwaysBorderRadius/mpv-desuka/releases/download/vDESUKA_VER/FULL_NAME) | [PATCH_NAME](https://github.com/AlwaysBorderRadius/mpv-desuka/releases/download/vDESUKA_VER/PATCH_NAME) |
 | Requiere | nada (base incluida) | [AJN vAJN_VER](AJN_URL) |
 
 Base probada: [AJN vAJN_VER](AJN_URL). No mezclar con otra base; si AJN publica cambios

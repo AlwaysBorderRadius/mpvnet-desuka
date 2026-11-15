@@ -1,14 +1,14 @@
 <div align="center">
 
-[🇪🇸 Español](#mpvnet-desuka) | [🇬🇧 English](#mpvnet-desuka-en)
+[🇪🇸 Español](#mpv-desuka) | [🇬🇧 English](#mpv-desuka-en)
 
-[![Downloads](https://img.shields.io/github/downloads/AlwaysBorderRadius/mpvnet-desuka/total?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases) [![Release](https://img.shields.io/github/v/release/AlwaysBorderRadius/mpvnet-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/releases) [![Stars](https://img.shields.io/github/stars/AlwaysBorderRadius/mpvnet-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpvnet-desuka/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/AlwaysBorderRadius/mpv-desuka/total?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpv-desuka/releases) [![Release](https://img.shields.io/github/v/release/AlwaysBorderRadius/mpv-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpv-desuka/releases) [![Stars](https://img.shields.io/github/stars/AlwaysBorderRadius/mpv-desuka?style=for-the-badge)](https://github.com/AlwaysBorderRadius/mpv-desuka/stargazers)
 
-# ✨MPVNET DESUKA✨
+# ✨MPV DESUKA✨
 
 </div>
 
-**mpvnet desuka** es una versión personalizada de mpvnet creada con el objetivo de ver anime en la mejor calidad y comodidad posible.  
+**MPV DESUKA** es una versión personalizada de mpvnet creada con el objetivo de ver anime en la mejor calidad y comodidad posible.  
 Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin perder detalles del fondo de la escena ni de las texturas, a la vez que se eliminan los artefactos mas visibles que puedan haber. Incluye tambien, una interfaz moderna y funciones extra, convirtiendolo asi en un reproductor completo y fácil de usar, a diferencia del mpv/mpvnet base. 
 
 > 📝 *Tambien apto para pelis y series.*
@@ -46,15 +46,15 @@ Remasteriza a 4k la imagen original con el uso de shaders en tiempo real, sin pe
 > 🪟 **Made for Windows**  
 > 💻 *Aunque tambien funciona en Linux mediante WINE o Proton.*
 
-1. **Extrae** la carpeta `mpvnet desuka` donde quieras.  
-   - Recomendado: `C:\Program Files\mpvnet desuka` o `C:\APPs\mpvnet desuka` si eres especial como yo.
+1. **Extrae** la carpeta `mpv desuka` donde quieras.  
+   - Recomendado: `C:\Program Files\mpv desuka` o `C:\APPs\mpv desuka` si eres especial como yo.
 
 2. Si lo has guardado en otra ruta:
    - Ve a `portable_config/script-opts/discord.conf`
-   - Edita la ruta en esta linea: `binary_path=C:\Program Files\mpvnet desuka\mpv-discord.exe`
+   - Edita la ruta en esta linea: `binary_path=C:\Program Files\mpv desuka\mpv-discord.exe`
 
 3. Para **GPUs AMD**:
-   - Abre `mpvnet desuka > ctrl+E > Global Settings`
+   - Abre `mpv desuka > ctrl+E > Global Settings`
    - Y cambia `Upscaling Backend` de `TensorRT` a `DirectML`
 
 4. En **GPUs NVIDIA RTX**:
@@ -72,7 +72,7 @@ Leete tambien el **changelog** (¡muy interesante!) y la **documentacion** + la 
 ### 🧯 Troubleshooting
 
 - Si AnimeJaNai no funciona (no carga o no ves cambios):  
-➝ Borra todos los `.engine` en `mpvnet desuka/animejanai/onnx` (solo para GPUs NVIDIA RTX)
+➝ Borra todos los `.engine` en `mpv desuka/animejanai/onnx` (solo para GPUs NVIDIA RTX)
 
 - Si mpvnet o la interfaz se congela:  
 ➝ Abre el Administrador de tareas y mata el proceso de `mpvnet` y `mpv-discord.exe`. 
@@ -177,20 +177,20 @@ Mi antigua version, actualizada con los cambios de la nueva.
 ## 🆕 Changelog (Pre-GitHub)
 
 <details>
-  <summary><strong>MPVNET DESUKA V1.2 - 4/10/2025</strong></summary>
+  <summary><strong>MPV DESUKA V1.2 - 4/10/2025</strong></summary>
 
 - Añadida una keybind faltante de mi anterior mpv
 </details>
 
 <details>
-  <summary><strong>MPVNET DESUKA V1.1 - 15/09/2025</strong></summary>
+  <summary><strong>MPV DESUKA V1.1 - 15/09/2025</strong></summary>
 
 - Añadida compatibilidad con los bordes redondeados de w11
 - Retocado diseño de los thumbnails
 </details>
 
 <details>
-  <summary><strong>🆕 MPVNET DESUKA V1 (RELEASE) - 25/08/2025</strong></summary>
+  <summary><strong>🆕 MPV DESUKA V1 (RELEASE) - 25/08/2025</strong></summary>
 
 - MPVNET AnimeJaNai v3.2.0 (MPVNET v7.1.1.3-beta + AnimeJaNai V3 + VapourSynth R70 + etc)
 - ModernX 0.4.3 (actualizado)
@@ -292,11 +292,11 @@ Nuevas keybinds importantes:
 
 <div align="center">
 
-# ✨MPVNET DESUKA (EN)✨
+# ✨MPV DESUKA (EN)✨
 
 </div>
 
-**mpvnet desuka** is a custom build of mpvnet made to watch anime in the best possible quality and comfort.  
+**MPV DESUKA** is a custom build of mpvnet made to watch anime in the best possible quality and comfort.  
 It upscales to 4k the original image using real-time shaders, without losing any details in the background or textures, while eliminating the most noticeable artifacts that may be present. It also includes a modern interface and extra features, making it a complete and easy-to-use player, unlike the base mpv/mpvnet. 
 
 > 📝 *Also suitable for movies and series.*
@@ -334,15 +334,15 @@ It upscales to 4k the original image using real-time shaders, without losing any
 > 🪟 **Made for Windows**  
 > 💻 *Although it also works on Linux using WINE or Proton.*
 
-1. **Extract** the `mpvnet desuka` folder wherever you want.  
-   - Recommended: `C:\Program Files\mpvnet desuka` or `C:\APPs\mpvnet desuka` if you’re special like me.
+1. **Extract** the `mpv desuka` folder wherever you want.  
+   - Recommended: `C:\Program Files\mpv desuka` or `C:\APPs\mpv desuka` if you’re special like me.
 
 2. If you saved it in a different path:
    - Go to `portable_config/script-opts/discord.conf`
-   - Edit the line: `binary_path=C:\Program Files\mpvnet desuka\mpv-discord.exe`
+   - Edit the line: `binary_path=C:\Program Files\mpv desuka\mpv-discord.exe`
 
 3. For **AMD GPUs**:
-   - Open `mpvnet desuka > ctrl+E > Global Settings`
+   - Open `mpv desuka > ctrl+E > Global Settings`
    - Change `Upscaling Backend` from `TensorRT` to `DirectML`
 
 4. In **NVIDIA GPUs RTX**:
@@ -360,7 +360,7 @@ Also check the **changelog** (very interesting!) and the **documentation** + the
 ### 🧯 Troubleshooting
 
 - If AnimeJaNai doesn’t work (no load or no visible effect):  
-  ➝ Delete all `.engine` files in `mpvnet desuka/animejanai/onnx` (only for NVIDIA RTX GPUs).
+  ➝ Delete all `.engine` files in `mpv desuka/animejanai/onnx` (only for NVIDIA RTX GPUs).
 
 - If mpvnet or the interface freezes:  
   ➝ Open Task Manager and kill the mpvnet and mpv-discord.exe processes.  
@@ -468,20 +468,20 @@ My older build, updated with the latest changes.
 ## 🆕 Changelog (Pre-GitHub)
 
 <details>
-  <summary><strong>MPVNET DESUKA V1.2 - 4/10/2025</strong></summary>
+  <summary><strong>MPV DESUKA V1.2 - 4/10/2025</strong></summary>
 
 - Added a missing keybind from my previous mpv setup.
 </details>
 
 <details>
-  <summary><strong>MPVNET DESUKA V1.1 - 15/09/2025</strong></summary>
+  <summary><strong>MPV DESUKA V1.1 - 15/09/2025</strong></summary>
 
 - Added compatibility with Windows 11 rounded corners.  
 - Tweaked thumbnail design.
 </details>
 
 <details>
-  <summary><strong>🆕 MPVNET DESUKA V1 (RELEASE) - 25/08/2025</strong></summary>
+  <summary><strong>🆕 MPV DESUKA V1 (RELEASE) - 25/08/2025</strong></summary>
 
 - MPVNET AnimeJaNai v3.2.0 (MPVNET v7.1.1.3-beta + AnimeJaNai V3 + VapourSynth R70 + etc)  
 - ModernX 0.4.3 (updated)  

@@ -1,4 +1,4 @@
-# AGENTS.md — mpvnet desuka
+# AGENTS.md — mpv Desuka
 
 Repo portable de mpvnet para Windows: reproductor + `portable_config/` (scripts,
 opciones, keybinds) + tooling en `.tools/`.
@@ -26,6 +26,20 @@ opciones, keybinds) + tooling en `.tools/`.
 - `portable_config/input.conf` — keybinds (p. ej. ciclo de subtítulos por
   `script-message-to modernx cycle-sub[-down]`).
 - `.tools/twemoji2ass_flags.py` — generador (requiere red para Twemoji).
+
+## File ownership (convención de marcadores)
+
+- Propios (comentarios normales, sin bloques `CUSTOM`/`EDIT`): `portable_config/scripts/update_checker.lua`,
+  `quick_subtitle_edit.lua`, `screenshotfolder.lua` (nombre heredado de una de sus dos fuentes,
+  se conserva como identificador funcional).
+- Base upstream (lo nuestro en bloques `CUSTOM`/`EDIT`): `modernx.lua`
+  (https://github.com/zydezu/ModernX @ 739a201), `thumbfast.lua`
+  (https://github.com/po5/thumbfast @ 0f711de), `autoload.lua`
+  (https://github.com/mpv-player/mpv TOOLS/lua, commit sin pinear),
+  `portable_config/scripts/animejanai_*.lua` (updater-owned),
+  `discord.lua` (https://github.com/tnychn/mpv-discord, archivado 2024, sin más updates).
+- Nombre: visible `mpv Desuka` (`MPV DESUKA` en el README); técnico `mpv-desuka` (slug, ficheros,
+  URLs) y carpeta `mpv desuka`.
 
 ## Convenciones
 

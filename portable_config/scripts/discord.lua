@@ -1,3 +1,6 @@
+-- Upstream: https://github.com/tnychn/mpv-discord @ 9224b11
+
+-- Upstream: https://github.com/tnychn/mpv-discord (archived 2024, no further updates)
 local msg = require("mp.msg")
 local opts = require("mp.options")
 local utils = require("mp.utils")

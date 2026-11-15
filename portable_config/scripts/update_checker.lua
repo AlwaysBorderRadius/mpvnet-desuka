@@ -1,5 +1,5 @@
 -- update_checker.lua
--- Startup update check against mpvnet desuka GitHub releases/latest.
+-- Startup update check against mpv Desuka GitHub releases/latest.
 -- Async fetch + short curl timeouts so a slow network can't freeze the OSD.
 -- Manual: script-message-to update_checker check-for-update
 
@@ -10,8 +10,8 @@ local options = require 'mp.options'
 
 local o = {
     check_on_startup = true,
-    repo = "AlwaysBorderRadius/mpvnet-desuka",
-    current_version = "", -- >>> EDIT Desuka <<< -- single source is update_checker.conf; empty = misconfigured
+    repo = "AlwaysBorderRadius/mpv-desuka",
+    current_version = "", -- single source is update_checker.conf; empty = misconfigured
     startup_delay = 5,
     curl_max_time = 10,
     curl_connect_timeout = 5,
@@ -38,7 +38,7 @@ local function read_modernx_language()
         local v = line:match("^%s*language%s*=%s*(%S+)")
         if v ~= nil then lang = v:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1") end
     end
-    lang = lang:match("^%s*(.-)%s*$") or "en" -- >>> EDIT Desuka <<< -- accept "ES" or padded values
+    lang = lang:match("^%s*(.-)%s*$") or "en" -- accept "ES" or padded values
     return lang:lower()
 end
 local mo = { language = read_modernx_language() }
@@ -71,9 +71,8 @@ local function t(key, a, b)
     return string.format(fmt, a, b)
 end
 
--- >>> CUSTOM Desuka: empty current_version means misconfigured, never fake it <<<
+-- Empty current_version means misconfigured, never fake it.
 local version_known = true
--- <<< CUSTOM Desuka >>>
 
 -- Clamp user opts to safe defaults.
 local function validate_user_opts()
@@ -87,19 +86,18 @@ local function validate_user_opts()
     end
     if type(o.repo) ~= "string" or o.repo == "" then
         msg.warn("update-checker: bad repo, using default")
-        o.repo = "AlwaysBorderRadius/mpvnet-desuka"
+        o.repo = "AlwaysBorderRadius/mpv-desuka"
     end
-    -- >>> CUSTOM Desuka: no invented fallback, fail loudly on empty version <<<
+    -- No invented fallback: fail loudly on empty version.
     if type(o.current_version) ~= "string" then
         msg.error("update-checker: bad current_version type, disabling check")
         o.current_version = ""
     end
-    o.current_version = o.current_version:match("^%s*(.-)%s*$") or "" -- >>> EDIT Desuka <<< -- trim, spaces-only counts as empty
+    o.current_version = o.current_version:match("^%s*(.-)%s*$") or "" -- trim, spaces-only counts as empty
     version_known = o.current_version ~= ""
     if not version_known then
         msg.error("update-checker: empty current_version in update_checker.conf, disabling check")
     end
-    -- <<< CUSTOM Desuka >>>
     local delay = tonumber(o.startup_delay)
     if delay == nil then
         msg.warn("update-checker: bad startup_delay, using 5")
@@ -194,7 +192,7 @@ local function fetch_latest_async(cb)
         "curl", "-sSL",
         "--max-time", tostring(o.curl_max_time),
         "--connect-timeout", tostring(o.curl_connect_timeout),
-        "--user-agent", "mpvnet-desuka-update-checker",
+        "--user-agent", "mpv-desuka-update-checker",
         api_url,
     }
     msg.verbose("update-checker: curl " .. table.concat(args, " "))
@@ -276,7 +274,7 @@ local function spinner_start()
 end
 -- <<< CUSTOM Desuka >>>
 local function check_for_update(manual)
-    if not version_known then -- >>> EDIT Desuka <<< -- fail loudly instead of comparing garbage
+    if not version_known then -- fail loudly instead of comparing garbage
         msg.error("update-checker: check aborted, version unknown")
         if manual then
             mp.commandv("script-message-to", "modernx", "modernx-toast",
