@@ -1,5 +1,4 @@
 -- Upstream: https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua @ 867990d949e9 (dir early-check removed)
-
 -- This script automatically loads playlist entries before and after the
 -- currently played file. It does so by scanning the directory a file is
 -- located in when starting playback. It sorts the directory entries
@@ -299,6 +298,7 @@ local function find_and_add_entries()
     end
 
     local path = mp.get_property("path", "")
+
     local dir, filename = utils.split_path(path)
     msg.trace(("dir: %s, filename: %s"):format(dir, filename))
     if o.disabled then
@@ -306,6 +306,11 @@ local function find_and_add_entries()
         return
     elseif #dir == 0 then
         msg.debug("stopping: not a local path")
+        return
+    end
+    local pathinfo = utils.file_info(path)
+    if pathinfo and pathinfo.is_dir then
+        msg.debug("stopping: path is a directory")
         return
     end
 

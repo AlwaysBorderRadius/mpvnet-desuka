@@ -35,7 +35,7 @@ opciones, keybinds) + tooling en `.tools/`.
 - Base upstream (lo nuestro en bloques `CUSTOM`/`EDIT`): `modernx.lua`
   (https://github.com/zydezu/ModernX @ 739a201), `thumbfast.lua`
   (https://github.com/po5/thumbfast @ 0f711de), `autoload.lua`
-  (https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua @ 867990d949e9, dir early-check removed),
+  (https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua @ 867990d949e9),
   `portable_config/scripts/animejanai_*.lua` (updater-owned),
   `discord.lua` (https://github.com/tnychn/mpv-discord @ 9224b11, archivado 2024, sin más updates).
 - Nombre: visible `mpv Desuka` (`MPV DESUKA` en el README); técnico `mpv-desuka` (slug, ficheros,
