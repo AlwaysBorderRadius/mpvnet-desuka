@@ -101,6 +101,6 @@ function read_file(path)
 end
 
 
--- >>> CUSTOM Desuka <<< -- key owned by input.conf (Ctrl+j), keep unbound for upstream diff
+-- >>> CUSTOM Desuka: key owned by input.conf (Ctrl+j), keep unbound for upstream diff <<<
 mp.add_key_binding(nil, "show_animejanai_stats", show_animejanai_stats)
 -- <<< CUSTOM Desuka >>>

@@ -132,7 +132,7 @@ local function validate_user_opts()
         msg.warn("update-checker: connect timeout above max time, clamping")
         o.curl_connect_timeout = o.curl_max_time
     end
-    if mo.language ~= "en" and mo.language ~= "es" then -- >>> EDIT Desuka <<<
+    if mo.language ~= "en" and mo.language ~= "es" then
         msg.warn("update-checker: bad language, using en")
         mo.language = "en"
     end
@@ -254,7 +254,7 @@ local function fetch_latest_async(cb)
 end
 
 -- Main check. Manual=true forces feedback even when up to date.
--- >>> CUSTOM Desuka: braille spinner while a manual check is in flight <<<
+-- braille spinner while a manual check is in flight
 local SPINNER_FRAMES = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
 local spinner_timer = nil
 local spinner_step = 0
@@ -272,7 +272,6 @@ local function spinner_start()
             "1000")
     end)
 end
--- <<< CUSTOM Desuka >>>
 local function check_for_update(manual)
     if not version_known then -- fail loudly instead of comparing garbage
         msg.error("update-checker: check aborted, version unknown")
@@ -291,7 +290,7 @@ local function check_for_update(manual)
             if manual then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "error", "update-checker",
-                    t("no_network"), -- >>> EDIT Desuka <<<
+                    t("no_network"),
                     "6000")
             end
             return
@@ -303,7 +302,7 @@ local function check_for_update(manual)
             -- Important toast, preempts any toast (no queue).
             mp.commandv("script-message-to", "modernx", "modernx-toast",
                 "warn", "update-checker",
-                t("update_available", latest, o.current_version), -- >>> EDIT Desuka <<<
+                t("update_available", latest, o.current_version),
                 "6000")
             msg.info("update-checker: new version " .. latest .. " (current " .. o.current_version .. ")")
         elseif cmp == 0 then
@@ -311,7 +310,7 @@ local function check_for_update(manual)
             if manual or o.notify_up_to_date then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "info", "update-checker",
-                    t("up_to_date", o.current_version), -- >>> EDIT Desuka <<<
+                    t("up_to_date", o.current_version),
                     "4000")
             end
         else
@@ -319,7 +318,7 @@ local function check_for_update(manual)
             if manual then
                 mp.commandv("script-message-to", "modernx", "modernx-toast",
                     "info", "update-checker",
-                    t("local_newer", o.current_version, latest), -- >>> EDIT Desuka <<<
+                    t("local_newer", o.current_version, latest),
                     "4000")
             end
         end

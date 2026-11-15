@@ -37,7 +37,7 @@ opciones, keybinds) + tooling en `.tools/`.
   (https://github.com/po5/thumbfast @ 0f711de), `autoload.lua`
   (https://github.com/mpv-player/mpv TOOLS/lua, commit sin pinear),
   `portable_config/scripts/animejanai_*.lua` (updater-owned),
-  `discord.lua` (https://github.com/tnychn/mpv-discord, archivado 2024, sin más updates).
+  `discord.lua` (https://github.com/tnychn/mpv-discord @ 9224b11, archivado 2024, sin más updates).
 - Nombre: visible `mpv Desuka` (`MPV DESUKA` en el README); técnico `mpv-desuka` (slug, ficheros,
   URLs) y carpeta `mpv desuka`.
 

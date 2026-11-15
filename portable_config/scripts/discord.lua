@@ -1,6 +1,4 @@
--- Upstream: https://github.com/tnychn/mpv-discord @ 9224b11
-
--- Upstream: https://github.com/tnychn/mpv-discord (archived 2024, no further updates)
+-- Upstream: https://github.com/tnychn/mpv-discord @ 9224b11 (archived 2024, no further updates)
 local msg = require("mp.msg")
 local opts = require("mp.options")
 local utils = require("mp.utils")
@@ -112,7 +110,7 @@ function stop()
 	notify("info", "Discord Rich Presence: Stopped")
 end
 
--- >>> CUSTOM Desuka <<< -- key owned by input.conf (d), keep unbound
+-- >>> CUSTOM Desuka: key owned by input.conf (d), keep unbound <<<
 -- d stays off for the session: file-loaded only auto-starts while enabled
 mp.register_event("file-loaded", function()
 	if enabled then start(true) end

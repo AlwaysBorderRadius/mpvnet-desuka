@@ -88,7 +88,7 @@ local function validate_user_opts()
 end
 validate_user_opts()
 
--- >>> CUSTOM Desuka: bilingual toasts <<<
+-- bilingual toasts
 -- UI language comes from modernx.conf (single source), like update_checker.
 local function read_modernx_language()
     local path = mp.find_config_file("script-opts/modernx.conf")
@@ -129,7 +129,6 @@ local function t(key, a)
     if a == nil then return fmt end
     return string.format(fmt, a)
 end
--- <<< CUSTOM Desuka >>>
 
 local state = {
     series = "default",
@@ -332,10 +331,10 @@ local function init()
     refresh_template()
 end
 
-local function screenshot_done(oneshot_mode) -- >>> EDIT Desuka <<< -- one-shot mode from the message
+local function screenshot_done(oneshot_mode) -- one-shot mode from the message
     if not state.dir or not state.prefix then refresh_template() end
 
-    -- >>> CUSTOM Desuka: one-shot screenshot mode (OSC button flag) <<<
+    -- one-shot screenshot mode (OSC button flag)
     -- Native each-frame bursts need %n templates, not (N): rejected, not truncated.
     local mode = options.screenshot_mode
     if type(oneshot_mode) == "string" then
@@ -346,7 +345,6 @@ local function screenshot_done(oneshot_mode) -- >>> EDIT Desuka <<< -- one-shot 
             msg.warn("screenshotfolder: bad shot mode '" .. tostring(oneshot_mode) .. "', using option")
         end
     end
-    -- <<< CUSTOM Desuka >>>
 
     mp.set_property("screenshot-format", options.file_ext)
     if options.file_ext == "png" then
@@ -360,16 +358,16 @@ local function screenshot_done(oneshot_mode) -- >>> EDIT Desuka <<< -- one-shot 
         if state.counter <= highest then state.counter = highest + 1 end
         mp.set_property("screenshot-template", state.prefix .. " (" .. state.counter .. ")")
     end
-    local shot_n = options.sequential_numbering and state.counter or nil -- >>> EDIT Desuka <<< -- number used below, before the bump
+    local shot_n = options.sequential_numbering and state.counter or nil -- number used below, before the bump
 
     local sub_visibility = nil
-    if options.hide_subtitles and mode ~= "subtitles" then -- >>> EDIT Desuka <<< -- explicit subtitles mode wins over the global opt-out
+    if options.hide_subtitles and mode ~= "subtitles" then -- explicit subtitles mode wins over the global opt-out
         sub_visibility = mp.get_property("sub-visibility")
         mp.set_property("sub-visibility", "no")
     end
 
     -- mp.commandv blocks until the file is written, so restore after is safe
-    mp.commandv("screenshot", mode) -- >>> EDIT Desuka <<< -- one-shot or option mode
+    mp.commandv("screenshot", mode) -- one-shot or option mode
 
     if options.hide_subtitles and sub_visibility ~= nil then
         mp.set_property("sub-visibility", sub_visibility)
@@ -384,7 +382,7 @@ local function screenshot_done(oneshot_mode) -- >>> EDIT Desuka <<< -- one-shot 
     local toast_msg = t("saved")
     if not options.short_saved_message then
         local dir = mp.get_property("screenshot-directory") or state.dir or ""
-        if options.sequential_numbering and shot_n then -- >>> EDIT Desuka <<< -- full file path when we know the number
+        if options.sequential_numbering and shot_n then -- full file path when we know the number
             toast_msg = t("saved_to", utils.join_path(dir, state.prefix .. " (" .. shot_n .. ")." .. options.file_ext):gsub("\\", "/"))
         else
             toast_msg = t("saved_to", dir:gsub("\\", "/"))
