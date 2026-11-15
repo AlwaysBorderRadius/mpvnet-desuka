@@ -35,7 +35,7 @@ opciones, keybinds) + tooling en `.tools/`.
 - Base upstream (lo nuestro en bloques `CUSTOM`/`EDIT`): `modernx.lua`
   (https://github.com/zydezu/ModernX @ 739a201), `thumbfast.lua`
   (https://github.com/po5/thumbfast @ 0f711de), `autoload.lua`
-  (https://github.com/mpv-player/mpv TOOLS/lua @ 867990d949e9, dir check removed),
+  (https://github.com/mpv-player/mpv/blob/master/TOOLS/lua/autoload.lua @ 867990d949e9, dir early-check removed),
   `portable_config/scripts/animejanai_*.lua` (updater-owned),
   `discord.lua` (https://github.com/tnychn/mpv-discord @ 9224b11, archivado 2024, sin más updates).
 - Nombre: visible `mpv Desuka` (`MPV DESUKA` en el README); técnico `mpv-desuka` (slug, ficheros,
@@ -43,6 +43,9 @@ opciones, keybinds) + tooling en `.tools/`.
 
 ## Convenciones
 
+- Cabecera upstream en ficheros con base upstream, primera línea:
+  `-- Upstream: <url> @ <commit> [(nota breve)]`. Si no hay commit exacto, nota honesta
+  (p. ej. `(dir early-check removed)`, `(archived 2024, no further updates)`).
 - Marcadores propios, comentarios en inglés y cortos. Bloques:
   `-- >>> CUSTOM Desuka: qué <<<` … `-- <<< CUSTOM Desuka >>>`.
   Líneas: sufijo inline `-- >>> EDIT Desuka <<< -- por qué`, en la propia
