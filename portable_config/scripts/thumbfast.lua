@@ -1,3 +1,5 @@
+-- Upstream: https://github.com/po5/thumbfast @ 0f711de
+--
 -- thumbfast.lua
 --
 -- High-performance on-the-fly thumbnailer

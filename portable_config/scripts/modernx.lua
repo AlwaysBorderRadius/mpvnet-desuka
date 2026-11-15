@@ -1,3 +1,4 @@
+-- Upstream: https://github.com/zydezu/ModernX @ 739a201
 --[[
     modernx.lua v2.0 by AlwaysBorderRadius 
     (based on ModernX v0.4.7 by zydezu, https://github.com/zydezu/ModernX)
