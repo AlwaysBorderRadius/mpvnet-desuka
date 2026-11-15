@@ -7920,6 +7920,7 @@ end
 function show_osc()
     -- show when disabled can happen (e.g. mouse_move) due to async/delayed unbinding
     if not state.enabled then return end
+    if subedit_osc_lock then return end -- >>> EDIT Desuka <<< -- subtitle editor holds the OSC hidden
 
     mp.msg.trace('show_osc')
     --remember last time of invocation (mouse move)
@@ -7997,6 +7998,7 @@ function pause_state(_, enabled)
         return
     end
     state.paused = enabled
+    if subedit_osc_lock then request_tick() return end -- >>> EDIT Desuka <<< -- subtitle editor holds the OSC hidden
     if user_opts.show_on_pause then
         if enabled then
             visibility_mode("auto")
@@ -9110,6 +9112,33 @@ mp.register_script_message("modernx-toast", function(a1, a2, a3, a4)
 end)
 mp.register_script_message("modernx-toast-clear", function(source)
     clear_toast(source, source == nil or source == "")
+end)
+-- <<< CUSTOM Desuka >>>
+
+-- >>> CUSTOM Desuka: subtitle-editor OSC lock <<<
+-- quick_subtitle_edit hides the whole OSC while selecting/editing (mouse
+-- movement would cover the subs and every click could mutate state mid-edit).
+-- show_osc/pause_state honor the flag; the toast still renders with OSC hidden.
+subedit_osc_lock = false
+subedit_prev_visibility = "auto"
+function subedit_set_osc_lock(on)
+    if on == "on" then
+        if not subedit_osc_lock then
+            local cur = mp.get_property("user-data/osc/visibility")
+            if cur == "always" or cur == "never" or cur == "auto" then
+                subedit_prev_visibility = cur
+            end
+        end
+        subedit_osc_lock = true
+        hide_osc()
+        visibility_mode("never")
+    else
+        subedit_osc_lock = false
+        visibility_mode(subedit_prev_visibility or "auto")
+    end
+end
+mp.register_script_message("modernx-edit-lock", function(v)
+    if v == "on" or v == "off" then subedit_set_osc_lock(v) end
 end)
 -- <<< CUSTOM Desuka >>>
 

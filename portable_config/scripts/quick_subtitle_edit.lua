@@ -19,6 +19,7 @@
 --   * Pausa automática al abrir el editor, restaurando el estado al salir.
 --   * Guardado robusto: reemplaza solo la línea/bloque del evento,
 --     preservando BOM y saltos de línea originales (CRLF/LF).
+--   * OSC oculto y teclas peligrosas tragadas mientras se elige/edita.
 
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
@@ -601,6 +602,51 @@ local function unbind_all()
     binding_counter = 0
 end
 
+-- >>> CUSTOM Desuka: swallow dangerous keys while selecting/editing <<<
+-- No input.conf command may mutate state mid-edit (file/track change, seek,
+-- pause, menus). Editor keys are never in these lists; forced bindings shadow
+-- the rest and unbind_all() removes them on exit. Selector swallows letters
+-- and digits too (no text input there); edit mode types them instead.
+local swallow_common = {
+    -- File/playlist (keyboard path; the mouse menu needs Ctrl+MBTN_Right below).
+    "F11", "F12", "Ctrl+F11", "Ctrl+F12", "KP9",
+    -- Chapters/seeks (plain arrows are cursor keys in edit mode, kept).
+    "PGUP", "PGDWN", "Ctrl+Left", "Ctrl+Right",
+    "Shift+Left", "Shift+Right", "Shift+Up", "Shift+Down",
+    "Ctrl+Alt+Up", "Ctrl+Alt+Down",
+    -- mpvnet dialogs and external tools.
+    "F1", "F2", "F9", "tab", "`", "Ctrl+p", "Ctrl+m", "Ctrl+c",
+    "Ctrl+i", "Ctrl+f", "Ctrl+s", "Ctrl+b", "Ctrl+e", "Ctrl+j",
+    "Ctrl+u", "Alt+r", "Alt+u", "Alt+d", "Alt+a", "Alt+s", "Alt+q",
+    "Ctrl+0", "Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4",
+    "Ctrl+5", "Ctrl+6", "Ctrl+7", "Ctrl+8", "Ctrl+9",
+    "Alt+1", "Alt+2", "Alt+3",
+    -- Mouse and media keys (the editor is keyboard-only).
+    "MBTN_Left", "MBTN_Left_DBL", "MBTN_Mid", "MBTN_Right",
+    "Ctrl+MBTN_Right", "MBTN_Forward", "MBTN_Back",
+    "Wheel_Up", "Wheel_Down", "Wheel_Left", "Wheel_Right",
+    "Ctrl+Wheel_Up", "Ctrl+Wheel_Down",
+    "Power", "Play", "Pause", "PlayPause", "Stop",
+    "Prev", "Next", "Forward", "Rewind",
+}
+local swallow_select_extra = {
+    "Space", "Home", "End", "Left", "Right", ".", ",",
+    "Ctrl+Up", "Ctrl+Down",
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "!", "@", "SHARP", "[", "]",
+}
+-- The selector has no text input: any letter would fire its input.conf (or
+-- mpv built-in) command instead, so swallow the full alphabet.
+for c in ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"):gmatch(".") do
+    table.insert(swallow_select_extra, c)
+end
+local function bind_swallow(keys)
+    for _, k in ipairs(keys) do
+        bind(k, function() end)
+    end
+end
+-- <<< CUSTOM Desuka >>>
+
 --------------------------------------------------------------------------
 -- Gestión de modos
 --------------------------------------------------------------------------
@@ -638,7 +684,7 @@ end
 -- Cached probe: prefer the modernx toast, fall back to native OSD.
 local modernx_probe = nil
 local function modernx_available()
-    if modernx_probe == nil then
+    if modernx_probe ~= true then -- >>> EDIT Desuka <<< -- never cache a miss: modernx may load later
         modernx_probe = true
         local ok, list = pcall(mp.get_property_native, "script-list")
         if ok and type(list) == "table" then
@@ -706,6 +752,15 @@ local function stop_loading()
         mp.commandv("script-message-to", "modernx", "modernx-toast-clear", "subedit")
     end
 end
+
+-- >>> CUSTOM Desuka: hide the modernx OSC while selecting/editing <<<
+-- Mouse movement would cover the subs and any click (seek, play, track menu)
+-- would mutate state mid-edit. The unified toast still renders with OSC hidden.
+local function osc_lock(on)
+    if not modernx_available() then return end
+    mp.commandv("script-message-to", "modernx", "modernx-edit-lock", on and "on" or "off")
+end
+-- <<< CUSTOM Desuka >>>
 
 local function pause_enter()
     if pause_saved == nil then
@@ -1492,6 +1547,7 @@ local function exit_mode(message, dur, discard)
           .. " path=" .. tostring(mp.get_property("path")))
     local osd_editor = edit and not (edit.render == "screen" and edit.overlay) -- >>> EDIT Desuka <<< -- mirror render_editor()
     unbind_all()
+    osc_lock(false) -- >>> EDIT Desuka <<< -- restore the OSC hidden on entry
     stop_loading()
     if selector_overlay then
         selector_overlay:remove()
@@ -1603,6 +1659,8 @@ local function register_selector_bindings()
     bind("ENTER", function() selector_key("ENTER") end)
     bind("KP_ENTER", function() selector_key("ENTER") end)
     bind("ESC", function() selector_key("ESC") end)
+    bind_swallow(swallow_common)
+    bind_swallow(swallow_select_extra)
 end
 
 local function enter_selector(cands)
@@ -2384,6 +2442,7 @@ local function register_edit_bindings()
         local hex = string.format("0x%X", utf8_codepoint(ch))
         bind(hex, function() handle_edit_key(ch) end, true)
     end
+    bind_swallow(swallow_common)
 end
 
 start_edit = function(cand)
@@ -2593,6 +2652,7 @@ local function edit_subtitle(mode)
     }
 
     -- Pause BEFORE extraction: ffmpeg may block and the time would drift.
+    osc_lock(true) -- >>> EDIT Desuka <<< -- hide the OSC before pause_state can flash it
     pause_enter()
     loading = true
     show_loading()
@@ -2603,6 +2663,7 @@ local function edit_subtitle(mode)
     -- primer subprocess del tick se evita el fallo transitorio de parseo de mpv
     -- (cubierto de todas formas por el retry de fs_command()).
     mp.add_timeout(0.05, function()
+        if not loading then return end -- >>> EDIT Desuka <<< -- file changed mid-startup, abort already ran
         get_session_edit_dir()
         -- Re-read time: user may have seeked during the delay.
         local now_t = mp.get_property_number("time-pos")
@@ -2610,6 +2671,7 @@ local function edit_subtitle(mode)
             stop_loading()
             loading = false
             cleanup_disposable()
+            osc_lock(false) -- >>> EDIT Desuka <<< -- restore the OSC hidden on entry
             ui_msg("No hay reproducción activa", 2, "warn")
             return
         end
@@ -2618,6 +2680,7 @@ local function edit_subtitle(mode)
         if not ok then
             stop_loading()
             cleanup_disposable()
+            osc_lock(false) -- >>> EDIT Desuka <<< -- restore the OSC hidden on entry
             ui_msg("Error al buscar subtítulos", 3, "error")
             return
         end
@@ -2625,6 +2688,7 @@ local function edit_subtitle(mode)
         if #cands == 0 then
             stop_loading()
             cleanup_disposable()
+            osc_lock(false) -- >>> EDIT Desuka <<< -- restore the OSC hidden on entry
             local extra = ""
             if #errs > 0 then
                 extra = " (" .. table.concat(errs, " · ") .. ")"
@@ -2644,6 +2708,7 @@ local function edit_subtitle(mode)
         if #filtered == 0 then
             stop_loading()
             cleanup_disposable()
+            osc_lock(false) -- >>> EDIT Desuka <<< -- restore the OSC hidden on entry
             ui_msg("Subtítulo demasiado complejo para edición (tags entre las palabras)", 3, "warn")
             return
         end
@@ -2665,6 +2730,7 @@ local function edit_subtitle(mode)
             msg.warn("[fuentes] ERROR: " .. tostring(fonts_err))
             stop_loading()
             cleanup_disposable()
+            osc_lock(false) -- >>> EDIT Desuka <<< -- restore the OSC hidden on entry
             ui_msg("Error al preparar las fuentes", 3, "error")
             return
         end
@@ -2688,6 +2754,18 @@ end)
 mp.add_key_binding(nil, "edit-subtitle-osd", function()
     edit_subtitle("osd")
 end)
+
+-- >>> CUSTOM Desuka: abort the session on file change <<<
+-- A new file (or playlist end) invalidates edit.file/doc and the selection
+-- rollback: saving afterwards would write the old file and restore stale ids.
+local function abort_on_file_change()
+    if state == "idle" and not loading then return end
+    session_rollback = nil -- the new file owns the selection now
+    exit_mode("Edición cancelada (cambio de archivo)", 2, true)
+end
+mp.register_event("file-loaded", abort_on_file_change)
+mp.register_event("end-file", abort_on_file_change)
+-- <<< CUSTOM Desuka >>>
 
 -- Al cerrar mpv se restaura osd-fonts-dir y se borra TODO el directorio de
 -- sesión (incluida la cache de fuentes fonts/). Si mpv se mata por la fuerza
