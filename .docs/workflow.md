@@ -21,6 +21,17 @@
 - Rollback: en `dev`, `reset --hard` al commit bueno; en `main`, `revert`
   del merge (`reset` al tag con `--force` solo en emergencia).
 
+## Releases (draft-first, publish manual)
+
+- Preview en `dev` (`/changelog-preview`, sin efectos) → README ES con el preview de
+  chuleta (en web apuntar a `dev`) → `/translate` al final → merge `[vN]` + tag lockstep
+  → `/release` empaqueta y crea/actualiza el draft (`--draft` siempre; mismo tag =
+  backup + update in place; tag publicado = abortar). Cuerpos editados a mano en la web
+  se preservan: solo se refresca `## Descargas`/`## Downloads`, regenerar todo exige orden
+  explicita.
+- Publish manual en la web. Pre-release solo para beta pública (el checker ignora
+  pre-releases en `releases/latest`); beta privada = ficheros de `.dist\` a mano, sin GitHub.
+
 ## Tras update AJN (el updater pisa scripts/, shaders/, managed y onnx/)
 
 - Copia externa de los V2 ANTES de `Ctrl+U` (irrecuperables si el overlay los borra).

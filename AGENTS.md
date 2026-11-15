@@ -52,7 +52,7 @@ opciones, keybinds) + tooling en `.tools/`.
   El `show-menu` nativo de mpvnet no sirve aquí: lo suprime cerca de
   los bordes (zonas muertas 10% laterales/superior, 22% inferior).
 - Los `.conf` de `portable_config/` se commitean en cada rama como parte del
-  estado portable (incluidos `mpv.conf`, `discord.conf` y `update-checker.conf`
+  estado portable (incluidos `mpv.conf`, `discord.conf` y `update_checker.conf`
   con sus ajustes locales).
 
 ## Workflow (resumen; detalle en `.docs/workflow.md`)
@@ -62,6 +62,20 @@ Ciclo por tarea: **plan → build → review**. Tras cada build: verificación +
 `dev` trabajo diario. Tras build verificado: commit + push a `dev`
 automático. A `main` solo por merge explícito `[vN] merge dev` + tag anotado
 `vN` en lockstep (versión y tag siempre juntos).
+
+## Releases desuka
+
+- Versión: `portable_config/script-opts/update_checker.conf` (`current_version`); tag `v{misma}`.
+  `version.txt` = base AJN, solo para filenames/notas. `update_checker.lua` default `""` + fail-fast
+  (sin fallback inventado).
+- Artefactos: `mpv-desuka-vN-ajn-vM-full.7z` (contenedor `mpv desuka\`) +
+  `mpv-desuka-vN-ajn-vM-patch.zip` (plano, overlay sobre AJN). Los genera
+  `.tools/New-DesukaRelease.ps1` (local, gitignored); salida en `.dist\vN\` (gitignored).
+- Orden: `/changelog-preview` (dev, sin efectos) → README ES (en web apuntar a `dev`) →
+  `/translate` (EN, al final) → merge `[vN]` + tag lockstep → `/release` (solo draft,
+  jamás publish) → pulir draft en web → publish manual. Cuerpos editados a mano se
+  preservan (solo se refresca `## Descargas`/`## Downloads`).
+- Beta privada: `-BetaLocal` empaqueta desde `dev` para reparto manual, sin tag/draft/merge.
 
 ## Versionado (qué sube a git)
 

@@ -11,7 +11,7 @@ local options = require 'mp.options'
 local o = {
     check_on_startup = true,
     repo = "AlwaysBorderRadius/mpvnet-desuka",
-    current_version = "1.2",
+    current_version = "", -- >>> EDIT Desuka <<< -- single source is update_checker.conf; empty = misconfigured
     startup_delay = 5,
     curl_max_time = 10,
     curl_connect_timeout = 5,
@@ -38,7 +38,8 @@ local function read_modernx_language()
         local v = line:match("^%s*language%s*=%s*(%S+)")
         if v ~= nil then lang = v:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1") end
     end
-    return lang
+    lang = lang:match("^%s*(.-)%s*$") or "en" -- >>> EDIT Desuka <<< -- accept "ES" or padded values
+    return lang:lower()
 end
 local mo = { language = read_modernx_language() }
 
@@ -50,6 +51,7 @@ local STRINGS = {
         up_to_date = "mpv Desuka is up to date (%s).",
         local_newer = "Local mpv Desuka version (%s) is newer than published (%s).",
         checking = "Searching for mpv Desuka updates...",
+        unknown_version = "Cannot check for updates: empty current_version in update_checker.conf.",
     },
     es = {
         no_network = "No se pudo comprobar la actualización de mpv Desuka (sin red o sin curl).",
@@ -57,6 +59,7 @@ local STRINGS = {
         up_to_date = "mpv Desuka está actualizado (%s).",
         local_newer = "Versión local de mpv Desuka (%s) más reciente que la publicada (%s).",
         checking = "Buscando actualización de mpv Desuka...",
+        unknown_version = "No se puede comprobar: current_version vacío en update_checker.conf.",
     },
 }
 
@@ -67,6 +70,10 @@ local function t(key, a, b)
     if b == nil then return string.format(fmt, a) end
     return string.format(fmt, a, b)
 end
+
+-- >>> CUSTOM Desuka: empty current_version means misconfigured, never fake it <<<
+local version_known = true
+-- <<< CUSTOM Desuka >>>
 
 -- Clamp user opts to safe defaults.
 local function validate_user_opts()
@@ -82,10 +89,17 @@ local function validate_user_opts()
         msg.warn("update-checker: bad repo, using default")
         o.repo = "AlwaysBorderRadius/mpvnet-desuka"
     end
-    if type(o.current_version) ~= "string" or o.current_version == "" then
-        msg.warn("update-checker: bad current_version, using 1.2")
-        o.current_version = "1.2"
+    -- >>> CUSTOM Desuka: no invented fallback, fail loudly on empty version <<<
+    if type(o.current_version) ~= "string" then
+        msg.error("update-checker: bad current_version type, disabling check")
+        o.current_version = ""
     end
+    o.current_version = o.current_version:match("^%s*(.-)%s*$") or "" -- >>> EDIT Desuka <<< -- trim, spaces-only counts as empty
+    version_known = o.current_version ~= ""
+    if not version_known then
+        msg.error("update-checker: empty current_version in update_checker.conf, disabling check")
+    end
+    -- <<< CUSTOM Desuka >>>
     local delay = tonumber(o.startup_delay)
     if delay == nil then
         msg.warn("update-checker: bad startup_delay, using 5")
@@ -262,6 +276,16 @@ local function spinner_start()
 end
 -- <<< CUSTOM Desuka >>>
 local function check_for_update(manual)
+    if not version_known then -- >>> EDIT Desuka <<< -- fail loudly instead of comparing garbage
+        msg.error("update-checker: check aborted, version unknown")
+        if manual then
+            mp.commandv("script-message-to", "modernx", "modernx-toast",
+                "error", "update-checker",
+                t("unknown_version"),
+                "6000")
+        end
+        return
+    end
     if manual then spinner_start() end
     fetch_latest_async(function(latest)
         spinner_stop()
