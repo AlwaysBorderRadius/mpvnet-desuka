@@ -30,8 +30,8 @@ opciones, keybinds) + tooling en `.tools/`.
 ## File ownership (convención de marcadores)
 
 - Propios (comentarios normales, sin bloques `CUSTOM`/`EDIT`): `portable_config/scripts/update_checker.lua`,
-  `quick_subtitle_edit.lua`, `custom_screenshot_folder.lua` + `custom_screenshot_folder-rules.lua`
-  (mix de customscreenshot + screenshotfolder, reglas custom en fichero aparte).
+  `quick_subtitle_edit.lua`, `custom_screenshot_folder.lua`
+  (mix de customscreenshot + screenshotfolder, reglas custom inline arriba del fichero).
 - Base upstream (lo nuestro en bloques `CUSTOM`/`EDIT`): `modernx.lua`
   (https://github.com/zydezu/ModernX @ 739a201), `thumbfast.lua`
   (https://github.com/po5/thumbfast @ 0f711de), `autoload.lua`

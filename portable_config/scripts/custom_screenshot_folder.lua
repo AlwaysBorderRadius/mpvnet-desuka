@@ -13,7 +13,7 @@
     - naming_mode=season: S/<Series>/<Season>/<Season> (N).ext
     - unmatched files: S/<quarantine>/<Filename> (N).ext
     - sequential_numbering=no uses mpv %n instead of the literal (N)
-    Custom rules live in custom_screenshot_folder-rules.lua (priority order).
+    Custom rules at the top of this file (custom_rules table, priority order).
 --]]
 
 local utils = require 'mp.utils'
@@ -151,7 +151,6 @@ local state = {
 }
 
 local season_suffixes = {
-    -- Mirror of the list in custom_screenshot_folder-rules.lua; keep in sync.
     "%s+%d+%a*%s+[Ss]eason$",  -- " 2nd Season"
     "%s+[Ss]eason%s+%d+%a*$",  -- " Season 2"
     "%s+[Ss]%d+$",             -- " S2"
@@ -199,38 +198,94 @@ local function split_path_parts(path)
     return parts
 end
 
-local custom_rules = {}
-
-local function load_custom_rules()
-    custom_rules = {}
-    local dir = mp.get_script_directory()
-    if dir == nil or dir == "" then return end
-    local rules_path = utils.join_path(dir, "custom_screenshot_folder-rules.lua")
-    local chunk, load_err = loadfile(rules_path)
-    if not chunk then
-        msg.warn("custom_screenshot_folder: no rules file, using builtin (" .. tostring(load_err) .. ")")
-        return
-    end
-    local ok, result = pcall(chunk)
-    if not ok or type(result) ~= "table" then
-        msg.warn("custom_screenshot_folder: bad rules file, using builtin")
-        return
-    end
-    for _, rule in ipairs(result) do
-        if type(rule) == "table" and type(rule.match) == "function" and rule.enabled ~= false then
-            custom_rules[#custom_rules + 1] = rule
-        end
-    end
-    if options.log_matched_rule then
-        msg.info("custom_screenshot_folder: loaded " .. #custom_rules .. " custom rule(s)")
-    end
+-- User-editable classification rules, first enabled match wins.
+-- Copy a block, set enabled=true, adjust to your naming.
+-- Shared helpers: strip_season_suffix, sanitize_filename, filename_prefix.
+local function clean_folder(name)
+    if not name then return "" end
+    local s = name:gsub('^%[.-%]%s*', '')
+    s = s:gsub('%s*[%(%[].*$', '')
+    return (s:gsub('^%s*(.-)%s*$', '%1'))
 end
-load_custom_rules()
+
+local function group_of(fname)
+    if not fname then return nil end
+    return fname:match('^%[.-%]%s*(.-)%s%-%s%d')
+end
+
+local custom_rules = {
+    {
+        -- Naming: Serie > Serie Temporada > Serie Temporada - XX - Cap
+        name = "mi-2-niveles",
+        enabled = true,
+        match = function(fname, fpath, parts)
+            local season_raw = parts and parts[#parts] or nil
+            local series_raw = parts and parts[#parts - 1] or nil
+            if not season_raw or not series_raw or not fname or fname == "" then return false end
+            if season_raw:find(series_raw, 1, true) ~= 1 then return false end
+            if fname:find(season_raw, 1, true) == 1 then return true end
+            return filename_prefix(fname) == season_raw
+        end,
+        series = function(fname, fpath, parts) return parts[#parts - 1] end,
+        season = function(fname, fpath, parts) return parts[#parts] end,
+    },
+    {
+        -- Naming: [Group] Show S2 [tags]/[Group] Show S2 - 01 [tags].mkv
+        name = "fansub-Sx",
+        enabled = false,
+        match = function(fname) return group_of(fname) ~= nil end,
+        series = function(fname)
+            local grouped = group_of(fname)
+            if not grouped then return nil end
+            local bare = strip_season_suffix(grouped)
+            if bare ~= "" then return bare end
+            return grouped
+        end,
+        season = function(fname, fpath, parts)
+            local grouped = group_of(fname)
+            if not grouped then return nil end
+            local bare = strip_season_suffix(grouped)
+            if bare ~= "" and bare ~= grouped then return grouped end
+            local folder_clean = clean_folder(parts and parts[#parts] or nil)
+            if folder_clean ~= "" and folder_clean:find(grouped, 1, true) == 1
+                and strip_season_suffix(folder_clean) ~= folder_clean then
+                return folder_clean
+            end
+            return nil
+        end,
+    },
+    {
+        -- Naming: Show S01E02
+        name = "sxxexx",
+        enabled = false,
+        match = function(fname)
+            if not fname then return false end
+            local nogroup = fname:gsub('^%[.-%]%s*', '')
+            local show = nogroup:match('^(.-)%s+[Ss]%d+[Ee]%d+')
+            return show ~= nil and show ~= ""
+        end,
+        series = function(fname)
+            local nogroup = fname:gsub('^%[.-%]%s*', '')
+            local show = nogroup:match('^(.-)%s+[Ss](%d+)[Ee]%d+')
+            if not show or show == "" then return nil end
+            local bare = strip_season_suffix(show)
+            if bare == "" then bare = show end
+            return bare
+        end,
+        season = function(fname)
+            local nogroup = fname:gsub('^%[.-%]%s*', '')
+            local show, sno = nogroup:match('^(.-)%s+[Ss](%d+)[Ee]%d+')
+            if not show or not sno then return nil end
+            return show .. " S" .. sno
+        end,
+    },
+}
 
 local function try_custom_rules(fname, path)
     if #custom_rules == 0 then return nil, nil, nil end
     local parts = split_path_parts(path)
     for _, rule in ipairs(custom_rules) do
+        if type(rule) == "table" and type(rule.match) == "function" and rule.enabled ~= false then
         local ok_match, matched = pcall(rule.match, fname, path, parts)
         if ok_match and matched then
             local series_raw, season_raw = nil, nil
@@ -253,6 +308,7 @@ local function try_custom_rules(fname, path)
             end
             msg.warn("custom_screenshot_folder: rule '" .. tostring(rule.name) .. "' matched but returned empty series")
             return nil, nil, rule.name
+        end
         end
     end
     return nil, nil, nil
