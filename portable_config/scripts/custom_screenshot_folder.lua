@@ -215,8 +215,9 @@ end
 
 local custom_rules = {
     {
-        -- Naming: Serie > Serie Temporada > Serie Temporada - XX - Cap
-        name = "mi-2-niveles",
+        -- Naming: Show > Show Season > Show Season - XX - Episode
+        -- Ex: Jujutsu Kaisen / Jujutsu Kaisen Shimetsu Kaiyuu Zenpen / Jujutsu Kaisen Shimetsu Kaiyuu Zenpen - 03 - Ep.mkv
+        name = "anilist",
         enabled = true,
         match = function(fname, fpath, parts)
             local season_raw = parts and parts[#parts] or nil
@@ -230,8 +231,9 @@ local custom_rules = {
         season = function(fname, fpath, parts) return parts[#parts] end,
     },
     {
-        -- Naming: [Group] Show S2 [tags]/[Group] Show S2 - 01 [tags].mkv
-        name = "fansub-Sx",
+        -- Naming: [Group] Show S2 [tags]\[Group] Show S2 - 01 [tags].mkv
+        -- Ex: [Foxtrot] Vinland Saga S2 [BD 1080p]\[Foxtrot] Vinland Saga S2 - 01 [BD 1080p].mkv
+        name = "generic-group-release",
         enabled = false,
         match = function(fname) return group_of(fname) ~= nil end,
         series = function(fname)
