@@ -99,9 +99,8 @@ end
 validate_user_opts()
 
 -- ============================ USER RULES ============================
--- Edit here: classification rules, first enabled match wins.
--- Copy a block, set enabled=true, adjust to your naming.
--- Helpers below are shared with the engine; keep them.
+
+-- ----- PART 1: helpers (shared with the engine, do not remove) -----
 local season_suffixes = {
     "%s+%d+%a*%s+[Ss]eason$",  -- " 2nd Season"
     "%s+[Ss]eason%s+%d+%a*$",  -- " Season 2"
@@ -162,6 +161,8 @@ local function group_of(fname)
     return fname:match('^%[.-%]%s*(.-)%s%-%s%d')
 end
 
+-- ----- PART 2: your rules (edit here, first enabled match wins) -----
+-- Copy a block, set enabled=true, adjust to your naming.
 local custom_rules = {
     {
         -- Naming: Show > Show Season > Show Season - XX - Episode
