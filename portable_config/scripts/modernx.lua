@@ -7420,7 +7420,7 @@ local function osc_init()
     ne.tooltipF = texts.screenshot
     ne.visible = (osc_param.playresx >= 900 - outeroffset - (user_opts.loop_button and 0 or 100) - (user_opts.ontop_button and 0 or 100) - (user_opts.info_button and 0 or 100))
     ne.eventresponder["mbtn_left_up"] = function()
-        mp.commandv("script-message-to", "screenshotfolder", "screenshotfolder-shot", user_opts.screenshot_flag) -- >>> EDIT Desuka <<< -- numbered via script, never collides
+        mp.commandv("script-message-to", "custom_screenshot_folder", "custom_screenshot_folder-shot", user_opts.screenshot_flag) -- >>> EDIT Desuka <<< -- numbered via script, never collides
     end
 
     --tog_info

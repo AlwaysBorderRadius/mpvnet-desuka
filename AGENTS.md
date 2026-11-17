@@ -30,8 +30,8 @@ opciones, keybinds) + tooling en `.tools/`.
 ## File ownership (convención de marcadores)
 
 - Propios (comentarios normales, sin bloques `CUSTOM`/`EDIT`): `portable_config/scripts/update_checker.lua`,
-  `quick_subtitle_edit.lua`, `screenshotfolder.lua` (nombre heredado de una de sus dos fuentes,
-  se conserva como identificador funcional).
+  `quick_subtitle_edit.lua`, `custom_screenshot_folder.lua` + `custom_screenshot_folder-rules.lua`
+  (mix de customscreenshot + screenshotfolder, reglas custom en fichero aparte).
 - Base upstream (lo nuestro en bloques `CUSTOM`/`EDIT`): `modernx.lua`
   (https://github.com/zydezu/ModernX @ 739a201), `thumbfast.lua`
   (https://github.com/po5/thumbfast @ 0f711de), `autoload.lua`
@@ -112,5 +112,3 @@ automático. A `main` solo por merge explícito `[vN] merge dev` + tag anotado
 - Antes de cada update AJN (`Ctrl+U` pisa `scripts/`, `shaders/`, managed y
   `onnx/`): copia externa de los V2. Después: `git status` → re-aplicar
   bloques CUSTOM → smoke test → commit.
-- Renombres de ficheros dev los hace el dueño; no renombrar trackeados por
-  iniciativa propia.

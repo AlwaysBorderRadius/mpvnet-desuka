@@ -6,12 +6,14 @@
     - https://github.com/jonniek/mpv-scripts/blob/master/customscreenshot.lua
 
     Rewritten for mpv Desuka: Series/Season extraction from path, naming modes,
-    portable save_location, validated options, forced key binding.
+    portable save_location, validated options, custom rules file, quarantine fallback.
 
     Layouts (save_location = S):
     - naming_mode=series: S/<Series>/<Series> (N).ext
     - naming_mode=season: S/<Series>/<Season>/<Season> (N).ext
+    - unmatched files: S/<quarantine>/<Filename> (N).ext
     - sequential_numbering=no uses mpv %n instead of the literal (N)
+    Custom rules live in custom_screenshot_folder-rules.lua (priority order).
 --]]
 
 local utils = require 'mp.utils'
@@ -29,6 +31,8 @@ local options = {
     jpeg_quality = 95,  -- 0 (worst) to 100 (best)
     sequential_numbering = true,  -- true: keep counting up; false: mpv %n (fills gaps)
     naming_mode = "series",  -- "series" or "season" (separates screenshots by serie or by serie>season)
+    quarantine_name = "_sin-clasificar",  -- folder for unmatched files: S/<quarantine>/<Filename> (N).ext
+    log_matched_rule = true,  -- log which custom rule matched (mpv.log)
 }
 (require "mp.options").read_options(options)
 
@@ -37,35 +41,40 @@ local function validate_user_opts()
         options.screenshot_mode = options.screenshot_mode:lower()
     end
     if options.screenshot_mode ~= "video" and options.screenshot_mode ~= "window" then
-        msg.warn("screenshotfolder: bad screenshot_mode, fallback to 'window'")
+        msg.warn("custom_screenshot_folder: bad screenshot_mode, fallback to 'window'")
         options.screenshot_mode = "window"
     end
     options.file_ext = tostring(options.file_ext or "png"):lower()
     if options.file_ext ~= "png" and options.file_ext ~= "jpg" and options.file_ext ~= "jpeg" then
-        msg.warn("screenshotfolder: bad file_ext, fallback to 'png'")
+        msg.warn("custom_screenshot_folder: bad file_ext, fallback to 'png'")
         options.file_ext = "png"
     end
     options.png_compression = math.floor(tonumber(options.png_compression) or 7)
     if options.png_compression < 0 or options.png_compression > 9 then
-        msg.warn("screenshotfolder: bad png_compression, fallback to 7")
+        msg.warn("custom_screenshot_folder: bad png_compression, fallback to 7")
         options.png_compression = 7
     end
     options.jpeg_quality = math.floor(tonumber(options.jpeg_quality) or 95)
     if options.jpeg_quality < 0 or options.jpeg_quality > 100 then
-        msg.warn("screenshotfolder: bad jpeg_quality, fallback to 95")
+        msg.warn("custom_screenshot_folder: bad jpeg_quality, fallback to 95")
         options.jpeg_quality = 95
     end
     options.naming_mode = tostring(options.naming_mode or "series"):lower()
     if options.naming_mode ~= "series" and options.naming_mode ~= "season" then
-        msg.warn("screenshotfolder: bad naming_mode, fallback to 'series'")
+        msg.warn("custom_screenshot_folder: bad naming_mode, fallback to 'series'")
         options.naming_mode = "series"
     end
+    if type(options.quarantine_name) ~= "string" or options.quarantine_name == ""
+        or options.quarantine_name:find("[/\\]") then
+        msg.warn("custom_screenshot_folder: bad quarantine_name, fallback to '_sin-clasificar'")
+        options.quarantine_name = "_sin-clasificar"
+    end
     if type(options.save_location) ~= "string" or options.save_location == "" then
-        msg.warn("screenshotfolder: bad save_location, fallback to '~~/screenshots/'")
+        msg.warn("custom_screenshot_folder: bad save_location, fallback to '~~/screenshots/'")
         options.save_location = "~~/screenshots/"
     end
     if type(options.screenshot_key) ~= "string" or options.screenshot_key == "" then
-        msg.warn("screenshotfolder: bad screenshot_key, fallback to 's'")
+        msg.warn("custom_screenshot_folder: bad screenshot_key, fallback to 's'")
         options.screenshot_key = "s"
     end
     -- mp.options leaves unknown strings as-is; coerce booleans strictly
@@ -78,13 +87,14 @@ local function validate_user_opts()
         elseif type(v) == "number" then
             return v ~= 0
         end
-        msg.warn("screenshotfolder: bad boolean option, fallback to default")
+        msg.warn("custom_screenshot_folder: bad boolean option, fallback to default")
         return default
     end
     options.short_saved_message = to_bool(options.short_saved_message, true)
     options.include_YouTube_ID = to_bool(options.include_YouTube_ID, true)
     options.hide_subtitles = to_bool(options.hide_subtitles, false)
     options.sequential_numbering = to_bool(options.sequential_numbering, true)
+    options.log_matched_rule = to_bool(options.log_matched_rule, true)
 end
 validate_user_opts()
 
@@ -136,9 +146,12 @@ local state = {
     dir = nil,
     prefix = "default",
     counter = 1,
+    quarantined = false,
+    quarantine_prefix = "default",
 }
 
 local season_suffixes = {
+    -- Mirror of the list in custom_screenshot_folder-rules.lua; keep in sync.
     "%s+%d+%a*%s+[Ss]eason$",  -- " 2nd Season"
     "%s+[Ss]eason%s+%d+%a*$",  -- " Season 2"
     "%s+[Ss]%d+$",             -- " S2"
@@ -171,6 +184,78 @@ end
 local function filename_prefix(fname)
     if not fname then return nil end
     return fname:match('^(.-)%s%-%s%d')
+end
+
+local function split_path_parts(path)
+    local parts = {}
+    if path then
+        local dir = utils.split_path(path)
+        if dir then
+            for part in dir:gmatch('[^\\/]+') do
+                parts[#parts + 1] = part
+            end
+        end
+    end
+    return parts
+end
+
+local custom_rules = {}
+
+local function load_custom_rules()
+    custom_rules = {}
+    local dir = mp.get_script_directory()
+    if dir == nil or dir == "" then return end
+    local rules_path = utils.join_path(dir, "custom_screenshot_folder-rules.lua")
+    local chunk, load_err = loadfile(rules_path)
+    if not chunk then
+        msg.warn("custom_screenshot_folder: no rules file, using builtin (" .. tostring(load_err) .. ")")
+        return
+    end
+    local ok, result = pcall(chunk)
+    if not ok or type(result) ~= "table" then
+        msg.warn("custom_screenshot_folder: bad rules file, using builtin")
+        return
+    end
+    for _, rule in ipairs(result) do
+        if type(rule) == "table" and type(rule.match) == "function" and rule.enabled ~= false then
+            custom_rules[#custom_rules + 1] = rule
+        end
+    end
+    if options.log_matched_rule then
+        msg.info("custom_screenshot_folder: loaded " .. #custom_rules .. " custom rule(s)")
+    end
+end
+load_custom_rules()
+
+local function try_custom_rules(fname, path)
+    if #custom_rules == 0 then return nil, nil, nil end
+    local parts = split_path_parts(path)
+    for _, rule in ipairs(custom_rules) do
+        local ok_match, matched = pcall(rule.match, fname, path, parts)
+        if ok_match and matched then
+            local series_raw, season_raw = nil, nil
+            if type(rule.series) == "function" then
+                local ok_series, out_series = pcall(rule.series, fname, path, parts)
+                if ok_series and type(out_series) == "string" then series_raw = out_series end
+            end
+            if type(rule.season) == "function" then
+                local ok_season, out_season = pcall(rule.season, fname, path, parts)
+                if ok_season and (out_season == nil or type(out_season) == "string") then season_raw = out_season end
+            end
+            local series = sanitize_filename(series_raw)
+            local season = sanitize_filename(season_raw)
+            if season == "" then season = nil end
+            if series ~= "" then
+                if options.log_matched_rule then
+                    msg.info("custom_screenshot_folder: rule '" .. tostring(rule.name) .. "' matched")
+                end
+                return series, season, rule.name
+            end
+            msg.warn("custom_screenshot_folder: rule '" .. tostring(rule.name) .. "' matched but returned empty series")
+            return nil, nil, rule.name
+        end
+    end
+    return nil, nil, nil
 end
 
 local function extract_names(path, fname)
@@ -276,6 +361,9 @@ end
 
 local function current_target()
     local save = expand_save_location()
+    if state.quarantined then
+        return utils.join_path(save, state.series), state.quarantine_prefix
+    end
     if options.naming_mode == "season" and state.season and state.season ~= "" then
         return utils.join_path(utils.join_path(save, state.series), state.season), state.season
     end
@@ -320,12 +408,34 @@ local function init()
         state.series = sanitize_filename(base)
         if state.series == "" then state.series = "default" end
         state.season = nil
+        state.quarantined = false
     else
-        local series, season = extract_names(path, fname)
-        if not series or series == "" then series = "default" end
-        if season == "" then season = nil end
-        state.series = series
-        state.season = season
+        local rule_series, rule_season = try_custom_rules(fname, path)
+        if rule_series and rule_series ~= "" then
+            state.series = rule_series
+            state.season = rule_season
+            state.quarantined = false
+        else
+            local series, season = extract_names(path, fname)
+            if not series or series == "" then series = "default" end
+            if season == "" then season = nil end
+            -- Builtin filename-only fallback means no confident match: quarantine
+            if season == nil and series == sanitize_filename(fname) and fname ~= "" then
+                state.series = sanitize_filename(options.quarantine_name)
+                if state.series == "" then state.series = "_sin-clasificar" end
+                state.season = nil
+                state.quarantined = true
+                state.quarantine_prefix = sanitize_filename(fname)
+                if state.quarantine_prefix == "" then state.quarantine_prefix = "default" end
+                if options.log_matched_rule then
+                    msg.info("custom_screenshot_folder: no rule matched, quarantine")
+                end
+            else
+                state.series = series
+                state.season = season
+                state.quarantined = false
+            end
+        end
     end
 
     refresh_template()
@@ -342,7 +452,7 @@ local function screenshot_done(oneshot_mode) -- one-shot mode from the message
         if base == "video" or base == "window" or base == "subtitles" then
             mode = base
         else
-            msg.warn("screenshotfolder: bad shot mode '" .. tostring(oneshot_mode) .. "', using option")
+            msg.warn("custom_screenshot_folder: bad shot mode '" .. tostring(oneshot_mode) .. "', using option")
         end
     end
 
@@ -401,7 +511,7 @@ end
 
 mp.register_event("file-loaded", init)
 mp.register_event("end-file", reset_on_unload)
--- All screenshot keys go through input.conf via screenshotfolder-shot,
--- so numbering never collides (see script-opts/screenshotfolder.conf).
--- mp.add_forced_key_binding(options.screenshot_key, "screenshotfolder-shot", screenshot_done)
-mp.register_script_message("screenshotfolder-shot", screenshot_done)
+-- All screenshot keys go through input.conf via custom_screenshot_folder-shot,
+-- so numbering never collides (see script-opts/custom_screenshot_folder.conf).
+-- mp.add_forced_key_binding(options.screenshot_key, "custom_screenshot_folder-shot", screenshot_done)
+mp.register_script_message("custom_screenshot_folder-shot", screenshot_done)
