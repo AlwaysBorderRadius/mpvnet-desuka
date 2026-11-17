@@ -98,58 +98,10 @@ local function validate_user_opts()
 end
 validate_user_opts()
 
--- bilingual toasts
--- UI language comes from modernx.conf (single source), like update_checker.
-local function read_modernx_language()
-    local path = mp.find_config_file("script-opts/modernx.conf")
-    if path == nil then
-        local dir = mp.get_script_directory()
-        if dir == nil or dir == "" then return "en" end
-        path = dir .. "/../script-opts/modernx.conf"
-    end
-    local f = io.open(path, "r")
-    if f == nil then return "en" end
-    local content = f:read("*a")
-    f:close()
-    if content == nil then return "en" end
-    local lang = "en"
-    for line in content:gmatch("[^\r\n]+") do
-        local v = line:match("^%s*language%s*=%s*(%S+)")
-        if v ~= nil then lang = v:gsub('^"(.*)"$', "%1"):gsub("^'(.-)'$", "%1") end
-    end
-    if lang ~= "en" and lang ~= "es" then lang = "en" end
-    return lang
-end
-local mo = { language = read_modernx_language() }
-
-local STRINGS = {
-    en = {
-        saved = "Screenshot saved",
-        saved_to = "Screenshot saved to: %s",
-    },
-    es = {
-        saved = "Captura guardada",
-        saved_to = "Captura guardada en: %s",
-    },
-}
-
-local function t(key, a)
-    local lang_table = STRINGS[mo.language] or STRINGS["en"]
-    local fmt = lang_table[key] or STRINGS["en"][key] or ""
-    if a == nil then return fmt end
-    return string.format(fmt, a)
-end
-
-local state = {
-    series = "default",
-    season = nil,
-    dir = nil,
-    prefix = "default",
-    counter = 1,
-    quarantined = false,
-    quarantine_prefix = "default",
-}
-
+-- ============================ USER RULES ============================
+-- Edit here: classification rules, first enabled match wins.
+-- Copy a block, set enabled=true, adjust to your naming.
+-- Helpers below are shared with the engine; keep them.
 local season_suffixes = {
     "%s+%d+%a*%s+[Ss]eason$",  -- " 2nd Season"
     "%s+[Ss]eason%s+%d+%a*$",  -- " Season 2"
@@ -198,9 +150,6 @@ local function split_path_parts(path)
     return parts
 end
 
--- User-editable classification rules, first enabled match wins.
--- Copy a block, set enabled=true, adjust to your naming.
--- Shared helpers: strip_season_suffix, sanitize_filename, filename_prefix.
 local function clean_folder(name)
     if not name then return "" end
     local s = name:gsub('^%[.-%]%s*', '')
@@ -281,6 +230,59 @@ local custom_rules = {
             return show .. " S" .. sno
         end,
     },
+}
+-- ========================== END USER RULES ==========================
+
+-- bilingual toasts
+-- UI language comes from modernx.conf (single source), like update_checker.
+local function read_modernx_language()
+    local path = mp.find_config_file("script-opts/modernx.conf")
+    if path == nil then
+        local dir = mp.get_script_directory()
+        if dir == nil or dir == "" then return "en" end
+        path = dir .. "/../script-opts/modernx.conf"
+    end
+    local f = io.open(path, "r")
+    if f == nil then return "en" end
+    local content = f:read("*a")
+    f:close()
+    if content == nil then return "en" end
+    local lang = "en"
+    for line in content:gmatch("[^\r\n]+") do
+        local v = line:match("^%s*language%s*=%s*(%S+)")
+        if v ~= nil then lang = v:gsub('^"(.*)"$', "%1"):gsub("^'(.-)'$", "%1") end
+    end
+    if lang ~= "en" and lang ~= "es" then lang = "en" end
+    return lang
+end
+local mo = { language = read_modernx_language() }
+
+local STRINGS = {
+    en = {
+        saved = "Screenshot saved",
+        saved_to = "Screenshot saved to: %s",
+    },
+    es = {
+        saved = "Captura guardada",
+        saved_to = "Captura guardada en: %s",
+    },
+}
+
+local function t(key, a)
+    local lang_table = STRINGS[mo.language] or STRINGS["en"]
+    local fmt = lang_table[key] or STRINGS["en"][key] or ""
+    if a == nil then return fmt end
+    return string.format(fmt, a)
+end
+
+local state = {
+    series = "default",
+    season = nil,
+    dir = nil,
+    prefix = "default",
+    counter = 1,
+    quarantined = false,
+    quarantine_prefix = "default",
 }
 
 local function try_custom_rules(fname, path)
