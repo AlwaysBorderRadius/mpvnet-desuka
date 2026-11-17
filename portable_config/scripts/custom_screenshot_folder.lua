@@ -162,7 +162,7 @@ local function group_of(fname)
 end
 
 -- ----- PART 2: your rules (edit here, first enabled match wins) -----
--- Copy a block, set enabled=true, adjust to your naming.
+-- Ask your AI to writte a block for your use case.
 local custom_rules = {
     {
         -- Naming: Show > Show Season > Show Season - XX - Episode
@@ -207,28 +207,33 @@ local custom_rules = {
         end,
     },
     {
-        -- Naming: Show S01E02
-        name = "sxxexx",
+        -- Naming: [Group] Show Sx [tags]/[Group] Show Sx - SxxExx [tags].mkv
+        -- Ex: [Foxtrot] Vinland Saga S2 [BD 1080p]/[Foxtrot] Vinland Saga S2 - S02E05 [BD 1080p].mkv
+        name = "generic-group-release-sxxexx",
         enabled = false,
         match = function(fname)
             if not fname then return false end
-            local nogroup = fname:gsub('^%[.-%]%s*', '')
-            local show = nogroup:match('^(.-)%s+[Ss]%d+[Ee]%d+')
+            local show = fname:match('^%[.-%]%s*(.-)%s%-%s[Ss]%d+[Ee]%d+')
             return show ~= nil and show ~= ""
         end,
         series = function(fname)
-            local nogroup = fname:gsub('^%[.-%]%s*', '')
-            local show = nogroup:match('^(.-)%s+[Ss](%d+)[Ee]%d+')
-            if not show or show == "" then return nil end
-            local bare = strip_season_suffix(show)
-            if bare == "" then bare = show end
+            local grouped = fname:match('^%[.-%]%s*(.-)%s%-%s[Ss]%d+[Ee]%d+')
+            if not grouped or grouped == "" then return nil end
+            local bare = strip_season_suffix(grouped)
+            if bare == "" then bare = grouped end
             return bare
         end,
-        season = function(fname)
-            local nogroup = fname:gsub('^%[.-%]%s*', '')
-            local show, sno = nogroup:match('^(.-)%s+[Ss](%d+)[Ee]%d+')
-            if not show or not sno then return nil end
-            return show .. " S" .. sno
+        season = function(fname, fpath, parts)
+            local grouped, sno = fname:match('^%[.-%]%s*(.-)%s%-%s[Ss](%d+)[Ee]%d+')
+            if not grouped or grouped == "" or not sno then return nil end
+            local bare = strip_season_suffix(grouped)
+            if bare ~= "" and bare ~= grouped then return grouped end
+            local folder_clean = clean_folder(parts and parts[#parts] or nil)
+            if folder_clean ~= "" and folder_clean:find(grouped, 1, true) == 1
+                and strip_season_suffix(folder_clean) ~= folder_clean then
+                return folder_clean
+            end
+            return grouped .. " S" .. sno
         end,
     },
 }
