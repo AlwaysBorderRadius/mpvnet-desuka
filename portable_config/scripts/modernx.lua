@@ -428,6 +428,9 @@ local language = {
         -- <<< CUSTOM Desuka >>>
         -- used by track_header(): "%s tracks:" / "Pista de %s:"
         tracks_header = '%s tracks:',
+        -- >>> CUSTOM Desuka: untitled track fallback <<<
+        untitled_track = '%s track %d',
+        -- <<< CUSTOM Desuka >>>
         playlist = 'Playlist',
         playlistshuffled = 'Shuffled playlist',
         nolist = 'Playlist is empty',
@@ -465,6 +468,7 @@ local language = {
         novideo = 'No hay pistas de video disponibles',
         -- used by track_header(): "%s tracks:" / "Pista de %s:"
         tracks_header = 'Pista de %s:',
+        untitled_track = 'Pista de %s %d',
         playlist = 'Playlist',
         playlistshuffled = 'Playlist mezclada',
         nolist = 'Playlist vacía',
@@ -1467,6 +1471,15 @@ local function track_header(ttype)
 end
 -- <<< CUSTOM Desuka >>>
 
+-- >>> CUSTOM Desuka: untitled track fallback <<<
+-- Fallback when a track carries neither lang nor title ("Video track 1").
+function track_fallback_label(ttype, n)
+    local label = valid_types[ttype] or ""
+    if (user_opts.language or "en") == "es" then label = label:lower() end
+    return string.format(texts.untitled_track, label, n)
+end
+-- <<< CUSTOM Desuka >>>
+
 -- updates the OSC internal playlists, should be run each time the track-layout changes
 function update_tracklist()
     local tracktable = mp.get_property_native('track-list', {})
@@ -1548,7 +1561,7 @@ function get_tracklist(ttype)
             else
                 label = title
             end
-            local full = (label ~= "" and label or texts.na)
+            local full = (label ~= "" and label or track_fallback_label(ttype, n))
             message = message .. '\n' .. full
             local row = { full = full }
             if drew_flag then
@@ -3960,7 +3973,7 @@ local function track_menu_build(ttype)
         else
             label = title
         end
-        item.full = (label ~= "" and label or texts.na)
+        item.full = (label ~= "" and label or track_fallback_label(ttype, n))
         if drew_flag then
             item.head = ""
             if lang_label and title ~= "" and label:sub(1, #lang_label) == lang_label then
