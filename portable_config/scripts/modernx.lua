@@ -6670,11 +6670,11 @@ function shader_state()
     return { a4k = a4k, ajn = ajn }
 end
 
--- Display name for an AJN slot: V3 presets, live profile names, Custom N, off = nil.
+-- Display name for an AJN slot: V3.1 presets, live profile names, Custom N, off = nil.
 function ajn_slot_label(slot)
-    if slot == 1001 then return "Quality"
-    elseif slot == 1002 then return "Balanced"
-    elseif slot == 1003 then return "Performance"
+    if slot == 1001 then return "Quality V3.1"
+    elseif slot == 1002 then return "Balanced V3.1"
+    elseif slot == 1003 then return "Performance V3.1"
     elseif slot and slot > 0 then
         local name = ajn_slot_names()[slot]
         if name and name ~= "" then return name end
