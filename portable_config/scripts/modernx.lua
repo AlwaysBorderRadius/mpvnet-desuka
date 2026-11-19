@@ -6795,6 +6795,8 @@ end
 -- Display leaf for AnimeJaNai custom slot rows (both dropdowns share the tree).
 -- First claim wins: duplicate profile names keep their "Custom N" label so no
 -- two rows collapse into one command via the tree's later-wins dedup.
+-- Empty slots (blank/"New Profile": no entry in names) return "": the tree
+-- skips empty leaves, so they stay out of the menu while Ctrl+1..9 still work.
 function ajn_slot_leaf(segs, leaf, names, parent)
     if #segs == 3 and segs[1] == "AnimeJaNai" and segs[2] == "Slots" then
         local n = leaf:match("^Custom (%d+)$")
@@ -6804,6 +6806,7 @@ function ajn_slot_leaf(segs, leaf, names, parent)
                 if parent and parent.index["_leaf:" .. name] then return leaf end
                 return name
             end
+            return ""
         end
     end
     return leaf
